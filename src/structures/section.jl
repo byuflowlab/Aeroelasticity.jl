@@ -1,36 +1,37 @@
 """
     TypicalSection <: StructuralModel
 
-Typical section structural model with state variables `q = [h, θ, hdot, θdot]`,
-parameters `p = [a, b, kh, kθ, m, xθ, Ip]`, and aerodynamic loads `r = [L, M]`
+Typical section structural model with state variables ``q = \\begin{bmatrix} h &
+θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, structural parameters ``p_s =
+\\begin{bmatrix} a & b & k_h & k_\\theta & m & x_\\theta & I_P \\end{bmatrix}^T``,
+and aerodynamic loads ``r = \\begin{bmatrix} L & M_\\frac{1}{4} \\end{bmatrix}^T``
 """
 struct TypicalSection <: StructuralModel end
 
+number_of_states(::TypicalSection) = 4
+number_of_inputs(::TypicalSection) = 2
 isinplace(::TypicalSection) = false
-has_mass_matrix(::TypicalSection) = false
+has_mass_matrix(::TypicalSection) = true
 constant_mass_matrix(::TypicalSection) = false
-linear_load_dependence(::TypicalSection) = true
+linear_input_dependence(::TypicalSection) = true
 defined_state_jacobian(::TypicalSection) = true
-defined_load_jacobian(::TypicalSection) = true
+defined_input_jacobian(::TypicalSection) = true
+constant_input_jacobian(::TypicalSection) = false
 
-init_mass_matrix(::TypicalSection) = zeros(4,4)
-
-function update_mass_matrix!(::TypicalSection, M, q, r, p, t)
+function get_mass_matrix(::TypicalSection, q, r, p, t)
     # extract structural parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # update mass matrix
-    M .= section_mass_matrix(b, m, xθ, Ip)
-    # return result
-    return M
+    return section_mass_matrix(b, m, xθ, Ip)
 end
 
 function get_rates(::TypicalSection, q, r, p, t)
     # extract structural states
     h, θ, hdot, θdot = u
-    # extract structural parameters
-    a, b, kh, kθ, m, xθ, Ip = p
     # extract aerodynamic loads
     L, M = r
+    # extract structural parameters
+    a, b, kh, kθ, m, xθ, Ip = p
     # calculate state rates
     return section_rhs(a, b, kh, kθ, h, θ, hdot, θdot, L, M)
 end
@@ -54,16 +55,24 @@ end
 # --- Internal Functions --- #
 
 # left side of rate equations (used for testing)
-section_lhs(b, m, xθ, Ip, dh, dθ, dhdot, dθdot) = SVector(dh, dθ, m*(dhdot + b*xθ*dθdot), Ip*dθdot + m*b*xθ*dhdot)
+function section_lhs(b, m, xθ, Ip, dh, dθ, dhdot, dθdot)
+    SVector(dh, dθ, m*(dhdot + b*xθ*dθdot), Ip*dθdot + m*b*xθ*dhdot)
+end
 
 # right side of rate equations (used for testing)
-section_rhs(a, b, kh, kθ, h, θ, hdot, θdot, L, M) = SVector(hdot, θdot, -kh*h - L, -kθ*θ + M + (b/2+a*b)*L)
+function section_rhs(a, b, kh, kθ, h, θ, hdot, θdot, L, M)
+    SVector(hdot, θdot, -kh*h - L, -kθ*θ + M + (b/2+a*b)*L)
+end
 
 # state jacobian
-section_state_jacobian(kh, kθ) = @SMatrix [0 0 1 0; 0 0 0 1; -kh 0 0 0; 0 -kθ 0 0]
+function section_state_jacobian(kh, kθ)
+    @SMatrix [0 0 1 0; 0 0 0 1; -kh 0 0 0; 0 -kθ 0 0]
+end
 
 # load jacobian
 section_load_jacobian(a, b) = @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
 
 # rate jacobian (mass matrix)
-section_mass_matrix(b, m, xθ, Ip) = @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
+function section_mass_matrix(b, m, xθ, Ip)
+    @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
+end
