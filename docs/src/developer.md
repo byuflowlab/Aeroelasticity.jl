@@ -272,7 +272,6 @@ function get_mass_matrix(::TypicalSection, q, r, p, t)
     # update mass matrix
     return @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
 end
-nothing #hide
 
 function get_rates(::TypicalSection, q, r, p, t)
     # extract structural states
