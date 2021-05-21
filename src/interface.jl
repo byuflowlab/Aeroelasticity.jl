@@ -243,12 +243,12 @@ function get_mass_matrix(models)
                 # state variable indices
                 iu2 = cumsum(Nu)
                 iu1 = iu2 .- Nu
-                iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models))
+                iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
 
                 # input variable indices
                 iy2 = cumsum(Ny)
                 iy1 = iy2 .- Ny
-                iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models))
+                iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
 
                 # get input mass matrix
                 My = get_input_mass_matrix(models)
@@ -306,17 +306,17 @@ function get_mass_matrix(models, u, y, p, t)
             # state variable indices
             iu2 = cumsum(Nu)
             iu1 = iu2 .- Nu
-            iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models))
+            iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
 
             # input variable indices
             iy2 = cumsum(Ny)
             iy1 = iy2 .- Ny
-            iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models))
+            iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
 
             # parameter indices
             ip2 = cumsum(Np)
             ip1 = ip2 .- Np
-            ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models))
+            ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models)))
 
             # get input mass matrix
             My = get_input_mass_matrix(models, u, p, t)
@@ -545,17 +545,17 @@ function get_rates(models, u, y, p, t)
         # state variable indices
         iu2 = cumsum(Nu)
         iu1 = iu2 .- Nu
-        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models))
+        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
 
         # input variable indices
         iy2 = cumsum(Ny)
         iy1 = iy2 .- Ny
-        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models))
+        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
 
         # parameter indices
         ip2 = cumsum(Np)
         ip1 = ip2 .- Np
-        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models))
+        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models)))
 
         # calculate state rates
         du = SVector{0,Float64}()
@@ -642,17 +642,17 @@ function get_state_jacobian(models, u, y, p, t)
         # state variable indices
         iu2 = cumsum(Nu)
         iu1 = iu2 .- Nu
-        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models))
+        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
 
         # input variable indices
         iy2 = cumsum(Ny)
         iy1 = iy2 .- Ny
-        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models))
+        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
 
         # parameter indices
         ip2 = cumsum(Np)
         ip1 = ip2 .- Np
-        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models))
+        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models)))
 
         # calculate input jacobian
         Jy = get_input_jacobian(models, u, p, t)
@@ -848,7 +848,7 @@ end
 Construct an ODEFunction corresponding to the specified model or models which
 may be solved using DifferentialEquations.
 """
-function ODEFunction(models)
+function ODEFunction(models::NTuple{N,T}) where {N, T <: AbstractModel}
 
     # is the combined model in place?
     iip = isinplace(models)
