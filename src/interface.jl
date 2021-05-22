@@ -1323,8 +1323,18 @@ separate_input_mass_matrix(models, J) = separate_input_matrix(models, M)
 
 separate_input_state_jacobian(models, J) = separate_input_matrix(models, M)
 
+"""
+    vector_combine(xsep)
+
+Concatenate the tuple of vectors in `xsep`.
+"""
 vector_combine(xsep) = vcat(xsep...)
 
+"""
+    vector_combine!(x, xsep)
+
+In-place version of [`vector_combine`](@ref)
+"""
 function vector_combine!(x, xsep)
     ix = 0
     for i = 1:length(xsep)
@@ -1334,45 +1344,66 @@ function vector_combine!(x, xsep)
     end
 end
 
+"""
+    matrix_combine(xsep, M, N)
+
+Concatenate the tuple of submatrices in `xsep` to form a new matrix composed of
+the M subcomponent matrix rows and N subcomponent matrix columns.
+"""
 function matrix_combine(xsep, M, N)
-    X = SMatrix{M,0,Float64}()
-    for j = 1:N
-        Xcol = vcat(xsep[SVector(i+1:i+M)])
-        for i = 1:M
-            # get submatrix
-            xsub = xsep[li[i,j]]
-            # get size of submatrix
-            mX, nX = size(xsub)
-            # insert submatrix into full matrix
-            x[iX+1:iX+mX, jX+1:jX+nX] = xsub
-            # increment row counter
-            iX += mX
-        end
-        # increment column counter
-        jX += nX
+
+    # linear index for indexing into `xsep`
+    li = LinearIndices((M,N))
+
+    # first column
+    X = xsep[li[1,1]]
+    for i = 2:M
+        X = vcat(X, xsep[li[i,1]])
     end
+
+    # remaining columns
+    for j = 2:N
+        Xcol = xsep[li[1,j]]
+        for i = 2:M
+            Xcol = vcat(Xcol, xsep[li[i,j]])
+        end
+        X = hcat(X, Xcol)
+    end
+
     return X
 end
 
+"""
+    matrix_combine!(X, xsep, M, N)
+
+In-place version of [`matrix_combine`](@ref)
+"""
 function matrix_combine!(X, xsep, M, N)
+
+    # linear index for indexing into `xsep`
     li = LinearIndices((M,N))
-    jX = 0 # column counter
+
+    # column counter
+    jX = 0
     for j = 1:N
-        iX = 0 # row counter
-        nX = 0 # number of columns for this set of submatrices
+        # current matrix row
+        iX = 0
+        # number of matrix columns in this submatrix column
+        nX = 0
         for i = 1:M
             # get submatrix
             xsub = xsep[li[i,j]]
             # get size of submatrix
             mX, nX = size(xsub)
             # insert submatrix into full matrix
-            x[iX+1:iX+mX, jX+1:jX+nX] = xsub
-            # increment row counter
+            X[iX+1:iX+mX, jX+1:jX+nX] = xsub
+            # increment current matrix row
             iX += mX
         end
-        # increment column counter
+        # increment column matrix column
         jX += nX
     end
+
     return X
 end
 
@@ -1382,20 +1413,31 @@ end
 Return the mass matrix corresponding to the specified combination of models as
 a DiffEqArrayOperator.
 """
-mass_matrix_operator(models)
+function mass_matrix_operator(models)
 
-function mass_matrix_operator(models::Tuple{AerodynamicModel, StructuralModel})
-    return mass_matrix_operator(models[1], models[2])
+    # problem dimensions
+    Nu = number_of_states(models)
+    Ny = number_of_inputs(models)
+
+    # initialize mass matrices
+    M = zeros(Nu, Nu)
+    My = zeros(Ny, Nu)
+
+    function update_func(M, u, p, t)
+        # update type of `My`
+        My = convert(typeof(M), My)
+        # calculate inputs
+
+         -> get_mass_matrix!(models, M, u, y, p, t; My = convert(typeof(M), My))
+    end
+
+    return DiffEqArrayOperator(M; update_func)
 end
 
-function mass_matrix_operator(models::Tuple{StructuralModel, AerodynamicModel})
-    return mass_matrix_operator(models[2], models[1])
-end
-
-function mass_matrix_operator(aero::AerodynamicModel, stru::StructuralModel)
+function mass_matrix_operator(models)
 
     # initialize mass matrix
-    M = init_mass_matrix(models)
+    M = zeros(number_of_states(models),
 
     # construct update function
     if linear_load_dependence(stru)
@@ -1410,45 +1452,42 @@ function mass_matrix_operator(aero::AerodynamicModel, stru::StructuralModel)
 end
 
 """
-    jacobian_function!(models)
+    rate_function(models; input_cache = zeros(number_of_inputs(models)))
+
+Return a function that calculates the (mass matrix multiplied) state rates for
+the specified combination of models.
+"""
+function rate_function(models; input_cache = zeros(number_of_inputs(models)))
+
+    # update inputs
+    if isinplace(models)
+
+
+
+    if isinplace(models)
+        f = (du, u, p, t) -> get_rates!(models, du, u, p, t)
+    else
+        f = (u, p, t) -> get_rates(models, u, p, t)
+    end
+
+    return f
+end
+
+"""
+    jacobian_function(models)
 
 Return a function that calculates the jacobian for the specified combination of
 models.
 """
-jacobian_function(models)
+function jacobian_function(models)
 
-function jacobian_function(models::Tuple{AerodynamicModel, StructuralModel})
-    return jacobian_function(models[1], models[2])
-end
-
-function jacobian_function(models::Tuple{StructuralModel, AerodynamicModel})
-    return jacobian_function(models[2], models[1])
-end
-
-
-function jacobian_function(aero, stru)
     if isinplace(models)
         jac = (J, u, p, t) -> get_state_jacobian!(models, J, u, p, t)
     else
         jac = (u, p, t) -> get_state_jacobian(models, u, p, t)
     end
-end
 
-function mass_matrix_operator(aero::AerodynamicModel, stru::StructuralModel)
-
-    # initialize mass matrix
-    M = init_mass_matrix(models)
-
-    # construct update function
-    if linear_load_dependence(stru)
-        Mas, Maa = init_load_mass_matrices(models)
-        update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t,
-            convert(typeof(M), Mas), convert(typeof(M), Maa))
-    else
-        update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t)
-    end
-
-    return DiffEqArrayOperator(M; update_func)
+    return jac
 end
 
 """
@@ -1459,30 +1498,157 @@ may be solved using DifferentialEquations.
 """
 function ODEFunction(models::NTuple{N,T}) where {N, T <: AbstractModel}
 
-    # is the combined model in place?
+    # problem dimensions
+    Nu = number_of_states(models)
+    Ny = number_of_inputs(models)
+    Np = number_of_parameters(models)
+
+    # determine whether the problems
     iip = isinplace(models)
 
-    # construct in-place or out-of-place ODE
-    if iip
-        f = (du, u, p, t) -> get_rates!(models, du, u, p, t)
+    # create cache variables
+    ucache = fill(NaN, Nu)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+
+    # construct in-place or out-of-place rate function
+    if isinplace(models)
+        f = (du, u, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if eltype(du) <: Float64
+                # update the cache variables
+                if (u != ucache) && (p != pcache) && (t != tcache[])
+                    # calculate and store new model inputs
+                    get_inputs!(models, ycache, u, p, t;
+                        uperm = ucache, pperm = pcache)
+                    # store current input arguments
+                    ucache .= u
+                    pcache .= p
+                    tcache .= t
+                end
+                # use the cached model inputs
+                y = ycache
+            else
+                # calculate model inputs (out-of-place to accomodate custom type)
+                y = get_inputs(models, u, p, t)
+            end
+            # calculate mass matrix multiplied state rates
+            get_rates!(models, du, u, y, p, t)
+        end
     else
-        f = (u, p, t) -> get_rates(models, u, p, t)
+        f = (du, u, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if eltype(du) <: Float64
+                # update the cache variables
+                if (u != ucache) && (p != pcache) && (t != tcache[])
+                    # calculate and store new model inputs
+                    y = get_inputs(models, u, p, t)
+                    # store current input arguments
+                    ucache .= u
+                    pcache .= p
+                    tcache .= t
+                end
+                # use statically sized version of the cached model inputs
+                y = SVector{Ny,Float64}(ycache)
+            else
+                # calculate model inputs (out-of-place to accomodate custom type)
+                y = get_inputs(models, u, p, t)
+            end
+            # calculate mass matrix multiplied state rates
+            du = get_rates(models, u, y, p, t)
+        end
     end
 
-    # construct mass matrix
-    if identity_mass_matrix(models)
-        mass_matrix = I
-    else
+    # construct mass matrix (or mass matrix operator)
+    if has_mass_matrix(models)
         if constant_mass_matrix(models)
-            mass_matrix = init_mass_matrix(models)
+            mass_matrix = get_mass_matrix(models)
         else
-            mass_matrix = mass_matrix_operator(models)
+            # initialize mass matrix
+            M = zeros(Nu, Nu)
+            # initialize cached input mass matrix
+            My_cache = zeros(Ny, Nu)
+            # construct update function
+            update_func = (M, u, p, t) -> begin
+                # check if we can use the cache variables (no custom types)
+                if eltype(M) <: Float64
+                    # update the cache variables
+                    if (u != ucache) && (p != pcache) && (t != tcache[])
+                        # calculate and store new model inputs
+                        get_inputs!(models, ycache, u, p, t;
+                            uperm = ucache, pperm = pcache)
+                        # store current input arguments
+                        ucache .= u
+                        pcache .= p
+                        tcache .= t
+                    end
+                    # use the cached model inputs
+                    y = ycache
+                else
+                    # calculate model inputs (out-of-place to accomodate custom type)
+                    y = get_inputs(models, u, p, t)
+                end
+                # update type of `My`
+                My = convert(typeof(M), My_cache)
+                # calculate inputs
+                get_mass_matrix!(models, M, u, y, p, t; My = convert(typeof(M), My))
+            end
+            # construct mass matrix operator
+            mass_matrix = DiffEqArrayOperator(M; update_func)
         end
+    else
+        mass_matrix = I
     end
 
     # construct jacobian function
     if defined_jacobian(models)
-        jac = jacobian_function(models)
+        if isinplace(models)
+            jac = (J, u, p, t) -> begin
+                # check if we can use the cache variables (no custom types)
+                if eltype(du) <: Float64
+                    # update the cache variables
+                    if (u != ucache) && (p != pcache) && (t != tcache[])
+                        # calculate and store new model inputs
+                        get_inputs!(models, ycache, u, p, t;
+                            uperm = ucache, pperm = pcache)
+                        # store current input arguments
+                        ucache .= u
+                        pcache .= p
+                        tcache .= t
+                    end
+                    # use the cached model inputs
+                    y = ycache
+                else
+                    # calculate model inputs (out-of-place to accomodate custom type)
+                    y = get_inputs(models, u, p, t)
+                end
+                # calculate jacobian
+                get_state_jacobian!(models, J, u, y, p, t)
+            end
+        else
+            jac = (u, p, t) -> begin
+                # check if we can use the cache variables (no custom types)
+                if eltype(du) <: Float64
+                    # update the cache variables
+                    if (u != ucache) && (p != pcache) && (t != tcache[])
+                        # calculate and store new model inputs
+                        y = get_inputs(models, u, p, t)
+                        # store current input arguments
+                        ucache .= u
+                        pcache .= p
+                        tcache .= t
+                    end
+                    # use statically sized version of the cached model inputs
+                    y = SVector{Ny,Float64}(ycache)
+                else
+                    # calculate model inputs (out-of-place to accomodate custom type)
+                    y = get_inputs(models, u, p, t)
+                end
+                # calculate jacobian
+                J = get_state_jacobian(models, u, y, p, t)
+            end
+        end
     else
         jac = nothing # let DifferentialEquations construct the jacobian
     end

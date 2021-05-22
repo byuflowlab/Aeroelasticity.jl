@@ -12,6 +12,8 @@ function get_input_mass_matrix(aero::PetersFiniteState, stru::TypicalSection, u,
     # create zero row vector with length nλ
     zλ = zero(aero.c')
     # construct submatrices
+    Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 -1]
+    Mda = @SMatrix vcat(zλ, zλ, zλ, zλ)
     Mrs = hcat(
         @SVector zeros(2),
         @SVector zeros(2),
@@ -19,10 +21,8 @@ function get_input_mass_matrix(aero::PetersFiniteState, stru::TypicalSection, u,
         peters_loads_θddot(a, b, ρ)
         )
     Mra = peters_loads_λdot(zλ)
-    Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 -1]
-    Mda = @SMatrix vcat(zλ, zλ, zλ, zλ)
     # assemble mass matrix
-    return vcat(hcat(Mrs, Mra), hcat(Mds, Mda))
+    return vcat(hcat(Mds, Mda), hcat(Mrs, Mra))
 end
 
 function get_inputs(aero::PetersFiniteState{N,TF}, stru::TypicalSection,
@@ -42,7 +42,7 @@ function get_inputs(aero::PetersFiniteState{N,TF}, stru::TypicalSection,
     # calculate aerodynamic loads
     L, M = peters_loads(a, b, U, ρ, bbar, θ, hdot, θdot, λ)
     # return portion of inputs that is not dependent on the state rates
-    return SVector(L, M, θdot, 0, 0)
+    return SVector(θdot, 0, 0, L, M)
 end
 
 function get_input_state_jacobian(aero::PetersFiniteState, stru::TypicalSection,
@@ -54,6 +54,8 @@ function get_input_state_jacobian(aero::PetersFiniteState, stru::TypicalSection,
     # create zero row vector with length nλ
     zλ = zero(aero.bbar')
     # compute jacobian sub-matrices
+    Jds = @SMatrix [0 0 0 1; 0 0 0 0; 0 0 0 0]
+    Jda = vcat(zλ, zλ, zλ)
     Jrs = hcat(
         peters_loads_h(b, U, ρ),
         peters_loads_θ(b, U, ρ),
@@ -61,10 +63,8 @@ function get_input_state_jacobian(aero::PetersFiniteState, stru::TypicalSection,
         peters_loads_θdot(a, b, U, ρ)
         )
     Jra = peters_loads_λ(b, ρ, bbar)
-    Jds = @SMatrix [0 0 0 1; 0 0 0 0; 0 0 0 0]
-    Jda = vcat(zλ, zλ, zλ)
     # return jacobian
-    return vcat(hcat(Jrs, Jra), hcat(Jds, Jda))
+    return vcat(hcat(Jds, Jda), hcat(Jrs, Jra))
 end
 
 # TODO: Parameter jacobian
