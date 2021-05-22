@@ -374,10 +374,9 @@ We start creating our aerodynamic model by defining a new type.
 """
     PetersFiniteState{N, TF} <: AerodynamicModel
 
-Peter's finite state model with `N` aerodynamic states, aerodynamic parameters
-``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``, and structural
-deflections ``d = \\begin{bmatrix} \\dot{\\theta} & \\ddot{h} &
-\\ddot{\\theta}\\end{bmatrix}^T``
+Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
+\\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
+``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
 """
 struct PetersFiniteState{N, TF} <: StructuralModel
     A::SMatrix{N,N,TF}
@@ -393,23 +392,26 @@ Here `N` is the number of aerodynamic state variables and `TF` is the floating p
 For convenience, we create a constructor which initializes matrix ``\bar{A}`` and vectors ``\bar{b}`` and ``\bar{c}`` given the number of aerodynamic state variables and floating point type.
 
 ```@example developer
+
 """
-    PetersFiniteState{N,TF}()
+    PetersFiniteState{N,TF=Float64}()
 
 Initialize an object of type `PetersFiniteState` which has `N` aerodynamic
 degrees of freedom.
 """
+PetersFiniteState{N}() where N = PetersFiniteState{N,Float64}()
+
 function PetersFiniteState{N,TF}() where {N,TF}
 
     b = zeros(TF, N)
     for i = 1:N
-        b[i] = (-1)^(n-1)*factorial(N + n)/factorial(N - n)*
-            1/factorial(n)^2
+        b[i] = (-1)^(i-1)*factorial(big(N + i))/factorial(big(N - i))*
+            1/factorial(big(i))^2
     end
     b[N] += (-1)^N
 
     c = zeros(TF, N)
-    c .= 2/n
+    c .= 2/N
 
     d = zeros(TF, N)
     d[1] = 1/2
@@ -424,9 +426,9 @@ function PetersFiniteState{N,TF}() where {N,TF}
         D[m, n] = -n/2
     end
 
-    A = D + d*b' + c*d' + 1//2*c*b'
+    A = D + d*b' + c*d' + 1/2*c*b'
 
-    return PetersFiniteState{N,TF}(A,b,c)
+    return PetersFiniteState{N, TF}(A, b, c)
 end
 
 nothing #hide
@@ -553,10 +555,10 @@ Note that this function is only used if `defined_state_jacobian(model) == true`.
 
 ### Structural Deflection Jacobian
 
-The jacobian of the right hand side of the governing aerodynamic equations with respect to the structural deflections is defined using the [`get_deflection_jacobian`](@ref) function.  If the jacobian of the right hand side of the governing aerodynamic equations with respect to the structural deflections is constant (`constant_input_jacobian(aero)==true`), this function is called without the `λ`, `d`, `p`, and `t` arguments. There is no out-of-place form for this function, however, it may be constructed as a either a linear map (if large) or static array (if small) in order to avoid allocations.
+The jacobian of the right hand side of the governing aerodynamic equations with respect to the structural deflections is defined using the [`get_input_jacobian`](@ref) function.  If the jacobian of the right hand side of the governing aerodynamic equations with respect to the structural deflections is constant (`constant_input_jacobian(aero)==true`), this function is called without the `λ`, `d`, `p`, and `t` arguments. There is no out-of-place form for this function, however, it may be constructed as a either a linear map (if large) or static array (if small) in order to avoid allocations.
 
 ```@example developer
-function get_deflection_jacobian(::PetersFiniteState, λ, d, p, t)
+function get_input_jacobian(::PetersFiniteState, λ, d, p, t)
     # extract parameters
     a, b, U, ρ = p
     # extract model constants
@@ -579,10 +581,9 @@ Putting it all together, a complete representation Peter's finite state aerodyna
 """
     PetersFiniteState{N, TF} <: AerodynamicModel
 
-Peter's finite state model with `N` aerodynamic states, aerodynamic parameters
-``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``, and structural
-deflections ``d = \\begin{bmatrix} \\dot{\\theta} & \\ddot{h} &
-\\ddot{\\theta}\\end{bmatrix}^T``
+Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
+\\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
+``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
 """
 struct PetersFiniteState{N, TF} <: StructuralModel
     A::SMatrix{N,N,TF}
@@ -591,22 +592,24 @@ struct PetersFiniteState{N, TF} <: StructuralModel
 end
 
 """
-    PetersFiniteState{N,TF}()
+    PetersFiniteState{N,TF=Float64}()
 
 Initialize an object of type `PetersFiniteState` which has `N` aerodynamic
 degrees of freedom.
 """
+PetersFiniteState{N}() where N = PetersFiniteState{N,Float64}()
+
 function PetersFiniteState{N,TF}() where {N,TF}
 
     b = zeros(TF, N)
     for i = 1:N
-        b[i] = (-1)^(n-1)*factorial(N + n)/factorial(N - n)*
-            1/factorial(n)^2
+        b[i] = (-1)^(i-1)*factorial(big(N + i))/factorial(big(N - i))*
+            1/factorial(big(i))^2
     end
     b[N] += (-1)^N
 
     c = zeros(TF, N)
-    c .= 2/n
+    c .= 2/N
 
     d = zeros(TF, N)
     d[1] = 1/2
@@ -621,9 +624,9 @@ function PetersFiniteState{N,TF}() where {N,TF}
         D[m, n] = -n/2
     end
 
-    A = D + d*b' + c*d' + 1//2*c*b'
+    A = D + d*b' + c*d' + 1/2*c*b'
 
-    return PetersFiniteState{N,TF}(A,b,c)
+    return PetersFiniteState{N, TF}(A, b, c)
 end
 
 number_of_states(::PetersFiniteState{N,TF}) where {N,TF} = N
@@ -656,7 +659,7 @@ function get_state_jacobian(model::PetersFiniteState, λ, d, p, t)
     return -U/b*Diagonal(one.(model.c))
 end
 
-function get_deflection_jacobian(::PetersFiniteState, λ, d, p, t)
+function get_input_jacobian(::PetersFiniteState, λ, d, p, t)
     # extract parameters
     a, b, U, ρ = p
     # extract model constants
