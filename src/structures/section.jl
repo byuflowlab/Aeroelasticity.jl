@@ -10,6 +10,7 @@ struct TypicalSection <: StructuralModel end
 
 number_of_states(::TypicalSection) = 4
 number_of_inputs(::TypicalSection) = 2
+number_of_parameters(::TypicalSection) = 7
 isinplace(::TypicalSection) = false
 has_mass_matrix(::TypicalSection) = true
 constant_mass_matrix(::TypicalSection) = false
@@ -43,7 +44,7 @@ function get_state_jacobian(::TypicalSection, q, r, p, t)
     return section_state_jacobian(kh, kθ)
 end
 
-function get_load_jacobian(::TypicalSection, q, r, p, t)
+function get_input_jacobian(::TypicalSection, q, r, p, t)
     # extract parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # return jacobian

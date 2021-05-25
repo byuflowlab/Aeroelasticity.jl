@@ -40,12 +40,8 @@ function number_of_states(model::AbstractModel)
         "model type $(typeof(model))")
 end
 
-function number_of_states(models)
-    N = 0
-    for model in models
-        N += number_of_states(model)
-    end
-    return N
+function number_of_states(models::NTuple{N,AbstractModel}) where N
+    sum(number_of_states.(models))
 end
 
 """
@@ -62,12 +58,26 @@ function number_of_inputs(model::AbstractModel)
         "model type $(typeof(model))")
 end
 
-function number_of_inputs(models)
-    N = 0
-    for model in models
-        N += number_of_inputs(model)
-    end
-    return N
+function number_of_inputs(models::NTuple{N,AbstractModel}) where N
+    sum(number_of_inputs.(models))
+end
+
+"""
+    number_of_parameters(models)
+
+Return the total number of parameters corresponding to the model or models.
+
+This property should be inferrable from the model types for in-place models.
+"""
+number_of_parameters
+
+function number_of_parameters(model::AbstractModel)
+    error("Required method definition for `number_of_parameters` not defined for "*
+        "model type $(typeof(model))")
+end
+
+function number_of_parameters(models::NTuple{N,AbstractModel}) where N
+    sum(number_of_parameters.(models))
 end
 
 """
@@ -85,12 +95,8 @@ function isinplace(model::AbstractModel)
         "model type $(typeof(model))")
 end
 
-function isinplace(models)
-    inplace = inplace_input(models)
-    for model in models
-        inplace = inplace || isinplace(model)
-    end
-    return inplace
+function isinplace(models::Tuple)
+    inplace_inputs(models) || any(isinplace.(models))
 end
 
 """
@@ -109,11 +115,7 @@ function has_mass_matrix(model::AbstractModel)
 end
 
 function has_mass_matrix(models)
-    result = has_input_mass_matrix(models)
-    for model in models
-        result = result || has_mass_matrix(model)
-    end
-    return result
+    has_input_mass_matrix(models) || any(has_mass_matrix.(models))
 end
 
 """
@@ -136,12 +138,9 @@ function constant_mass_matrix(model::AbstractModel)
 end
 
 function constant_mass_matrix(models)
-    result = constant_input_mass_matrix(models)
-    for model in models
-        result = result && constant_input_jacobian(model)
-        result = result && constant_mass_matrix(model)
-    end
-    return result
+    return constant_input_mass_matrix(models) &&
+        all(constant_input_jacobian.(models)) &&
+        all(constant_mass_matrix.(models))
 end
 
 """
@@ -155,11 +154,7 @@ linear_input_dependence
 linear_input_dependence(model::AbstractModel) = false
 
 function linear_input_dependence(models)
-    result = true
-    for model in models
-        result = result && linear_input_dependence(model)
-    end
-    return result
+    return all(linear_input_dependence.(models))
 end
 
 """
@@ -173,12 +168,9 @@ defined_state_jacobian
 defined_state_jacobian(model::AbstractModel) = false
 
 function defined_state_jacobian(models)
-    result = defined_input_state_jacobian(models)
-    for model in models
-        result = result && defined_state_jacobian(model)
-        result = result && defined_input_jacobian(model)
-    end
-    return result
+    return defined_input_state_jacobian(models) &&
+        all(defined_state_jacobian.(models)) &&
+        all(defined_input_jacobian.(models))
 end
 
 """
@@ -207,8 +199,8 @@ get_mass_matrix
 
 function get_mass_matrix(model::AbstractModel)
     if isinplace(model)
-        N = number_of_states(model)
-        M = zeros(N,N)
+        Nu = number_of_states(model)
+        M = zeros(Nu,Nu)
         get_mass_matrix!(model, M)
     else
         if has_mass_matrix(model)
@@ -220,18 +212,39 @@ function get_mass_matrix(model::AbstractModel)
                     "calling `get_mass_matrix` for model type $(typeof(model))")
             end
         else
-            N = number_of_states(model) # should be inferrable
-            M = SMatrix{N,N}(I)
+            Nu = number_of_states(model)
+            M = SMatrix{Nu,Nu}(I)
         end
     end
     return M
 end
 
-function get_mass_matrix(models)
+function get_mass_matrix(model::AbstractModel, u, y, p, t)
+    if isinplace(model)
+        Nu = number_of_states(model)
+        M = similar(u, Nu, Nu)
+        get_mass_matrix!(model, M, u, y, p, t)
+    else
+        if has_mass_matrix(model)
+            if constant_mass_matrix(model)
+                M = get_mass_matrix(model)
+            else
+                error("Required function `get_mass_matrix(model)` not defined "*
+                    "for model type $(typeof(model))")
+            end
+        else
+            Nu = number_of_states(model)
+            M = SMatrix{Nu,Nu}(I)
+        end
+    end
+    return M
+end
+
+function get_mass_matrix(models::NTuple{N,AbstractModel}) where N
 
     if isinplace(models)
-        N = number_of_states(models)
-        M = zeros(N, N)
+        Nu = number_of_states(models)
+        M = zeros(Nu, Nu)
         get_mass_matrix!(models, M)
     else
         if has_mass_matrix(models)
@@ -242,23 +255,24 @@ function get_mass_matrix(models)
 
                 # state variable indices
                 iu2 = cumsum(Nu)
-                iu1 = iu2 .- Nu
-                iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
+                iu1 = iu2 .- Nu .+ 1
+                iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), length(models))
 
                 # input variable indices
                 iy2 = cumsum(Ny)
-                iy1 = iy2 .- Ny
-                iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
+                iy1 = iy2 .- Ny .+ 1
+                iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), length(models))
 
                 # get input mass matrix
                 My = get_input_mass_matrix(models)
 
                 # calculate mass matrix
-                N = number_of_states(models)
-                M = SMatrix{0,N,Float64}()
+                Nutot = number_of_states(models)
+                M = SMatrix{0,Nutot,Float64}()
                 for i = 1:length(models)
                     D = get_input_jacobian(models[i])
-                    Mi = SMatrix{Nu[i],0,Float64}()
+                    Nui = number_of_states(models[i])
+                    Mi = SMatrix{Nui,0,Float64}()
                     for j = 1:length(models)
                         Myij = My[iy[i], iu[j]]
                         if i == j
@@ -270,7 +284,7 @@ function get_mass_matrix(models)
                             if linear_input_dependence(models[i])
                                 Mij = D*Myij
                             else
-                                Mij = SMatrix{Nu[i],Nu[j]}(ntuple(i->0, Nu*Nj))
+                                Mij = zero(D*Myij)
                             end
                         end
                         Mi = hcat(Mi, Mij)
@@ -282,74 +296,56 @@ function get_mass_matrix(models)
                     "calling `get_mass_matrix` for model types $(typeof.(models)) ")
             end
         else
-            N = number_of_states(models) # this should be inferrable
-            M = SMatrix{N,N}(I)
+            Nu = number_of_states(models) # this should be inferrable
+            M = SMatrix{Nu,Nu}(I)
         end
     end
 
     return M
 end
 
-function get_mass_matrix(models, u, y, p, t)
+function get_mass_matrix(models::NTuple{N,AbstractModel}, u, y, p, t) where N
 
     if isinplace(models)
-        N = number_of_states(models)
-        M = zeros(N, N)
+        Nu = number_of_states(models)
+        M = zeros(Nu, Nu)
         get_mass_matrix!(models, M, u, y, p, t)
     else
         if has_mass_matrix(models)
+
             # get dimensions (these should be inferrable)
             Nu = number_of_states.(models)
             Ny = number_of_inputs.(models)
             Np = number_of_parameters.(models)
 
-            # state variable indices
+            # extract state variables for each model
             iu2 = cumsum(Nu)
-            iu1 = iu2 .- Nu
-            iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
+            iu1 = iu2 .- Nu .+ 1
+            iu = UnitRange.(iu1, iu2)
+            us = getindex.(Ref(u), iu)
 
-            # input variable indices
+            # extract inputs for each model
             iy2 = cumsum(Ny)
-            iy1 = iy2 .- Ny
-            iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
+            iy1 = iy2 .- Ny .+ 1
+            iy = UnitRange.(iy1, iy2)
+            ys = getindex.(Ref(y), iy)
 
-            # parameter indices
+            # extract parameters for each model
             ip2 = cumsum(Np)
-            ip1 = ip2 .- Np
-            ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models)))
+            ip1 = ip2 .- Np .+ 1
+            ip = UnitRange.(ip1, ip2)
+            ps = getindex.(Ref(p), ip)
 
-            # get input mass matrix
+            # calculate mass matrix for each model
+            Mii = get_mass_matrix.(models, us, ys, ps, t)
+
+            # check for linear load dependence
+            linear = linear_load_dependence.(models)
+
+            # calculate mass matrix corresponding to the input function
             My = get_input_mass_matrix(models, u, p, t)
 
-            # calculate mass matrix
-            N = number_of_states(models)
-            M = SMatrix{0,N,Float64}()
-            for i = 1:length(models)
-                D = get_input_jacobian(models[i], u[iu[i]], p[ip[i]], t)
-                Mi = SMatrix{Nu[i],0,Float64}()
-                for j = 1:length(models)
-                    Myij = My[iy[i], iu[j]]
-                    if i == j
-                        Mij = get_mass_matrix(models[i], u[iu[i]], y[iy[i]], p[ip[i]], t)
-                        if linear_input_dependence(models[i])
-                            Mij = Mij + D*Myij
-                        end
-                    else
-                        if linear_input_dependence(models[i])
-                            Mij = D*Myij
-                        else
-                            Mij = SMatrix{Nu[i],Nu[j]}(ntuple(i->0, Nu*Nj))
-                        end
-                    end
-                    Mi = hcat(Mi, Mij)
-                end
-                M = vcat(M, Mi)
-            end
-        else
-            N = number_of_states(models) # this should be inferrable
-            M = SMatrix{N,N}(I)
-        end
-    end
+            #TODO: Finish this.
 
     return M
 end
@@ -385,8 +381,30 @@ function get_mass_matrix!(model::AbstractModel, M)
     return M
 end
 
-function get_mass_matrix!(models, M;
-    My = zeros(number_of_inputs(models), number_of_states(models)))
+function get_mass_matrix!(model::AbstractModel, M, u, y, p, t)
+    if isinplace(model)
+        if has_mass_matrix(model)
+            if constant_mass_matrix(model)
+                get_mass_matrix!(model, M)
+            else
+                error("Required function `get_mass_matrix!(model, M)` not defined "*
+                    "for model type $(typeof(model))")
+            end
+        else
+            Nu = number_of_states(model)
+            M .= 0
+            for i = 1:Nu
+                M[i,i] = 1
+            end
+        end
+    else
+        M .= get_mass_matrix(model, u, y, p, t)
+    end
+    return M
+end
+
+function get_mass_matrix!(models::NTuple{N,AbstractModel}, M;
+    My = zeros(number_of_inputs(models), number_of_states(models))) where N
 
     if isinplace(models)
         if has_mass_matrix(models)
@@ -398,12 +416,12 @@ function get_mass_matrix!(models, M;
                 # state variable indices
                 iu2 = cumsum(Nu)
                 iu1 = iu2 .- Nu
-                iu = range.(iu1, iu2)
+                iu = UnitRange.(iu1, iu2)
 
                 # input variable indices
                 iy2 = cumsum(Ny)
                 iy1 = iy2 .- Ny
-                iy = range.(iy1, iy2)
+                iy = UnitRange.(iy1, iy2)
 
                 # get input mass matrix
                 get_input_mass_matrix!(models, My)
@@ -434,9 +452,9 @@ function get_mass_matrix!(models, M;
                     "calling `get_mass_matrix!` for model types $(typeof.(models)) ")
             end
         else
-            N = number_of_states(models)
+            Nu = number_of_states(models)
             M .= 0
-            for i = 1:N
+            for i = 1:Nu
                 M[i,i] = 1
             end
         end
@@ -447,8 +465,8 @@ function get_mass_matrix!(models, M;
     return M
 end
 
-function get_mass_matrix!(models, M, u, y, p, t;
-    My = zeros(number_of_inputs(models), number_of_states(models)))
+function get_mass_matrix!(models::NTuple{N,AbstractModel}, M, u, y, p, t;
+    My = zeros(number_of_inputs(models), number_of_states(models))) where N
 
     if isinplace(models)
         if has_mass_matrix(models)
@@ -459,18 +477,18 @@ function get_mass_matrix!(models, M, u, y, p, t;
 
             # state variable indices
             iu2 = cumsum(Nu)
-            iu1 = iu2 .- Nu
-            iu = range.(iu1, iu2)
+            iu1 = iu2 .- Nu .+ 1
+            iu = UnitRange.(iu1, iu2)
 
             # input variable indices
             iy2 = cumsum(Ny)
-            iy1 = iy2 .- Ny
-            iy = range.(iy1, iy2)
+            iy1 = iy2 .- Ny .+ 1
+            iy = UnitRange.(iy1, iy2)
 
             # parameter indices
             ip2 = cumsum(Np)
-            ip1 = ip2 .- Np
-            ip = range.(ip1, ip2)
+            ip1 = ip2 .- Np .+ 1
+            ip = UnitRange.(ip1, ip2)
 
             # get input mass matrix
             get_input_mass_matrix!(models, My, u, p, t)
@@ -499,9 +517,9 @@ function get_mass_matrix!(models, M, u, y, p, t;
                 end
             end
         else
-            N = number_of_states(models)
+            Nu = number_of_states(models)
             M .= 0
-            for i = 1:N
+            for i = 1:Nu
                 M[i,i] = 1
             end
         end
@@ -531,7 +549,7 @@ function get_rates(model::AbstractModel, u, y, p, t)
     return du
 end
 
-function get_rates(models, u, y, p, t)
+function get_rates(models::NTuple{N,AbstractModel}, u, y, p, t) where N
 
     if isinplace(models)
         du = similar(u)
@@ -544,18 +562,18 @@ function get_rates(models, u, y, p, t)
 
         # state variable indices
         iu2 = cumsum(Nu)
-        iu1 = iu2 .- Nu
-        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
+        iu1 = iu2 .- Nu .+ 1
+        iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), length(models))
 
         # input variable indices
         iy2 = cumsum(Ny)
-        iy1 = iy2 .- Ny
-        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
+        iy1 = iy2 .- Ny .+ 1
+        iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), length(models))
 
         # parameter indices
         ip2 = cumsum(Np)
-        ip1 = ip2 .- Np
-        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models)))
+        ip1 = ip2 .- Np .+ 1
+        ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), length(models))
 
         # calculate state rates
         du = SVector{0,Float64}()
@@ -584,7 +602,7 @@ function get_rates!(model::AbstractModel, du, u, y, p, t)
     return du
 end
 
-function get_rates!(models, du, u, y, p, t)
+function get_rates!(models::NTuple{N,AbstractModel}, du, u, y, p, t) where N
 
     if isinplace(models)
         # get dimensions
@@ -594,18 +612,18 @@ function get_rates!(models, du, u, y, p, t)
 
         # state variable indices
         iu2 = cumsum(Nu)
-        iu1 = iu2 .- Nu
-        iu = range.(iu1, iu2)
+        iu1 = iu2 .- Nu .+ 1
+        iu = UnitRange.(iu1, iu2)
 
         # input variable indices
         iy2 = cumsum(Ny)
-        iy1 = iy2 .- Ny
-        iy = range.(iy1, iy2)
+        iy1 = iy2 .- Ny .+ 1
+        iy = UnitRange.(iy1, iy2)
 
         # parameter indices
         ip2 = cumsum(Np)
-        ip1 = ip2 .- Np
-        ip = range.(ip1, ip2)
+        ip1 = ip2 .- Np .+ 1
+        ip = UnitRange.(ip1, ip2)
 
         for i = 1:length(models)
             vdu = view(du, iu[i])
@@ -628,7 +646,24 @@ Calculate the jacobian with respect to the states for the specified model or mod
 """
 get_state_jacobian
 
-function get_state_jacobian(models, u, y, p, t)
+function get_state_jacobian(model::AbstractModel, u, y, p, t)
+    if isinplace(model)
+        N = number_of_states(model)
+        J = zeros(N,N)
+        get_state_jacobian!(model, J)
+    else
+        if has_state_jacobian(model)
+            error("Required function `get_state_jacobian(model)` not defined "*
+                "for model type $(typeof(model))")
+        else
+            N = number_of_states(model)
+            J = SMatrix{N,N}(I)
+        end
+    end
+    return J
+end
+
+function get_state_jacobian(models::NTuple{N,AbstractModel}, u, y, p, t) where N
 
     if isinplace(models)
         J = similar(u, (length(u), length(u)))
@@ -641,31 +676,32 @@ function get_state_jacobian(models, u, y, p, t)
 
         # state variable indices
         iu2 = cumsum(Nu)
-        iu1 = iu2 .- Nu
-        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i]), length(models)))
+        iu1 = iu2 .- Nu .+ 1
+        iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), length(models))
 
         # input variable indices
         iy2 = cumsum(Ny)
-        iy1 = iy2 .- Ny
-        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i]), length(models)))
+        iy1 = iy2 .- Ny .+ 1
+        iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), length(models))
 
         # parameter indices
         ip2 = cumsum(Np)
-        ip1 = ip2 .- Np
-        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i]), length(models)))
+        ip1 = ip2 .- Np .+ 1
+        ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), length(models))
 
         # calculate input jacobian
-        Jy = get_input_jacobian(models, u, p, t)
+        Jy = get_input_state_jacobian(models, u, p, t)
 
         # calculate jacobian
-        N = number_of_states(models)
-        J = SMatrix{0,N,Float64}()
+        Nutot = number_of_states(models)
+        J = SMatrix{0,Nutot,Float64}()
         for i = 1:length(models)
             ui = u[iu[i]]
             yi = y[iy[i]]
             pi = p[ip[i]]
             D = get_input_jacobian(models[i], ui, yi, pi, t)
-            Ji = SMatrix{Nu[i],0,Float64}()
+            Nui = number_of_states(models[i])
+            Ji = SMatrix{Nui,0,Float64}()
             for j = 1:length(models)
                 Jyij = Jy[iy[i], iu[j]]
                 if i == j
@@ -692,15 +728,15 @@ get_state_jacobian!
 
 function get_state_jacobian!(model::AbstractModel, J, u, y, p, t)
     if isinplace(model)
-        J .= get_state_jacobian!(model, u, y, p, t)
-    else
         error("Required method definition for `get_state_jacobian!` not defined for "*
             "model type $(typeof(model))")
+    else
+        J .= get_state_jacobian!(model, u, y, p, t)
     end
 end
 
-function get_state_jacobian!(models, J, u, y, p, t;
-    Jy = zeros(number_of_inputs(models), number_of_states(models)))
+function get_state_jacobian!(models::NTuple{N,AbstractModel}, J, u, y, p, t;
+    Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
 
     if isinplace(models)
         # get dimensions
@@ -710,18 +746,18 @@ function get_state_jacobian!(models, J, u, y, p, t;
 
         # state variable indices
         iu2 = cumsum(Nu)
-        iu1 = iu2 .- Nu
-        iu = range.(iu1, iu2)
+        iu1 = iu2 .- Nu .+ 1
+        iu = UnitRange.(iu1, iu2)
 
         # input variable indices
         iy2 = cumsum(Ny)
-        iy1 = iy2 .- Ny
-        iy = range.(iy1, iy2)
+        iy1 = iy2 .- Ny .+ 1
+        iy = UnitRange.(iy1, iy2)
 
         # parameter indices
         ip2 = cumsum(Np)
-        ip1 = ip2 .- Np
-        ip = range.(ip1, ip2)
+        ip1 = ip2 .- Np .+ 1
+        ip = UnitRange.(ip1, ip2)
 
         # get input jacobian
         get_input_state_jacobian!(models, Jy, u, p, t)
@@ -755,8 +791,6 @@ end
 
 Calculate the jacobian with respect to the inputs for the specified model or models.
 """
-get_input_jacobian
-
 function get_input_jacobian(model::AbstractModel, J, u, y, p, t)
     if isinplace(model)
         get_input_jacobian!(model, J, u, y, p, t)
@@ -767,71 +801,27 @@ function get_input_jacobian(model::AbstractModel, J, u, y, p, t)
 end
 
 """
-    inplace_input(models)
+    inplace_inputs(models)
 
-Return a flag indicating whether the state rates corresponding to the model or
+Return a flag indicating whether the inputs corresponding to the model or
 combination of models are calculated in-place.
 
 This property should be inferrable from the model types.
 """
-@generated function inplace_input(models::NTuple{N,T}) where {N,T}
-    # begin contructing expression
-    expr = :()
-    # loop through all possible model orderings
-    for perm in permutations(ntuple(i->i, N))
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            perm = SVector($(perm...))
-            reordered_models = models[perm]
-            # check if a method is defined for this permutation
-            if applicable(inplace_input, reordered_models...)
-                # call relevant method
-                return inplace_input(reordered_models...)
-            end
-        end
-    end
-    expr = quote
-        :($expr)
-        error("Required method definition for `inplace_input` not defined for "*
-            "model types $(typeof.(models))")
-    end
-    return expr
+function inplace_inputs(models::NTuple{N,AbstractModel}) where N
+    inplace_inputs(models...)
 end
 
 """
     has_input_mass_matrix(models)
 
 Return a flag indicating whether the input function for the provided combination
-ofmodels has a mass matrix.
+of models has a mass matrix.
 
 This property should be inferrable from the model types.
 """
-@generated function has_input_mass_matrix(models::NTuple{N,T}) where {N,T}
-    # begin contructing expression
-    expr = :()
-    # loop through all possible model orderings
-    for perm in permutations(ntuple(i->i, N))
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            perm = SVector($(perm...))
-            reordered_models = models[perm]
-            # check if a method is defined for this permutation
-            if applicable(has_input_mass_matrix, reordered_models...)
-                # call relevant method
-                return has_input_mass_matrix(reordered_models...)
-            end
-        end
-    end
-    expr = quote
-        :($expr)
-        error("Required method definition for `has_input_mass_matrix` not "*
-            "defined for model types $(typeof.(models))")
-    end
-    return expr
+function has_input_mass_matrix(models::NTuple{N,AbstractModel}) where N
+    has_input_mass_matrix(models...)
 end
 
 """
@@ -842,29 +832,8 @@ the provided combination of models
 
 This property should be inferrable from the model type.
 """
-@generated function constant_input_mass_matrix(models::NTuple{N,T}) where {N,T}
-    # begin contructing expression
-    expr = :()
-    # loop through all possible model orderings
-    for perm in permutations(ntuple(i->i, N))
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            perm = SVector($(perm...))
-            reordered_models = models[perm]
-            # check if a method is defined for this permutation
-            if applicable(constant_input_mass_matrix, reordered_models...)
-                # call relevant method
-                return constant_input_mass_matrix(reordered_models...)
-            end
-        end
-    end
-    expr = quote
-        error("Required method definition for `constant_input_mass_matrix` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+function constant_input_mass_matrix(models::NTuple{N,AbstractModel}) where N
+    constant_input_mass_matrix(models...)
 end
 
 """
@@ -873,191 +842,66 @@ end
 Return a flag indicating whether the jacobian of the input function for the
 provided combination of models is manually defined.
 """
-@generated function defined_input_state_jacobian(models::NTuple{N,T}) where {N,T}
-    # begin contructing expression
-    expr = :()
-    # loop through all possible model orderings
-    for perm in permutations(ntuple(i->i, N))
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            perm = SVector($(perm...))
-            reordered_models = models[perm]
-            # check if a method is defined for this permutation
-            if applicable(defined_input_state_jacobian, reordered_models...)
-                # call relevant method
-                return defined_input_state_jacobian(reordered_models...)
-            end
-        end
-    enddefined_input_state_jacobian
-    expr = quote
-        :($expr)
-        error("Required method definition for `defined_input_state_jacobian` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+function defined_input_state_jacobian(models::NTuple{N,AbstractModel}) where N
+    defined_input_state_jacobian(models...)
 end
 
 """
     get_input_mass_matrix(models)
-    get_input_mass_matrix(models, u, y, p, t)
+    get_input_mass_matrix(models, u, p, t)
 
 Calculate the input function mass matrix for the specified combination of models.
 """
 get_input_mass_matrix
 
-@generated function get_input_mass_matrix(models)
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, length(models)))
-        # get permutation and inverse permutation vectors
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation for a defined method
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models...)
-                # calculate the permuted mass matrix
-                Mperm = get_input_mass_matrix(reordered_models...)
-                # separate the permuted mass matrix into submatrices
-                Msub = separate_input_mass_matrix(reordered_models, Mperm)
-                # reorder the submatrices to construct the mass matrix
-                M = matrix_combine(Msub[$pinv, $pinv], length(models), length(models))
-                # return the result
-                return M
-            end
-        end
+function get_input_mass_matrix(models::NTuple{N,AbstractModel}) where N
+    if inplace_inputs(models)
+        Nu = number_of_states(models)
+        Ny = number_of_inputs(models)
+        My = zeros(Ny, Nu)
+        get_input_mass_matrix!(models..., My)
+    else
+        My = get_input_mass_matrix(models...)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_input_mass_matrix` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+    return My
 end
 
-@generated function get_input_mass_matrix(models, u, p, t)
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # get permutation and inverse permutation vectors
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models..., u, p, t)
-                # apply the permutation to the states
-                us = separate_states(models, u)
-                uperm = vector_combine(us[$p])
-                # apply the permutation to the parameters
-                ps = separate_parameters(models, p)
-                pperm = vector_combine(ps[$p])
-                # calculate the permuted mass matrix
-                Mperm = get_input_mass_matrix(reordered_models..., uperm, pperm, t)
-                # separate the permuted mass matrix into submatrices
-                Msub = separate_input_mass_matrix(reordered_models, Mperm)
-                # reorder the submatrices to construct the mass matrix
-                M = matrix_combine(Msub[$pinv, $pinv], length(models), length(models)
-                # return the result
-                return M
-            end
-        end
+function get_input_mass_matrix(models::NTuple{N,AbstractModel}, u, p, t) where N
+    if inplace_inputs(models)
+        Nu = number_of_states(models)
+        Ny = number_of_inputs(models)
+        My = similar(u, Ny, Nu)
+        get_input_mass_matrix!(models..., My, u, p, t)
+    else
+        My = get_input_mass_matrix(models..., u, p, t)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_input_mass_matrix` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+    return My
 end
 
 """
     get_input_mass_matrix!(models, M)
-    get_input_mass_matrix!(models, M, u, y, p, t)
+    get_input_mass_matrix!(models, M, u, p, t)
 
 In-place version of [`get_input_mass_matrix`](@ref).
 """
 get_input_mass_matrix!
 
-@generated function get_input_mass_matrix!(models, M; Mperm = similar(M))
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # get permutation and inverse permutation vectors
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models...)
-                # calculate the permuted mass matrix
-                get_input_mass_matrix!(reordered_models..., Mperm)
-                # separate the permuted mass matrix into submatrices
-                Msub = separate_input_mass_matrix(reordered_models, Mperm)
-                # reorder the submatrices to construct the mass matrix
-                M = matrix_combine!(M, Msub[$pinv, $pinv], length(models), length(models))
-            end
-        end
+function get_input_mass_matrix!(models::NTuple{N,AbstractModel}, My) where N
+    if inplace_inputs(models)
+        get_input_mass_matrix!(models..., My)
+    else
+        My .= get_input_mass_matrix(models...)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_input_mass_matrix!` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+    return My
 end
 
-@generated function get_input_mass_matrix!(models, M, u, p, t; Mperm = similar(M),
-    uperm = similar(u), pperm = similar(p))
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # permutation and inverse permutation
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models..., u, p, t)
-                # apply the permutation to the states
-                us = separate_states(models, u)
-                vector_combine!(uperm, us[$p])
-                # apply the permutation to the parameters
-                ps = separate_parameters(models, p)
-                vector_combine!(pperm, ps[$p])
-                # calculate the permuted mass matrix
-                get_input_mass_matrix!(reordered_models..., Mperm, uperm, pperm, t)
-                # separate the permuted mass matrix into submatrices
-                Msub = separate_input_mass_matrix(reordered_models, Mperm)
-                # reorder the submatrices to construct the mass matrix
-                matrix_combine!(M, Msub[$pinv, $pinv], length(models), length(models))
-            end
-        end
+function get_input_mass_matrix!(models::NTuple{N,AbstractModel}, My, u, p, t) where N
+    if inplace_inputs(models)
+        get_input_mass_matrix!(models..., My, u, p, t)
+    else
+        My .= get_input_mass_matrix(models..., u, p, t)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_input_mass_matrix!` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+    return My
 end
 
 """
@@ -1065,134 +909,46 @@ end
 
 Calculate the inputs to the specified combination of models.
 """
-@generated function get_inputs(models, u, p, t)
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # permutation and inverse permutation
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models..., u, p, t)
-                # apply the permutation to the states
-                us = separate_states(models, u)
-                uperm = vector_combine(us[$p])
-                # apply the permutation to the parameters
-                ps = separate_parameters(models, p)
-                pperm = vector_combine(ps[$p])
-                # calculate the permuted inputs
-                yperm = get_inputs(reordered_models..., uperm, pperm, t)
-                # separate the permuted inputs
-                ys = separate_inputs(reordered_models, yperm)
-                # reorder the separated inputs
-                y = vector_combine(ys[$pinv])
-                # return the result
-                return y
-            end
-        end
+function get_inputs(models::NTuple{N,AbstractModel}, u, p, t) where N
+    if inplace_inputs(models)
+        Ny = number_of_inputs(models)
+        y = similar(u, Ny)
+        get_inputs!(models..., y, u, p, t)
+    else
+        y = get_inputs(models..., u, p, t)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_inputs` not defined for "*
-            "model types $(typeof.(models))")
-    end
-    return expr
+    return y
 end
 
 """
-    get_inputs!(models, y, u, p, t)
+    get_inputs!(models::NTuple{N,AbstractModel}, y, u, p, t) where N
 
 In-place version of [`get_inputs`](@ref)
 """
-@generated function get_inputs!(models, y, u, p, t; yperm = similar(y),
-    uperm = similar(u), pperm = similar(p))
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # permutation and inverse permutation
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models..., u, p, t)
-                # apply the permutation to the states
-                us = separate_states(models, u)
-                vector_combine!(uperm, us[$p])
-                # apply the permutation to the parameters
-                ps = separate_parameters(models, p)
-                vector_combine!(pperm, ps[$p])
-                # calculate the permuted inputs
-                get_inputs!(reordered_models..., yperm, uperm, pperm, t)
-                # separate the permuted inputs
-                ys = separate_inputs(reordered_models, yperm)
-                # reorder the separated inputs
-                vector_combine!(y, ys[$pinv])
-            end
-        end
+function get_inputs!(models, y, u, p, t)
+    if inplace_inputs
+        get_inputs!(models..., y, u, p, t)
+    else
+        y .= get_inputs(models..., u, p, t)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_inputs!` not defined for "*
-            "model types $(typeof.(models))")
-    end
-    return expr
 end
 
 """
-    get_input_state_jacobian(models, u, p, t)
+    get_input_state_jacobian(models::NTuple{N,AbstractModel}, u, p, t) where N
 
 Calculate the jacobian of the input function with respect to the state variables
 for the specified combination of models.
 """
-@generated function get_input_state_jacobian(models, u, p, t)
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # get permutation and inverse permutation vectors
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models..., u, p, t)
-                # apply the permutation to the states
-                us = separate_states(models, u)
-                uperm = vector_combine(us[$p])
-                # apply the permutation to the parameters
-                ps = separate_parameters(models, p)
-                pperm = vector_combine(ps[$p])
-                # calculate the permuted jacobian
-                Jperm = get_input_state_jacobian(reordered_models..., uperm, pperm, t)
-                # separate the permuted jacobian into submatrices
-                Jsub = separate_input_state_jacobian(reordered_models, Jperm)
-                # reorder the submatrices to construct the jacobian
-                J = matrix_combine(Jsub[$pinv, $pinv], length(models), length(models))
-                # return the result
-                return J
-            end
-        end
+function get_input_state_jacobian(models::NTuple{N,AbstractModel}, u, p, t) where N
+    if inplace_inputs(models)
+        Nu = number_of_states(models)
+        Ny = number_of_inputs(models)
+        Jy = similar(u, Ny, Nu)
+        get_input_state_jacobian!(models..., Jy, u, p, t)
+    else
+        Jy = get_input_mass_matrix(models..., u, p, t)
     end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_input_state_jacobian` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
+    return Jy
 end
 
 """
@@ -1200,278 +956,80 @@ end
 
 In-place version of [`get_input_state_jacobian`](@ref)
 """
-@generated function get_input_state_jacobian!(models, J, u, p, t,
-    Jperm = similar(M), uperm = similar(u), pperm = similar(p))
-    # begin expression construction
-    expr = :()
-    # loop through all permutations
-    for perm in permutations(ntuple(i->i, N))
-        # permutation and inverse permutation
-        p = SVector(perm...)
-        pinv = SVector(invperm(perm)...)
-        # check each permutation
-        expr = quote
-            :($expr)
-            # get next model permutation
-            reordered_models = models[$p]
-            # check if a method is defined for this permutation
-            if applicable(get_inputs, reordered_models..., u, p, t)
-                # apply the permutation to the states
-                us = separate_states(models, u)
-                vector_combine!(uperm, us[$p])
-                # apply the permutation to the parameters
-                ps = separate_parameters(models, p)
-                vector_combine!(pperm, ps[$p])
-                # calculate the permuted jacobian
-                get_input_mass_matrix!(reordered_models..., Jperm, uperm, pperm, t)
-                # separate the permuted jacobian into submatrices
-                Jsub = separate_input_mass_matrix(reordered_models, Jperm)
-                # reorder the submatrices to construct the jacobian
-                matrix_combine!(J, Jsub[$pinv, $pinv], length(models), length(models))
-            end
-        end
-    end
-    expr = quote
-        :($expr)
-        error("Required method definition for `get_input_state_jacobian!` "*
-            "not defined for model types $(typeof.(models))")
-    end
-    return expr
-end
-
-function state_variable_indices(models)
-    Nu = number_of_states.(models)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu
-    if isinplace(models)
-        iu = ntuple(i->SVector{Nu[i]}(range(iu1[i], iu2[i])), length(models))
+function get_input_state_jacobian!(models::NTuple{N,AbstractModel}, Jy, u, p, t) where N
+    if inplace_inputs(models)
+        get_input_state_jacobian!(models..., Jy, u, p, t)
     else
-        iu = ntuple(i->range(iu1[i], iu2[i]), length(models))
+        Jy .= get_input_state_jacobian(models..., u, p, t)
     end
-    return iu
+    return Jy
 end
 
-function input_variable_indices(models)
-    Ny = number_of_inputs.(models)
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny
-    if isinplace(models)
-        iy = ntuple(i->SVector{Ny[i]}(range(iy1[i], iy2[i])), length(models))
-    else
-        iy = ntuple(i->range(iy1[i], iy2[i]), length(models))
-    end
-    return iy
-end
+# """
+#     mass_matrix_operator!(models)
+#
+# Return the mass matrix corresponding to the specified combination of models as
+# a DiffEqArrayOperator.
+# """
+# function mass_matrix_operator(models)
+#
+#     # problem dimensions
+#     Nu = number_of_states(models)
+#     Ny = number_of_inputs(models)
+#
+#     # initialize mass matrices
+#     M = zeros(Nu, Nu)
+#     My = zeros(Ny, Nu)
+#
+#     function update_func(M, u, p, t)
+#         # update type of `My`
+#         My = convert(typeof(M), My)
+#         # calculate inputs
+#
+#          -> get_mass_matrix!(models, M, u, y, p, t; My = convert(typeof(M), My))
+#     end
+#
+#     return DiffEqArrayOperator(M; update_func)
+# end
 
-function parameter_indices(models)
-    Np = number_of_inputs.(models)
-    ip2 = cumsum(Np)
-    ip1 = ip2 .- Np
-    if isinplace(models)
-        ip = ntuple(i->SVector{Np[i]}(range(ip1[i], ip2[i])), length(models))
-    else
-        ip = ntuple(i->range(ip1[i], ip2[i]), length(models))
-    end
-    return ip
-end
+# function mass_matrix_operator(models)
+#
+#     # initialize mass matrix
+#     M = zeros(number_of_states(models),
+#
+#     # construct update function
+#     if linear_load_dependence(stru)
+#         Mas, Maa = init_load_mass_matrices(models)
+#         update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t,
+#             convert(typeof(M), Mas), convert(typeof(M), Maa))
+#     else
+#         update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t)
+#     end
+#
+#     return DiffEqArrayOperator(M; update_func)
+# end
 
-function separate_states(models, u)
-    iu = state_variable_indices(models)
-    if isinplace(models)
-        usep = ntuple(i->view(u,iu), length(models))
-    else
-        usep = ntuple(i->u[iu], length(models))
-    end
-    return usep
-end
-
-function separate_inputs(models, y)
-    iy = input_variable_indices(models)
-    if isinplace(models)
-        ysep = ntuple(i->view(y,iy), length(models))
-    else
-        ysep = ntuple(i->y[iy], length(models))
-    end
-end
-
-function separate_parameters(models, p)
-    ip = parameter_indices(models)
-    if isinplace(models)
-        psep = ntuple(i->view(p,ip), length(models))
-    else
-        psep = ntuple(i->p[iy], length(models))
-    end
-end
-
-function separate_input_matrix(models, M)
-    iy = input_variable_indices(models)
-    iu = state_variable_indices(models)
-    if isinplace(models)
-        Msub = ()
-        for j = 1:length(models)
-            Msub = (Msub..., ntuple(i->view(M,iy[i],iu[j]), length(models)))
-        end
-    else
-        Msub = ()
-        for j = 1:length(models)
-            Msub = (Msub..., ntuple(i->M[iy[i],iu[j]], length(models)))
-        end
-    end
-end
-
-separate_input_mass_matrix(models, J) = separate_input_matrix(models, M)
-
-separate_input_state_jacobian(models, J) = separate_input_matrix(models, M)
-
-"""
-    vector_combine(xsep)
-
-Concatenate the tuple of vectors in `xsep`.
-"""
-vector_combine(xsep) = vcat(xsep...)
-
-"""
-    vector_combine!(x, xsep)
-
-In-place version of [`vector_combine`](@ref)
-"""
-function vector_combine!(x, xsep)
-    ix = 0
-    for i = 1:length(xsep)
-        nxsep = length(xsep)
-        x[ix+1:ix+nxsep] = xsep[i]
-        ix += nxsep
-    end
-end
-
-"""
-    matrix_combine(xsep, M, N)
-
-Concatenate the tuple of submatrices in `xsep` to form a new matrix composed of
-the M subcomponent matrix rows and N subcomponent matrix columns.
-"""
-function matrix_combine(xsep, M, N)
-
-    # linear index for indexing into `xsep`
-    li = LinearIndices((M,N))
-
-    # first column
-    X = xsep[li[1,1]]
-    for i = 2:M
-        X = vcat(X, xsep[li[i,1]])
-    end
-
-    # remaining columns
-    for j = 2:N
-        Xcol = xsep[li[1,j]]
-        for i = 2:M
-            Xcol = vcat(Xcol, xsep[li[i,j]])
-        end
-        X = hcat(X, Xcol)
-    end
-
-    return X
-end
-
-"""
-    matrix_combine!(X, xsep, M, N)
-
-In-place version of [`matrix_combine`](@ref)
-"""
-function matrix_combine!(X, xsep, M, N)
-
-    # linear index for indexing into `xsep`
-    li = LinearIndices((M,N))
-
-    # column counter
-    jX = 0
-    for j = 1:N
-        # current matrix row
-        iX = 0
-        # number of matrix columns in this submatrix column
-        nX = 0
-        for i = 1:M
-            # get submatrix
-            xsub = xsep[li[i,j]]
-            # get size of submatrix
-            mX, nX = size(xsub)
-            # insert submatrix into full matrix
-            X[iX+1:iX+mX, jX+1:jX+nX] = xsub
-            # increment current matrix row
-            iX += mX
-        end
-        # increment column matrix column
-        jX += nX
-    end
-
-    return X
-end
-
-"""
-    mass_matrix_operator!(models)
-
-Return the mass matrix corresponding to the specified combination of models as
-a DiffEqArrayOperator.
-"""
-function mass_matrix_operator(models)
-
-    # problem dimensions
-    Nu = number_of_states(models)
-    Ny = number_of_inputs(models)
-
-    # initialize mass matrices
-    M = zeros(Nu, Nu)
-    My = zeros(Ny, Nu)
-
-    function update_func(M, u, p, t)
-        # update type of `My`
-        My = convert(typeof(M), My)
-        # calculate inputs
-
-         -> get_mass_matrix!(models, M, u, y, p, t; My = convert(typeof(M), My))
-    end
-
-    return DiffEqArrayOperator(M; update_func)
-end
-
-function mass_matrix_operator(models)
-
-    # initialize mass matrix
-    M = zeros(number_of_states(models),
-
-    # construct update function
-    if linear_load_dependence(stru)
-        Mas, Maa = init_load_mass_matrices(models)
-        update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t,
-            convert(typeof(M), Mas), convert(typeof(M), Maa))
-    else
-        update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t)
-    end
-
-    return DiffEqArrayOperator(M; update_func)
-end
-
-"""
-    rate_function(models; input_cache = zeros(number_of_inputs(models)))
-
-Return a function that calculates the (mass matrix multiplied) state rates for
-the specified combination of models.
-"""
-function rate_function(models; input_cache = zeros(number_of_inputs(models)))
-
-    # update inputs
-    if isinplace(models)
-
-
-
-    if isinplace(models)
-        f = (du, u, p, t) -> get_rates!(models, du, u, p, t)
-    else
-        f = (u, p, t) -> get_rates(models, u, p, t)
-    end
-
-    return f
-end
+# """
+#     rate_function(models; input_cache = zeros(number_of_inputs(models)))
+#
+# Return a function that calculates the (mass matrix multiplied) state rates for
+# the specified combination of models.
+# """
+# function rate_function(models; input_cache = zeros(number_of_inputs(models)))
+#
+#     # update inputs
+#     if isinplace(models)
+#
+#
+#
+#     if isinplace(models)
+#         f = (du, u, p, t) -> get_rates!(models, du, u, p, t)
+#     else
+#         f = (u, p, t) -> get_rates(models, u, p, t)
+#     end
+#
+#     return f
+# end
 
 """
     jacobian_function(models)

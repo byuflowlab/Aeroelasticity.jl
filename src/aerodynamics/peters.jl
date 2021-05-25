@@ -51,6 +51,7 @@ end
 
 number_of_states(::PetersFiniteState{N,TF}) where {N,TF} = N
 number_of_inputs(::PetersFiniteState) = 3
+number_of_parameters(::PetersFiniteState) = 4
 isinplace(::PetersFiniteState) = false
 has_mass_matrix(::PetersFiniteState) = true
 constant_mass_matrix(::PetersFiniteState) = true
@@ -75,11 +76,13 @@ end
 function get_state_jacobian(model::PetersFiniteState, λ, d, p, t)
     # extract parameters
     a, b, U, ρ = p
+    # extract model constants
+    cbar = model.c
     # jacobian with respect to aerodynamic states
     return peters_state_jacobian(b, U, cbar)
 end
 
-function get_input_jacobian(::PetersFiniteState, λ, d, p, t)
+function get_input_jacobian(model::PetersFiniteState, λ, d, p, t)
     # extract parameters
     a, b, U, ρ = p
     # extract model constants
@@ -108,8 +111,8 @@ function peters_loads(a, b, U, ρ, bbar, θ, hdot, θdot, λ)
     return SVector(L, M)
 end
 peters_loads_λ(b, ρ, bbar) = -pi/2*ρ*b^2*vcat(bbar', zero(bbar)')
-function peters_loads_λdot(zλ)
-    tmp = zero(zλ)'
+function peters_loads_λdot(cbar)
+    tmp = zero(cbar)'
     return vcat(tmp, tmp)
 end
 peters_loads_h(b, U, ρ) = SVector(2*pi*ρ*U*b, 0)
