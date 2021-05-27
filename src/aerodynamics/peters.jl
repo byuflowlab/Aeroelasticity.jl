@@ -1,16 +1,17 @@
 """
-    PetersFiniteState{N,TF} <: AerodynamicModel
+    PetersFiniteState{N,TF,SV,SA} <: AerodynamicModel
 
 Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
 \\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
 ``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
 """
-struct PetersFiniteState{N,TF} <: StructuralModel
-    A::SMatrix{N,N,TF}
-    b::SVector{N,TF}
-    c::SVector{N,TF}
+struct PetersFiniteState{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: StructuralModel
+    A::TA
+    b::TV
+    c::TV
 end
 
+# --- Constructors --- #
 """
     PetersFiniteState{N,TF=Float64}()
 
@@ -46,23 +47,27 @@ function PetersFiniteState{N,TF}() where {N,TF}
 
     A = D + d*b' + c*d' + 1/2*c*b'
 
-    return PetersFiniteState{N,TF}(A, b, c)
+    return PetersFiniteState(SMatrix{N,N,TF}(A), SVector{N,TF}(b), SVector{N,TF}(c))
 end
 
-number_of_states(::PetersFiniteState{N,TF}) where {N,TF} = N
-number_of_inputs(::PetersFiniteState) = 3
-number_of_parameters(::PetersFiniteState) = 4
-isinplace(::PetersFiniteState) = false
-has_mass_matrix(::PetersFiniteState) = true
-constant_mass_matrix(::PetersFiniteState) = true
-linear_input_dependence(::PetersFiniteState) = true
-defined_state_jacobian(::PetersFiniteState) = true
-defined_input_jacobian(::PetersFiniteState) = true
-constant_input_jacobian(::PetersFiniteState) = false
+# --- Traits --- #
+number_of_states(::Type{PetersFiniteState{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
+number_of_inputs(::Type{<:PetersFiniteState}) = 3
+number_of_parameters(::Type{<:PetersFiniteState}) = 4
+isinplace(::Type{<:PetersFiniteState}) = false
+has_mass_matrix(::Type{<:PetersFiniteState}) = true
+constant_mass_matrix(::Type{<:PetersFiniteState}) = true
+linear_input_dependence(::Type{<:PetersFiniteState}) = true
+defined_state_jacobian(::Type{<:PetersFiniteState}) = true
+defined_input_jacobian(::Type{<:PetersFiniteState}) = true
+constant_input_jacobian(::Type{<:PetersFiniteState}) = false
 
-get_mass_matrix(model::PetersFiniteState) =  model.A
+# --- Interface Methods --- #
+get_mass_matrix(model::PetersFiniteState) = model.A
 
-function get_rates(model::PetersFiniteState, λ, d, p, t)
+function get_rates(model::PetersFiniteState{N,TF,SV,SA}, λ, d, p, t) where {N,TF,SV,SA}
+    # extract aerodynamic states as statically sized vector
+    λ = SVector{N}(λ)
     # extract structural deflections
     θdot, hddot, θddot = d
     # extract parameters
@@ -70,7 +75,7 @@ function get_rates(model::PetersFiniteState, λ, d, p, t)
     # extract model constants
     cbar = model.c
     # calculate rates
-    return peters_rhs(b, U, cbar, θdot, λ)
+    return peters_rhs(a, b, U, cbar, θdot, hddot, θddot, λ)
 end
 
 function get_state_jacobian(model::PetersFiniteState, λ, d, p, t)
@@ -93,9 +98,9 @@ end
 
 # TODO: Add parameter jacobian
 
-# --- Internal Functions --- #
+# --- Internal Methods --- #
 peters_lhs(a, b, Abar, cbar, dhdot, dθdot, dλ) = Abar*dλ
-peters_rhs(b, U, cbar, θdot, λ) = cbar*(hddot + U*θdot + (b/2-a*b)*θddot) - U/b*λ
+peters_rhs(a, b, U, cbar, θdot, hddot, θddot,  λ) = cbar*(hddot + U*θdot + (b/2-a*b)*θddot) - U/b*λ
 peters_mass_matrix(Abar) = Abar
 peters_state_jacobian(b, U, cbar) = -U/b*Diagonal(one.(cbar))
 peters_input_jacobian(a, b, U, cbar) = hcat(U*cbar, cbar, (b/2-a*b)*cbar)

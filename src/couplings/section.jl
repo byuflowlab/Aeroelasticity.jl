@@ -1,9 +1,12 @@
-# --- TypicalSection + PetersFiniteState --- #
-inplace_inputs(::PetersFiniteState, ::TypicalSection) = false
-has_input_mass_matrix(::PetersFiniteState, ::TypicalSection) = true
-constant_input_mass_matrix(::PetersFiniteState, ::TypicalSection) = false
-defined_input_state_jacobian(::PetersFiniteState, ::TypicalSection) = true
+# --- Peter's Finite State --- #
 
+# traits
+inplace_inputs(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = false
+has_input_mass_matrix(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = true
+constant_input_mass_matrix(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = false
+defined_input_state_jacobian(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = true
+
+# interface methods
 function get_input_mass_matrix(aero::PetersFiniteState, stru::TypicalSection, u, p, t)
     # extract model constants
     cbar = aero.c
@@ -25,8 +28,8 @@ function get_input_mass_matrix(aero::PetersFiniteState, stru::TypicalSection, u,
     return vcat(hcat(Mds, Mda), hcat(Mrs, Mra))
 end
 
-function get_inputs(aero::PetersFiniteState{N,TF}, stru::TypicalSection,
-    u, p, t) where {N,TF}
+function get_inputs(aero::PetersFiniteState{N,TF,SV,SA}, stru::TypicalSection,
+    u, p, t) where {N,TF,SV,SA}
     # indices for extracting state variables
     iq = SVector{4}(1:4)
     iλ = SVector{N}(5:4+N)

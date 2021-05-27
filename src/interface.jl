@@ -30,54 +30,99 @@ abstract type DynamicsModel <: AbstractModel end
     number_of_states(models)
 
 Return the total number of states corresponding to the model or models.
-
-This property should be inferrable from the model types for in-place models.
 """
 number_of_states
 
-function number_of_states(model::AbstractModel)
-    error("Required method definition for `number_of_states` not defined for "*
-        "model type $(typeof(model))")
-end
+number_of_states(model::AbstractModel) = number_of_states(typeof(model))
 
 function number_of_states(models::NTuple{N,AbstractModel}) where N
     sum(number_of_states.(models))
+end
+
+function number_of_states(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    sum(number_of_states.((T.parameters...)))
 end
 
 """
     number_of_inputs(models)
 
 Return the total number of inputs corresponding to the model or models.
-
-This property should be inferrable from the model types for in-place models.
 """
 number_of_inputs
 
-function number_of_inputs(model::AbstractModel)
-    error("Required method definition for `number_of_inputs` not defined for "*
-        "model type $(typeof(model))")
-end
+number_of_inputs(model::AbstractModel) = number_of_inputs(typeof(model))
 
 function number_of_inputs(models::NTuple{N,AbstractModel}) where N
     sum(number_of_inputs.(models))
+end
+
+function number_of_inputs(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    sum(number_of_inputs.((T.parameters...)))
 end
 
 """
     number_of_parameters(models)
 
 Return the total number of parameters corresponding to the model or models.
-
-This property should be inferrable from the model types for in-place models.
 """
 number_of_parameters
 
-function number_of_parameters(model::AbstractModel)
-    error("Required method definition for `number_of_parameters` not defined for "*
-        "model type $(typeof(model))")
-end
+number_of_parameters(model::AbstractModel) = number_of_parameters(typeof(model))
 
 function number_of_parameters(models::NTuple{N,AbstractModel}) where N
     sum(number_of_parameters.(models))
+end
+
+function number_of_parameters(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    sum(number_of_parameters.((T.parameters...)))
+end
+
+function state_indices(models::NTuple{N,AbstractModel}) where N
+    # input indices
+    Nu = number_of_states.(typeof.(models))
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    return UnitRange.(iu1, iu2)
+end
+
+@generated function static_state_indices(models::NTuple{N,AbstractModel}) where N
+    Nu = number_of_states.(models.parameters)
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+    return :($iu)
+end
+
+function input_indices(models::NTuple{N,AbstractModel}) where N
+    # input indices
+    Ny = number_of_inputs.(typeof.(models))
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    return UnitRange.(iy1, iy2)
+end
+
+@generated function static_input_indices(models::NTuple{N,AbstractModel}) where N
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+    return :($iy)
+end
+
+function parameter_indices(models::NTuple{N,AbstractModel}) where N
+    # parameter indices
+    Np = number_of_parameters.(typeof.(models))
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    return UnitRange.(ip1, ip2)
+end
+
+@generated function static_parameter_indices(models::NTuple{N,AbstractModel}) where N
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+    return :($ip)
 end
 
 """
@@ -90,13 +135,15 @@ This property should be inferrable from the model type.
 """
 isinplace
 
-function isinplace(model::AbstractModel)
-    error("Required method definition for `isinplace` not defined for "*
-        "model type $(typeof(model))")
+isinplace(model::AbstractModel) = isinplace(typeof(model))
+
+function isinplace(models::NTuple{N,AbstractModel}) where N
+    inplace_inputs(models...) || any(isinplace.(models))
 end
 
-function isinplace(models::Tuple)
-    inplace_inputs(models) || any(isinplace.(models))
+function isinplace(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    inplace_inputs(model_types...) || any(isinplace.(model_types))
 end
 
 """
@@ -109,13 +156,15 @@ This property should be inferrable from the model type.
 """
 has_mass_matrix
 
-function has_mass_matrix(model::AbstractModel)
-    error("Required method definition for `has_mass_matrix` not defined for "*
-        "model type $(typeof(model))")
+has_mass_matrix(model::AbstractModel) = has_mass_matrix(typeof(model))
+
+function has_mass_matrix(models::NTuple{N,AbstractModel}) where N
+    has_input_mass_matrix(models) || any(has_mass_matrix.(models))
 end
 
-function has_mass_matrix(models)
-    has_input_mass_matrix(models) || any(has_mass_matrix.(models))
+function has_mass_matrix(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    has_input_mass_matrix(model_types...) || any(has_mass_matrix.(model_types))
 end
 
 """
@@ -129,18 +178,20 @@ This property should be inferrable from the model type.
 constant_mass_matrix
 
 function constant_mass_matrix(model::AbstractModel)
-    if has_mass_matrix(model)
-        error("Required method definition for `constant_mass_matrix` not defined "*
-            "for model type $(typeof(model))")
-    else
-        return true
-    end
+    constant_matrix_state(mass_matrix_state(typeof(model)))
 end
 
-function constant_mass_matrix(models)
-    return constant_input_mass_matrix(models) &&
+function constant_mass_matrix(models::NTuple{N,AbstractModel}) where N
+    return constant_input_mass_matrix(models...) &&
         all(constant_input_jacobian.(models)) &&
         all(constant_mass_matrix.(models))
+end
+
+function constant_mass_matrix(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    return constant_input_mass_matrix(model_types...) &&
+        all(constant_input_jacobian.(model_types)) &&
+        all(constant_mass_matrix.(model_types))
 end
 
 """
@@ -151,10 +202,15 @@ combination of models has a linear dependence on the inputs
 """
 linear_input_dependence
 
-linear_input_dependence(model::AbstractModel) = false
+linear_input_dependence(model::AbstractModel) = linear_input_dependence(typeof(model))
 
-function linear_input_dependence(models)
+function linear_input_dependence(models::NTuple{N,AbstractModel}) where N
     return all(linear_input_dependence.(models))
+end
+
+function linear_input_dependence(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    return all(linear_input_dependence.(model_types))
 end
 
 """
@@ -165,12 +221,19 @@ to the states is manually defined.
 """
 defined_state_jacobian
 
-defined_state_jacobian(model::AbstractModel) = false
+defined_state_jacobian(model::AbstractModel) = defined_state_jacobian(typeof(model))
 
-function defined_state_jacobian(models)
-    return defined_input_state_jacobian(models) &&
+function defined_state_jacobian(models::NTuple{N,AbstractModel}) where N
+    return defined_input_state_jacobian(models...) &&
         all(defined_state_jacobian.(models)) &&
         all(defined_input_jacobian.(models))
+end
+
+function defined_state_jacobian(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    return defined_input_state_jacobian(model_types...) &&
+        all(defined_state_jacobian.(model_types)) &&
+        all(defined_input_jacobian.(model_types))
 end
 
 """
@@ -179,7 +242,11 @@ end
 Return a flag indicating whether the jacobian of the state rates with respect
 to the inputs is defined. Defaults to false.
 """
-defined_input_jacobian(model::AbstractModel) = false
+defined_input_jacobian
+
+defined_input_jacobian(model::AbstractModel) = defined_input_jacobian(typeof(model))
+
+defined_input_jacobian(::Type{T}) where T<:AbstractModel = false
 
 """
     constant_input_jacobian(model)
@@ -187,7 +254,11 @@ defined_input_jacobian(model::AbstractModel) = false
 Return a flag indicating whether the jacobian of the state rates with respect
 to the inputs is constant.  Defaults to false.
 """
-constant_input_jacobian(model::AbstractModel) = false
+function constant_input_jacobian(model::AbstractModel)
+    constant_matrix_state(input_jacobian_state(model))
+end
+
+constant_input_jacobian(::Type{T}) where T<:AbstractModel = false
 
 """
     get_mass_matrix(models)
@@ -197,157 +268,226 @@ Calculate the mass matrix for a model or combination of models.
 """
 get_mass_matrix
 
-function get_mass_matrix(model::AbstractModel)
-    if isinplace(model)
-        Nu = number_of_states(model)
-        M = zeros(Nu,Nu)
-        get_mass_matrix!(model, M)
-    else
-        if has_mass_matrix(model)
-            if constant_mass_matrix(model)
-                error("Required function `get_mass_matrix(model)` not defined "*
-                    "for model type $(typeof(model))")
-            else
-                error("State, input, parameter, and time arguments are required when "*
-                    "calling `get_mass_matrix` for model type $(typeof(model))")
-            end
-        else
-            Nu = number_of_states(model)
-            M = SMatrix{Nu,Nu}(I)
-        end
-    end
-    return M
-end
-
 function get_mass_matrix(model::AbstractModel, u, y, p, t)
-    if isinplace(model)
-        Nu = number_of_states(model)
-        M = similar(u, Nu, Nu)
-        get_mass_matrix!(model, M, u, y, p, t)
-    else
-        if has_mass_matrix(model)
-            if constant_mass_matrix(model)
-                M = get_mass_matrix(model)
-            else
-                error("Required function `get_mass_matrix(model)` not defined "*
-                    "for model type $(typeof(model))")
-            end
-        else
-            Nu = number_of_states(model)
-            M = SMatrix{Nu,Nu}(I)
-        end
-    end
-    return M
+    return get_mass_matrix(mass_matrix_state(model), inplaceness(model), model,
+        u, y, p, t)
 end
 
-function get_mass_matrix(models::NTuple{N,AbstractModel}) where N
-
-    if isinplace(models)
-        Nu = number_of_states(models)
-        M = zeros(Nu, Nu)
-        get_mass_matrix!(models, M)
-    else
-        if has_mass_matrix(models)
-            if constant_mass_matrix(models)
-                # get dimensions (these should be inferrable)
-                Nu = number_of_states.(models)
-                Ny = number_of_inputs.(models)
-
-                # state variable indices
-                iu2 = cumsum(Nu)
-                iu1 = iu2 .- Nu .+ 1
-                iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), length(models))
-
-                # input variable indices
-                iy2 = cumsum(Ny)
-                iy1 = iy2 .- Ny .+ 1
-                iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), length(models))
-
-                # get input mass matrix
-                My = get_input_mass_matrix(models)
-
-                # calculate mass matrix
-                Nutot = number_of_states(models)
-                M = SMatrix{0,Nutot,Float64}()
-                for i = 1:length(models)
-                    D = get_input_jacobian(models[i])
-                    Nui = number_of_states(models[i])
-                    Mi = SMatrix{Nui,0,Float64}()
-                    for j = 1:length(models)
-                        Myij = My[iy[i], iu[j]]
-                        if i == j
-                            Mij = get_mass_matrix(models[i])
-                            if linear_input_dependence(models[i])
-                                Mij = Mij + D*Myij
-                            end
-                        else
-                            if linear_input_dependence(models[i])
-                                Mij = D*Myij
-                            else
-                                Mij = zero(D*Myij)
-                            end
-                        end
-                        Mi = hcat(Mi, Mij)
-                    end
-                    M = vcat(M, Mi)
-                end
-            else
-                error("State, input, parameter, and time arguments are required when "*
-                    "calling `get_mass_matrix` for model types $(typeof.(models)) ")
-            end
-        else
-            Nu = number_of_states(models) # this should be inferrable
-            M = SMatrix{Nu,Nu}(I)
-        end
-    end
-
-    return M
+function get_mass_matrix(models::NTuple{N,AbstractModel}, args...) where N
+    return get_mass_matrix(mass_matrix_state(models), inplaceness(models), models, args...)
 end
 
-function get_mass_matrix(models::NTuple{N,AbstractModel}, u, y, p, t) where N
+get_mass_matrix(::Identity, ::Union{InPlace, OutOfPlace}, models, args...) = I
 
-    if isinplace(models)
-        Nu = number_of_states(models)
-        M = zeros(Nu, Nu)
-        get_mass_matrix!(models, M, u, y, p, t)
-    else
-        if has_mass_matrix(models)
+function get_mass_matrix(::Union{Constant, Varying}, ::InPlace, models)
+    Nu = number_of_states(model)
+    M = zeros(Nu,Nu)
+    return get_mass_matrix!(models, M)
+end
 
-            # get dimensions (these should be inferrable)
-            Nu = number_of_states.(models)
-            Ny = number_of_inputs.(models)
-            Np = number_of_parameters.(models)
+function get_mass_matrix(::Union{Constant, Varying}, ::InPlace, models, u, y, p, t)
+    Nu = number_of_states(model)
+    M = similar(u, Nu, Nu)
+    return get_mass_matrix!(models, M, u, y, p, t)
+end
 
-            # extract state variables for each model
-            iu2 = cumsum(Nu)
-            iu1 = iu2 .- Nu .+ 1
-            iu = UnitRange.(iu1, iu2)
-            us = getindex.(Ref(u), iu)
+function get_mass_matrix(::Constant, ::OutOfPlace, model::AbstractModel, u, y, p, t)
+    return get_mass_matrix(model)
+end
 
-            # extract inputs for each model
-            iy2 = cumsum(Ny)
-            iy1 = iy2 .- Ny .+ 1
-            iy = UnitRange.(iy1, iy2)
-            ys = getindex.(Ref(y), iy)
+function get_mass_matrix(::Constant, ::OutOfPlace, models::NTuple{N, AbstractModel}) where N
 
-            # extract parameters for each model
-            ip2 = cumsum(Np)
-            ip1 = ip2 .- Np .+ 1
-            ip = UnitRange.(ip1, ip2)
-            ps = getindex.(Ref(p), ip)
+    # initialize mass matrix
+    M = initialize_mass_matrix(models)
 
-            # calculate mass matrix for each model
-            Mii = get_mass_matrix.(models, us, ys, ps, t)
+    # calculate input jacobian
+    D = input_jacobian(models)
 
-            # check for linear load dependence
-            linear = linear_load_dependence.(models)
+    # calculate input mass matrix
+    My = get_input_mass_matrix(models...)
 
-            # calculate mass matrix corresponding to the input function
-            My = get_input_mass_matrix(models, u, p, t)
+    return M + D*My
+end
 
-            #TODO: Finish this.
+function get_mass_matrix(::Varying, ::OutOfPlace, models::NTuple{N, AbstractModel},
+    u, y, p, t) where N
 
-    return M
+    # initialize mass matrix
+    M = initialize_mass_matrix(models, u, y, p, t)
+
+    # calculate input jacobian
+    D = input_jacobian(models, u, y, p, t)
+
+    # calculate input mass matrix
+    My = get_input_mass_matrix(models..., u, p, t)
+
+    return M + D*My
+end
+
+function initialize_mass_matrix(models::NTuple{N,AbstractModel}) where N
+    initialize_static_mass_matrix(models)
+end
+
+function initialize_mass_matrix(models::NTuple{N,AbstractModel}, u, y, p, t) where N
+    initialize_varying_mass_matrix(models, u, y, p, t)
+end
+
+@generated function initialize_static_mass_matrix(models::NTuple{N,AbstractModel}) where N
+
+    # get number of state variables in each model
+    Nu = number_of_states.(models.parameters)
+
+    # initialize row names
+    Mi = [Symbol("M", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Mij = [zeros(SMatrix{Nu[i], Nu[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Mi[1]) = vcat(get_mass_matrix(models[1]), $(Mij[1, 2:end]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Mi[i]) = vcat($(Mij[i, 1:i-1]...), get_mass_matrix(models[$i]), $(Mij[i, i+1:end]...))
+        end
+    end
+    expr = quote
+        $expr
+        M = hcat($(Mi...))
+    end
+
+    return expr
+end
+
+@generated function initialize_varying_mass_matrix(models::NTuple{N,AbstractModel},
+    u, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nu = number_of_states.(models.parameters)
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Mi = [Symbol("M", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Mij = [zeros(SMatrix{Nu[i], Nu[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Mi[1]) = vcat(get_mass_matrix(models[1], u[$(iu[1])], y[$(iy[1])], p[$(ip[1])], t),
+            $(Mij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Mi[i]) = vcat($(Mij[1:i-1, i]...), get_mass_matrix(models[$i], u[$(iu[i])],
+                y[$(iy[i])], p[$(ip[i])], t), $(Mij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        M = hcat($(Mi...))
+    end
+
+    return expr
+end
+
+function input_jacobian(models::NTuple{N,AbstractModel}) where N
+    static_input_jacobian(models)
+end
+
+function input_jacobian(models::NTuple{N,AbstractModel}, u, y, p, t) where N
+    varying_input_jacobian(models, u, y, p, t)
+end
+
+@generated function static_input_jacobian(models::NTuple{N,AbstractModel}) where N
+
+    # get number of state variables in each model
+    Nu = number_of_states.(models.parameters)
+    Ny = number_of_inputs.(models.parameters)
+
+    # initialize row names
+    Di = [Symbol("D", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Dij = [zeros(SMatrix{Nu[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Di[1]) = vcat(get_input_jacobian(models[1]), $(Dij[1, 2:end]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Di[i]) = vcat($(Dij[i, 1:i-1]...), get_input_jacobian(models[$i]),
+                $(Dij[i, i+1:end]...))
+        end
+    end
+    expr = quote
+        $expr
+        D = hcat($(Di...))
+    end
+
+    return expr
+end
+
+@generated function varying_input_jacobian(models::NTuple{N,AbstractModel},
+    u, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nu = number_of_states.(models.parameters)
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Di = [Symbol("D", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Dij = [zeros(SMatrix{Nu[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Di[1]) = vcat(get_input_jacobian(models[1], u[$(iu[1])], y[$(iy[1])], p[$(ip[1])], t),
+            $(Dij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Di[i]) = vcat($(Dij[1:i-1, i]...), get_input_jacobian(models[$i], u[$(iu[i])],
+                y[$(iy[i])], p[$(ip[i])], t), $(Dij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        D = hcat($(Di...))
+    end
+
+    return expr
 end
 
 """
@@ -358,173 +498,102 @@ In-place version of `get_mass_matrix`.
 """
 get_mass_matrix!
 
-function get_mass_matrix!(model::AbstractModel, M)
-    if isinplace(model)
-        if has_mass_matrix(model)
-            if constant_mass_matrix(model)
-                error("Required function `get_mass_matrix!(model, M)` not defined "*
-                    "for model type $(typeof(model))")
-            else
-                error("State, input, parameter, and time arguments are required when "*
-                    "calling `get_mass_matrix!` for model type $(typeof(model))")
-            end
-        else
-            N = number_of_states(model)
-            M .= 0
-            for i = 1:N
-                M[i,i] = 1
-            end
-        end
-    else
-        M .= get_mass_matrix(model)
-    end
-    return M
-end
-
 function get_mass_matrix!(model::AbstractModel, M, u, y, p, t)
-    if isinplace(model)
-        if has_mass_matrix(model)
-            if constant_mass_matrix(model)
-                get_mass_matrix!(model, M)
-            else
-                error("Required function `get_mass_matrix!(model, M)` not defined "*
-                    "for model type $(typeof(model))")
-            end
-        else
-            Nu = number_of_states(model)
-            M .= 0
-            for i = 1:Nu
-                M[i,i] = 1
-            end
-        end
-    else
-        M .= get_mass_matrix(model, u, y, p, t)
+    return get_mass_matrix!(mass_matrix_state(model), inplaceness(model), model,
+        M, u, y, p, t)
+end
+
+function get_mass_matrix!(models::NTuple{N,AbstractModel}, M, args...; kwargs...) where N
+    return get_mass_matrix!(mass_matrix_state(models), inplaceness(models),
+        models, M, args...; kwargs...)
+end
+
+function get_mass_matrix!(::Identity, ::Union{InPlace, OutOfPlace}, M,
+    models::NTuple{N,AbstractModel}, args...; kwargs...) where N
+    M .= 0
+    for i = 1:N
+        M[i,i] = 1
     end
     return M
 end
 
-function get_mass_matrix!(models::NTuple{N,AbstractModel}, M;
-    My = zeros(number_of_inputs(models), number_of_states(models))) where N
+function get_mass_matrix!(::Union{Constant, Varying}, ::OutOfPlace, models, M,
+    args...; kwargs...)
+    return M .= get_mass_matrix(models, args...)
+end
 
-    if isinplace(models)
-        if has_mass_matrix(models)
-            if constant_mass_matrix(models)
-                # get dimensions
-                Nu = number_of_states.(models)
-                Ny = number_of_inputs.(models)
+function get_mass_matrix!(::Constant, ::InPlace, model::AbstractModel, M, u, y,
+    p, t; kwargs...)
+    return get_mass_matrix!(model, M; kwargs...)
+end
 
-                # state variable indices
-                iu2 = cumsum(Nu)
-                iu1 = iu2 .- Nu
-                iu = UnitRange.(iu1, iu2)
+function get_mass_matrix!(::Constant, ::InPlace, models::NTuple{N, AbstractModel},
+    M; My = similar(M, number_of_inputs(models), number_of_states(models))) where N
 
-                # input variable indices
-                iy2 = cumsum(Ny)
-                iy1 = iy2 .- Ny
-                iy = UnitRange.(iy1, iy2)
+    # get state and parameter indices
+    iu = state_indices(models)
+    iy = input_indices(models)
 
-                # get input mass matrix
-                get_input_mass_matrix!(models, My)
+    # calculate input mass matrix
+    get_input_mass_matrix!(models, My)
 
-                # calculate mass matrix
-                for i = 1:length(models)
-                    D = get_input_jacobian(models[i])
-                    for j = 1:length(models)
-                        Mij = view(M, iu[i], iu[j])
-                        Myij = view(My, iy[i], iu[j])
-                        if i == j
-                            get_mass_matrix!(models, Mij)
-                            if linear_input_dependence(models[i])
-                                mul!(Mij, D, Myij, 1, 1)
-                            end
-                        else
-                            if linear_input_dependence(models[i])
-                                mul!(Mij, D, Myij)
-                            else
-                                Mij .= 0
-                            end
-                        end
-                    end
+    # calculate mass matrix
+    for i = 1:length(models)
+        D = get_input_jacobian(models[i])
+        for j = 1:length(models)
+            Mij = view(M, iu[i], iu[j])
+            Myij = view(My, iy[i], iu[j])
+            if i == j
+                get_mass_matrix!(models, Mij)
+                if linear_input_dependence(models[i])
+                    mul!(Mij, D, Myij, 1, 1)
                 end
-
             else
-                error("State, input, parameter, and time arguments are required when "*
-                    "calling `get_mass_matrix!` for model types $(typeof.(models)) ")
-            end
-        else
-            Nu = number_of_states(models)
-            M .= 0
-            for i = 1:Nu
-                M[i,i] = 1
+                if linear_input_dependence(models[i])
+                    mul!(Mij, D, Myij)
+                else
+                    Mij .= 0
+                end
             end
         end
-    else
-        M .= get_mass_matrix(models)
     end
 
     return M
 end
 
-function get_mass_matrix!(models::NTuple{N,AbstractModel}, M, u, y, p, t;
-    My = zeros(number_of_inputs(models), number_of_states(models))) where N
+function get_mass_matrix!(::Varying, ::InPlace, models::NTuple{N, AbstractModel},
+    M; My = similar(M, number_of_inputs(models), number_of_states(models))) where N
 
-    if isinplace(models)
-        if has_mass_matrix(models)
-            # get dimensions
-            Nu = number_of_states.(models)
-            Ny = number_of_inputs.(models)
-            Np = number_of_parameters.(models)
+    # get state and parameter indices
+    iu = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
 
-            # state variable indices
-            iu2 = cumsum(Nu)
-            iu1 = iu2 .- Nu .+ 1
-            iu = UnitRange.(iu1, iu2)
+    # calculate input mass matrix
+    get_input_mass_matrix!(models, My, u, p, t)
 
-            # input variable indices
-            iy2 = cumsum(Ny)
-            iy1 = iy2 .- Ny .+ 1
-            iy = UnitRange.(iy1, iy2)
-
-            # parameter indices
-            ip2 = cumsum(Np)
-            ip1 = ip2 .- Np .+ 1
-            ip = UnitRange.(ip1, ip2)
-
-            # get input mass matrix
-            get_input_mass_matrix!(models, My, u, p, t)
-
-            # calculate mass matrix
-            for i = 1:length(models)
-                ui = view(u, iu[i])
-                yi = view(y, iy[i])
-                pi = view(p, ip[i])
-                D = get_input_jacobian(models[i], ui, yi, pi, t)
-                for j = 1:length(models)
-                    Mij = view(M, iu[i], iu[j])
-                    Myij = view(My, iy[i], iu[j])
-                    if i == j
-                        get_mass_matrix!(models, Mij, ui, yi, pi, t)
-                        if linear_input_dependence(models[i])
-                            mul!(Mij, D, Myij, 1, 1)
-                        end
-                    else
-                        if linear_input_dependence(models[i])
-                            mul!(Mij, D, Myij)
-                        else
-                            Mij .= 0
-                        end
-                    end
+    # calculate mass matrix
+    for i = 1:length(models)
+        ui = view(u, iu[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        D = get_input_jacobian(models[i], ui, yi, pi, t)
+        for j = 1:length(models)
+            Mij = view(M, iu[i], iu[j])
+            Myij = view(My, iy[i], iu[j])
+            if i == j
+                get_mass_matrix!(models, Mij, ui, yi, pi, t)
+                if linear_input_dependence(models[i])
+                    mul!(Mij, D, Myij, 1, 1)
+                end
+            else
+                if linear_input_dependence(models[i])
+                    mul!(Mij, D, Myij)
+                else
+                    Mij .= 0
                 end
             end
-        else
-            Nu = number_of_states(models)
-            M .= 0
-            for i = 1:Nu
-                M[i,i] = 1
-            end
         end
-    else
-        M .= get_mass_matrix(models, u, y, p, t)
     end
 
     return M
@@ -539,50 +608,57 @@ models.
 get_rates
 
 function get_rates(model::AbstractModel, u, y, p, t)
-    if isinplace(model)
-        du = similar(u)
-        get_rates!(model, du, u, y, p, t)
-    else
-        error("Required method definition for `get_rates` not defined for "*
-            "model type $(typeof(model))")
-    end
+    return get_rates(inplaceness(model), model, u, y, p, t)
+end
+
+function get_rates(models::NTuple{N,AbstractModel}, args...) where N
+    return get_rates(inplaceness(models), models, args...)
+end
+
+function get_rates(::InPlace, models, u, y, p, t)
+    du = similar(u)
+    get_rates!(models, du, u, y, p, t)
     return du
 end
 
-function get_rates(models::NTuple{N,AbstractModel}, u, y, p, t) where N
+function get_rates(::OutOfPlace, models::NTuple{N,AbstractModel}, u, y, p, t) where N
+    return get_model_rates(models, u, y, p, t)
+end
 
-    if isinplace(models)
-        du = similar(u)
-        get_rates!(models, du, u, y, p, t)
-    else
-        # get dimensions (these should be inferrable)
-        Nu = number_of_states.(models)
-        Ny = number_of_inputs.(models)
-        Np = number_of_parameters.(models)
+@generated function get_model_rates(models::NTuple{N,AbstractModel}, u, y, p, t) where N
+    # get indices of state, input, and parameter vectors for each model
+    Nu = number_of_states.(models.parameters)
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
 
-        # state variable indices
-        iu2 = cumsum(Nu)
-        iu1 = iu2 .- Nu .+ 1
-        iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), length(models))
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
 
-        # input variable indices
-        iy2 = cumsum(Ny)
-        iy1 = iy2 .- Ny .+ 1
-        iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), length(models))
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
 
-        # parameter indices
-        ip2 = cumsum(Np)
-        ip1 = ip2 .- Np .+ 1
-        ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), length(models))
+    # initialize state variable names
+    dui = [Symbol("du", i) for i = 1:N]
 
-        # calculate state rates
-        du = SVector{0,Float64}()
-        for i = 1:length(models)
-            du = vcat(du, get_rates(models[i], u[iu[i]], y[iy[i]], p[ip[i]], t))
+    expr = :()
+    for i = 1:N
+        expr = quote
+            $expr
+            $(dui[i]) = get_rates(models[$i], u[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
         end
     end
 
-    return du
+    expr = quote
+        $expr
+        du = vcat($(dui...))
+    end
+
+    return expr
 end
 
 """
@@ -593,47 +669,29 @@ In-place version of [`get_rates`](@ref)
 get_rates!
 
 function get_rates!(model::AbstractModel, du, u, y, p, t)
-    if isinplace(model)
-        error("Required method definition for `get_rates!` not defined for "*
-            "model type $(typeof(model))")
-    else
-        du .= get_rates(model, u, y, p, t)
-    end
-    return du
+    return get_rates!(inplaceness(model), model, du, u, y, p, t)
 end
 
 function get_rates!(models::NTuple{N,AbstractModel}, du, u, y, p, t) where N
+    return get_rates!(inplaceness(models), models, du, u, y, p, t)
+end
 
-    if isinplace(models)
-        # get dimensions
-        Nu = number_of_states.(models)
-        Ny = number_of_inputs.(models)
-        Np = number_of_parameters.(models)
+function get_rates!(::OutOfPlace, models, du, u, y, p, t)
+    return du .= get_rates(models, u, y, p, t)
+end
 
-        # state variable indices
-        iu2 = cumsum(Nu)
-        iu1 = iu2 .- Nu .+ 1
-        iu = UnitRange.(iu1, iu2)
+function get_rates!(::InPlace, models::NTuple{N,AbstractModel}, du, u, y, p, t) where N
 
-        # input variable indices
-        iy2 = cumsum(Ny)
-        iy1 = iy2 .- Ny .+ 1
-        iy = UnitRange.(iy1, iy2)
+    iu = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
 
-        # parameter indices
-        ip2 = cumsum(Np)
-        ip1 = ip2 .- Np .+ 1
-        ip = UnitRange.(ip1, ip2)
-
-        for i = 1:length(models)
-            vdu = view(du, iu[i])
-            vu = view(u, iu[i])
-            vy = view(y, iy[i])
-            vp = view(p, ip[i])
-            get_rates!(models[i], vdu, vu, vy, vp, t)
-        end
-    else
-        du .= get_rates(models, u, y, p, t)
+    for i = 1:length(models)
+        vdu = view(du, iu[i])
+        vu = view(u, iu[i])
+        vy = view(y, iy[i])
+        vp = view(p, ip[i])
+        get_rates!(models[i], vdu, vu, vy, vp, t)
     end
 
     return du
@@ -809,7 +867,11 @@ combination of models are calculated in-place.
 This property should be inferrable from the model types.
 """
 function inplace_inputs(models::NTuple{N,AbstractModel}) where N
-    inplace_inputs(models...)
+    inplace_inputs(typeof.(models))
+end
+
+function inplace_inputs(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    inplace_inputs(T.parameters...)
 end
 
 """
@@ -821,7 +883,11 @@ of models has a mass matrix.
 This property should be inferrable from the model types.
 """
 function has_input_mass_matrix(models::NTuple{N,AbstractModel}) where N
-    has_input_mass_matrix(models...)
+    has_input_mass_matrix(typeof.(models))
+end
+
+function has_input_mass_matrix(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    has_input_mass_matrix(T.parameters...)
 end
 
 """
@@ -833,7 +899,11 @@ the provided combination of models
 This property should be inferrable from the model type.
 """
 function constant_input_mass_matrix(models::NTuple{N,AbstractModel}) where N
-    constant_input_mass_matrix(models...)
+    constant_input_mass_matrix(typeof.(models))
+end
+
+function constant_input_mass_matrix(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    constant_input_mass_matrix(T.parameters...)
 end
 
 """
@@ -843,7 +913,11 @@ Return a flag indicating whether the jacobian of the input function for the
 provided combination of models is manually defined.
 """
 function defined_input_state_jacobian(models::NTuple{N,AbstractModel}) where N
-    defined_input_state_jacobian(models...)
+    defined_input_state_jacobian(typeof.(models))
+end
+
+function defined_input_state_jacobian(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    defined_input_state_jacobian(T.parameters...)
 end
 
 """
@@ -998,7 +1072,7 @@ end
 #     M = zeros(number_of_states(models),
 #
 #     # construct update function
-#     if linear_load_dependence(stru)
+#     if linear_input_dependence(stru)
 #         Mas, Maa = init_load_mass_matrices(models)
 #         update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t,
 #             convert(typeof(M), Mas), convert(typeof(M), Maa))
