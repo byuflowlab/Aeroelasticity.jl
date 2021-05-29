@@ -1,26 +1,24 @@
 """
-    TypicalSection <: StructuralModel
+    TypicalSection <: AbstractModel
 
 Typical section structural model with state variables ``q = \\begin{bmatrix} h &
 θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, structural parameters ``p_s =
 \\begin{bmatrix} a & b & k_h & k_\\theta & m & x_\\theta & I_P \\end{bmatrix}^T``,
 and aerodynamic loads ``r = \\begin{bmatrix} L & M_\\frac{1}{4} \\end{bmatrix}^T``
 """
-struct TypicalSection <: StructuralModel end
+struct TypicalSection <: AbstractModel end
 
 # --- Traits --- #
 number_of_states(::Type{TypicalSection}) = 4
 number_of_inputs(::Type{TypicalSection}) = 2
 number_of_parameters(::Type{TypicalSection}) = 7
-isinplace(::Type{TypicalSection}) = false
-has_mass_matrix(::Type{TypicalSection}) = true
-constant_mass_matrix(::Type{TypicalSection}) = false
-linear_input_dependence(::Type{TypicalSection}) = true
-defined_state_jacobian(::Type{TypicalSection}) = true
-defined_input_jacobian(::Type{TypicalSection}) = true
-constant_input_jacobian(::Type{TypicalSection}) = false
+inplaceness(::Type{TypicalSection}) = OutOfPlace()
+mass_matrix_type(::Type{TypicalSection}) = Constant()
+state_jacobian_type(::Type{TypicalSection}) = Varying()
+input_jacobian_type(::Type{TypicalSection}) = Varying()
+input_dependence_type(::Type{TypicalSection}) = Linear()
 
-# --- Interface Methods --- #
+# --- Methods --- #
 
 function get_mass_matrix(::TypicalSection, q, r, p, t)
     # extract structural parameters
@@ -56,7 +54,7 @@ end
 
 # TODO: Add get_parameter_jacobian
 
-# --- Internal Methods --- #
+# --- Internal --- #
 
 # left side of rate equations (used for testing)
 function section_lhs(b, m, xθ, Ip, dh, dθ, dhdot, dθdot)

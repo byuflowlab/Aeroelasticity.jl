@@ -1,11 +1,11 @@
 """
-    PetersFiniteState{N,TF,SV,SA} <: AerodynamicModel
+    PetersFiniteState{N,TF,SV,SA} <: AbstractModel
 
 Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
 \\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
 ``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
 """
-struct PetersFiniteState{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: StructuralModel
+struct PetersFiniteState{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: AbstractModel
     A::TA
     b::TV
     c::TV
@@ -23,14 +23,15 @@ PetersFiniteState{N}() where N = PetersFiniteState{N,Float64}()
 function PetersFiniteState{N,TF}() where {N,TF}
 
     b = zeros(TF, N)
-    for i = 1:N
-        b[i] = (-1)^(i-1)*factorial(big(N + i))/factorial(big(N - i))*
-            1/factorial(big(i))^2
+    for n = 1:N-1
+        b[n] = (-1)^(n-1)*factorial(N + n - 1)/factorial(N - n - 1)*1/factorial(n)^2
     end
-    b[N] += (-1)^N
+    b[N] = (-1)^(N-1)
 
     c = zeros(TF, N)
-    c .= 2/N
+    for n = 1:N
+        c[n] = 2/n
+    end
 
     d = zeros(TF, N)
     d[1] = 1/2
@@ -38,11 +39,11 @@ function PetersFiniteState{N,TF}() where {N,TF}
     D = zeros(TF, N, N)
     for m in 1:N-1
         n = m + 1
-        D[m, n] = n/2
+        D[m, n] = 1/(2*n)
     end
     for m in 2:N
         n = m - 1
-        D[m, n] = -n/2
+        D[m, n] = -1/(2*n)
     end
 
     A = D + d*b' + c*d' + 1/2*c*b'
@@ -97,6 +98,80 @@ function get_input_jacobian(model::PetersFiniteState, λ, d, p, t)
 end
 
 # TODO: Add parameter jacobian
+
+# --- Typical Section Model Coupling --- #
+
+# traits
+inplace_inputs(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = false
+has_input_mass_matrix(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = true
+constant_input_mass_matrix(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = false
+defined_input_state_jacobian(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = true
+
+# interface methods
+function get_input_mass_matrix(aero::PetersFiniteState, stru::TypicalSection, u, p, t)
+    # extract model constants
+    cbar = aero.c
+    # extract parameters
+    a, b, kh, kθ, m, xθ, Ip, a, b, U, ρ = p
+    # create zero row vector with length nλ
+    zλ = zero(aero.c')
+    # construct submatrices
+    Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 -1]
+    Mda = vcat(zλ, zλ, zλ)
+    Mrs = hcat(
+        (@SVector zeros(2)),
+        (@SVector zeros(2)),
+        peters_loads_hddot(b, ρ),
+        peters_loads_θddot(a, b, ρ),
+        )
+    Mra = peters_loads_λdot(aero.c)
+    # assemble mass matrix
+    return vcat(hcat(Mds, Mda), hcat(Mrs, Mra))
+end
+
+function get_inputs(aero::PetersFiniteState{N,TF,SV,SA}, stru::TypicalSection,
+    u, p, t) where {N,TF,SV,SA}
+    # indices for extracting state variables
+    iq = SVector{4}(1:4)
+    iλ = SVector{N}(5:4+N)
+    # separate aerodynamic and structural states
+    q = u[iq]
+    λ = u[iλ]
+    # extract structural state variables
+    h, θ, hdot, θdot = q
+    # extract parameters
+    a, b, kh, kθ, m, xθ, Ip, a, b, U, ρ = p
+    # extract model constants
+    bbar = aero.b
+    # calculate aerodynamic loads
+    L, M = peters_loads(a, b, U, ρ, bbar, θ, hdot, θdot, λ)
+    # return portion of inputs that is not dependent on the state rates
+    return SVector(θdot, 0, 0, L, M)
+end
+
+function get_input_state_jacobian(aero::PetersFiniteState, stru::TypicalSection,
+    u, p, t)
+    # extract parameters
+    a, b, kh, kθ, m, xθ, Ip, a, b, U, ρ = p
+    # extract model constants
+    bbar = aero.b
+    # create zero row vector with length nλ
+    zλ = zero(aero.b')
+    # compute jacobian sub-matrices
+    Jds = @SMatrix [0 0 0 1; 0 0 0 0; 0 0 0 0]
+    Jda = vcat(zλ, zλ, zλ)
+    Jrs = hcat(
+        peters_loads_h(b, U, ρ),
+        peters_loads_θ(b, U, ρ),
+        peters_loads_hdot(),
+        peters_loads_θdot(a, b, U, ρ)
+        )
+    Jra = peters_loads_λ(b, ρ, bbar)
+    # return jacobian
+    return vcat(hcat(Jds, Jda), hcat(Jrs, Jra))
+end
+
+# TODO: Parameter jacobian
 
 # --- Internal Methods --- #
 peters_lhs(a, b, Abar, cbar, dhdot, dθdot, dλ) = Abar*dλ

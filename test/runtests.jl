@@ -32,6 +32,90 @@ using Test
 
 end
 
+@testet "Peters Finite State - Hodges" begin
+
+    using AerostructuralDynamics, LinearAlgebra
+
+    # number of aerodynamic states
+    N = 6
+
+    # dimensionless parameters
+    a = -1/5 # center of mass normalized location
+    e = -1/10 # reference point normalized location
+    μ = 20 # = m/(ρ*pi*b^2)
+    r2 = 6/25 # = Ip/(m*b^2)
+    σ = 2/5 # = ωh/ωθ
+    V = range(0, 3, length=100)
+
+    # dimensionalized parameters
+    b = 0.5
+    ρ = 1
+    m = ρ*pi*b^2
+    ωθ = 1
+    ωh = ωθ*σ
+    kh = m*ωh^2
+    kθ = m*ωθ^2
+    xθ = e - a
+    Ip = r2*m*b^2
+    U = V*b*ωθ
+
+    # aerodynamic model
+    aero = PetersFiniteState{N}()
+
+    # structural model
+    stru = TypicalSection()
+
+    # combined models
+    models = (aero, stru)
+
+    # --- Test Aerodynamic Model --- #
+
+    U0 = 0
+    u_aero = zeros(N)
+    y_aero = zeros(N)
+    p_aero = [a, b, U0, ρ]
+    t = 0
+
+    dλ = get_rates(aero, u_aero, y_aero, p_aero, t)
+    Jλ = get_state_jacobian(aero, u_aero, y_aero, p_aero, t)
+    Mλ = get_mass_matrix(aero, u_aero, y_aero, p_aero, t)
+
+    # --- Test Structural Model --- #
+
+    u_stru = zeros(4)
+    y_stru = zeros(2)
+    p_stru = [a, b, kh, kθ, m, xθ, Ip]
+    t = 0
+
+    dq = get_rates(stru, u_stru, y_stru, p_stru, t)
+    Jq = get_state_jacobian(stru, u_stru, y_stru, p_stru, t)
+    Mq = get_mass_matrix(stru, u_stru, y_stru, p_stru, t)
+
+    @test Mq == [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
+    @test Jq == [0 0 1 0; 0 0 0 1; -kh 0 0 0; 0 -kθ 0 0]
+
+    # test zero velocity eigenvalues
+    u_aero = zeros(N)
+    u_stru = zeros(4)
+    u = vcat(u_aero, u_stru)
+
+    # parameters
+    p_aero = [a, b, U[i], ρ]
+    p_stru = [a, b, kh, kθ, m, xθ, Ip]
+    p = vcat(p_aero, p_stru)
+
+    # time
+    t = 0.0
+
+    # calculate inputs
+    y = get_inputs(models, u, p, t)
+
+
+
+
+    get_mass_matrix(stru, )
+end
+
 @testset "Peters Finite State + Typical Section" begin
 
     N = 4
