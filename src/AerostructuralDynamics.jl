@@ -8,7 +8,7 @@ import DifferentialEquations.ODEFunction
 
 export AbstractModel
 export TypicalSection
-export Steady, PetersFiniteState
+export Steady, QuasiSteady, PetersFiniteState
 
 export number_of_states
 export number_of_inputs
@@ -31,9 +31,7 @@ export get_state_jacobian, get_state_jacobian!
 
 include("traits.jl")
 include("interface.jl")
-include("structures/coupled-section.jl")
 include("structures/section.jl")
-include("aerodynamics/steady.jl")
 include("aerodynamics/quasisteady.jl")
 include("aerodynamics/peters.jl")
 

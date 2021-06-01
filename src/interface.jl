@@ -5,7 +5,7 @@ Return the total number of states corresponding to the model or models.
 """
 number_of_states
 
-number_of_states(model::AbstractModel) = number_of_states(typeof(model))
+number_of_states(model::TM) where TM <:AbstractModel = number_of_states(TM)
 
 number_of_states(::Type{T}) where T<:NoStateModel = 0
 
@@ -24,7 +24,7 @@ Return the total number of inputs corresponding to the model or models.
 """
 number_of_inputs
 
-number_of_inputs(model::AbstractModel) = number_of_inputs(typeof(model))
+number_of_inputs(model::TM) where TM <: AbstractModel = number_of_inputs(TM)
 
 number_of_inputs(::Type{T}) where T<:NoStateModel = 0
 
@@ -43,7 +43,7 @@ Return the total number of parameters corresponding to the model or models.
 """
 number_of_parameters
 
-number_of_parameters(model::AbstractModel) = number_of_parameters(typeof(model))
+number_of_parameters(model::TM) where TM<:AbstractModel = number_of_parameters(TM)
 
 function number_of_parameters(models::NTuple{N,AbstractModel}) where N
     sum(number_of_parameters.(models))
@@ -60,7 +60,7 @@ Return the indices corresponding to the state variables for each model in `model
 """
 function state_indices(models::NTuple{N,AbstractModel}) where N
     # input indices
-    Nu = number_of_states.(typeof.(models))
+    Nu = number_of_states.(models)
     iu2 = cumsum(Nu)
     iu1 = iu2 .- Nu .+ 1
     return UnitRange.(iu1, iu2)
@@ -73,7 +73,7 @@ Return the indices corresponding to the input variables for each model in `model
 """
 function input_indices(models::NTuple{N,AbstractModel}) where N
     # input indices
-    Ny = number_of_inputs.(typeof.(models))
+    Ny = number_of_inputs.(models)
     iy2 = cumsum(Ny)
     iy1 = iy2 .- Ny .+ 1
     return UnitRange.(iy1, iy2)
@@ -86,7 +86,7 @@ Return the indices corresponding to the parameters for each model in `models`
 """
 function parameter_indices(models::NTuple{N,AbstractModel}) where N
     # parameter indices
-    Np = number_of_parameters.(typeof.(models))
+    Np = number_of_parameters.(models)
     ip2 = cumsum(Np)
     ip1 = ip2 .- Np .+ 1
     return UnitRange.(ip1, ip2)
@@ -98,9 +98,9 @@ end
 
 Calculate the mass matrix for a model or combination of models.
 """
-function get_mass_matrix(models, args...; kwargs...)
-    return _get_mass_matrix(mass_matrix_type(typeof(models)),
-        inplaceness(typeof(models)), models, args...; kwargs...)
+function get_mass_matrix(models::TM, args...; kwargs...) where TM
+    return _get_mass_matrix(mass_matrix_type(TM), inplaceness(TM), models,
+        args...; kwargs...)
 end
 
 # dispatch to an in-place function
@@ -123,8 +123,11 @@ function _get_mass_matrix(::Empty, ::OutOfPlace, models, args...; kwargs...)
 end
 
 # return the identity matrix
-function _get_mass_matrix(::Identity, ::OutOfPlace, models, args...; kwargs...)
-    Nu = number_of_states(typeof(models))
+function _get_mass_matrix(::Identity, ::OutOfPlace, models::TM, args...;
+    kwargs...) where TM
+
+    Nu = number_of_states(TM)
+
     return SMatrix{Nu, Nu, Float64}(I)
 end
 
@@ -252,9 +255,9 @@ end
 
 In-place version of `get_mass_matrix`.
 """
-function get_mass_matrix!(M, models, args...; kwargs...)
-    return _get_mass_matrix!(M, mass_matrix_type(typeof(models)),
-        inplaceness(typeof(models)), models, args...; kwargs...)
+function get_mass_matrix!(M, models::TM, args...; kwargs...) where TM
+    return _get_mass_matrix!(M, mass_matrix_type(TM), inplaceness(TM), models,
+        args...; kwargs...)
 end
 
 # dispatch to an out-of-place function
@@ -451,9 +454,9 @@ end
 Calculate the jacobian with respect to the state variables for the specified
 models.
 """
-function get_state_jacobian(models, u, y, p, t)
-    return _get_state_jacobian(state_jacobian_type(typeof(models)),
-        inplaceness(typeof(models)), models, u, y, p, t)
+function get_state_jacobian(models::TM, u, y, p, t) where TM
+    return _get_state_jacobian(state_jacobian_type(TM), inplaceness(TM), models,
+        u, y, p, t)
 end
 
 # dispatch to an in-place function
@@ -476,8 +479,8 @@ function _get_state_jacobian(::Empty, ::OutOfPlace, models, args...)
 end
 
 # return the identity matrix
-function _get_state_jacobian(::Identity, ::OutOfPlace, models, args...)
-    Nu = number_of_states(typeof(models))
+function _get_state_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Nu = number_of_states(TM)
     return SMatrix{Nu, Nu, Float64}(I)
 end
 
@@ -727,20 +730,20 @@ end
 
 Calculate the jacobian with respect to the inputs for the specified model or models.
 """
-function get_input_jacobian(models, args...)
-    return _get_input_jacobian(input_jacobian_type(typeof(models)), models, args...)
+function get_input_jacobian(models::TM, args...) where TM
+    return _get_input_jacobian(input_jacobian_type(TM), models, args...)
 end
 
 # return an empty matrix
-function _get_input_jacobian(::Empty, models, args...)
-    Ny = number_of_inputs(typeof(models))
+function _get_input_jacobian(::Empty, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
     return SMatrix{Ny, 0, Float64}()
 end
 
 # return a zero-valued matrix
 function _get_input_jacobian(::Zeros, models, args...)
-    Ny = number_of_inputs(typeof(models))
-    Nu = number_of_states(typeof(models))
+    Ny = number_of_inputs(models)
+    Nu = number_of_states(models)
     return FillMap(0, Ny, Nu)
 end
 
@@ -843,14 +846,14 @@ Calculate the input function mass matrix for the specified combination of models
 """
 get_input_mass_matrix
 
-function get_input_mass_matrix(models; kwargs...)
-    return _get_input_mass_matrix(mass_matrix_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models; kwargs...)
+function get_input_mass_matrix(models::TM; kwargs...) where TM
+    return _get_input_mass_matrix(mass_matrix_type(TM.parameters...),
+        inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_mass_matrix(models, u, p, t; kwargs...)
-    return _get_input_mass_matrix(mass_matrix_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models, u, p, t; kwargs...)
+function get_input_mass_matrix(models::TM, u, p, t; kwargs...) where TM
+    return _get_input_mass_matrix(mass_matrix_type(TM.parameters...),
+        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # dispatch to an in-place function
@@ -870,15 +873,21 @@ function _get_input_mass_matrix(::Any, ::InPlace, models, u, p, t; kwargs...)
 end
 
 # return an empty matrix
-function _get_input_mass_matrix(::Empty, ::OutOfPlace, models, args...; kwargs...)
-    Ny = number_of_inputs(typeof(models))
+function _get_input_mass_matrix(::Empty, ::OutOfPlace, models::TM, args...;
+    kwargs...) where TM
+
+    Ny = number_of_inputs(TM)
+
     return SMatrix{Ny, 0, Float64}()
 end
 
 # return a matrix of zeros
-function _get_input_mass_matrix(::Zeros, ::OutOfPlace, models, args...; kwargs...)
-    Ny = number_of_inputs(typeof(models))
-    Nu = number_of_states(typeof(models))
+function _get_input_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
+    kwargs...) where TM
+
+    Ny = number_of_inputs(TM)
+    Nu = number_of_states(TM)
+
     return zeros(SMatrix{Ny, Nu, Float64})
 end
 
@@ -909,14 +918,14 @@ In-place version of [`get_input_mass_matrix`](@ref).
 """
 get_input_mass_matrix!
 
-function get_input_mass_matrix!(My, models; kwargs...)
-    return _get_input_mass_matrix!(My, mass_matrix_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models; kwargs...)
+function get_input_mass_matrix!(My, models::TM; kwargs...) where TM
+    return _get_input_mass_matrix!(My, mass_matrix_type(TM.parameters...),
+        inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_mass_matrix!(My, models, u, p, t; kwargs...)
-    return _get_input_mass_matrix!(My, mass_matrix_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models, u, p, t; kwargs...)
+function get_input_mass_matrix!(My, models::TM, u, p, t; kwargs...) where TM
+    return _get_input_mass_matrix!(My, mass_matrix_type(TM.parameters...),
+        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # dispatch to an out-of-place function
@@ -962,8 +971,8 @@ end
 
 Calculate the inputs to the specified combination of models.
 """
-function get_inputs(models, u, p, t)
-    return _get_inputs(inplaceness(typeof.(models)...), models, u, p, t)
+function get_inputs(models::TM, u, p, t) where TM
+    return _get_inputs(inplaceness(TM.parameters...), models, u, p, t)
 end
 
 # dispatch to an in-place function
@@ -1006,14 +1015,14 @@ for the specified combination of models.
 """
 get_input_state_jacobian
 
-function get_input_state_jacobian(models; kwargs...)
-    return _get_input_state_jacobian(state_jacobian_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models; kwargs...)
+function get_input_state_jacobian(models::TM; kwargs...) where TM
+    return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),
+        inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_state_jacobian(models, u, p, t; kwargs...)
-    return _get_input_state_jacobian(mass_matrix_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models, u, p, t; kwargs...)
+function get_input_state_jacobian(models::TM, u, p, t; kwargs...) where TM
+    return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),
+        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # dispatch to an in-place function
@@ -1033,15 +1042,21 @@ function _get_input_state_jacobian(::Any, ::InPlace, models, u, p, t; kwargs...)
 end
 
 # return an empty matrix
-function _get_input_state_jacobian(::Empty, ::OutOfPlace, models, args...; kwargs...)
-    Ny = number_of_inputs(typeof(models))
+function _get_input_state_jacobian(::Empty, ::OutOfPlace, models::TM, args...;
+    kwargs...) where TM
+
+    Ny = number_of_inputs(TM)
+
     return SMatrix{Ny, 0, Float64}()
 end
 
 # return a matrix of zeros
-function _get_input_state_jacobian(::Zeros, ::OutOfPlace, models, args...; kwargs...)
-    Ny = number_of_inputs(typeof(models))
-    Nu = number_of_states(typeof(models))
+function _get_input_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...;
+    kwargs...) where TM
+
+    Ny = number_of_inputs(TM)
+    Nu = number_of_states(TM)
+
     return zeros(SMatrix{Ny, Nu, Float64})
 end
 
@@ -1071,14 +1086,14 @@ In-place version of [`get_input_state_jacobian`](@ref)
 """
 get_input_state_jacobian!
 
-function get_input_state_jacobian!(Jy, models; kwargs...)
-    return _get_input_state_jacobian!(Jy, state_jacobian_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models; kwargs...)
+function get_input_state_jacobian!(Jy, models::TM; kwargs...) where TM
+    return _get_input_state_jacobian!(Jy, state_jacobian_type(TM.parameters...),
+        inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_state_jacobian!(Jy, models, u, p, t; kwargs...)
-    return _get_input_state_jacobian!(Jy, state_jacobian_type(typeof.(models)...),
-        inplaceness(typeof.(models)...), models, u, p, t; kwargs...)
+function get_input_state_jacobian!(Jy, models::TM, u, p, t; kwargs...) where TM
+    return _get_input_state_jacobian!(Jy, state_jacobian_type(TM.parameters...),
+        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # dispatch to an out-of-place function

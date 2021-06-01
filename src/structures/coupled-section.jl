@@ -51,20 +51,28 @@ end
 
 # left side of rate equations (used for testing)
 function section_lhs(b, m, xθ, Ip, dh, dθ, dhdot, dθdot)
-    SVector(dh, dθ, m*(dhdot + b*xθ*dθdot), Ip*dθdot + m*b*xθ*dhdot)
+    SVector(dh, dθ, m*(dhdot*b + b*xθ*dθdot), Ip/(m*b^2)*dθdot + xθ*dhdot)
 end
 
 # right side of rate equations (used for testing)
 function section_rhs(U, ρ, a, b, kh, kθ, h, θ, hdot, θdot, L, M)
-    SVector(hdot, θdot, -kh*h - 2*pi*ρ*b*U^2*θ, -kθ*θ + (b/2+a*b)*2*pi*ρ*b*U^2*θ)
+    SVector(hdot, θdot, -kh*b*h - 2*pi*ρ*b*U^2*θ, -kθ/(m*b^2)*θ + (b/2+a*b)*2*pi*ρ/(m*b^2)*b*U^2*θ)
 end
 
 # state jacobian
 function section_state_jacobian(U, ρ, a, b, kh, kθ)
-    @SMatrix [0 0 1 0; 0 0 0 1; -kh -2*pi*ρ*b*U^2 0 0; 0 -kθ+(b/2+a*b)*2*pi*ρ*b*U^2 0 0]
+
+    L_θ = 2*pi*ρ*b*U^2
+    @SMatrix [0           0                            1           0;  #h/b
+              0           0                            0           1;  #θ
+             -kh  -L_θ                   0           0;  #hdot/b
+              0  b*(1/2+a)*L_θ-kθ        0           0]  #θdot
 end
 
 # rate jacobian (mass matrix)
 function section_mass_matrix(b, m, xθ, Ip)
-    @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
+    @SMatrix [1 0 0 0;       #dh/b
+              0 1 0 0;       #dθ
+              0 0 m m*b*xθ;  #dhdot/b
+              0 0 m*b*xθ Ip] #dθdot
 end
