@@ -57,7 +57,6 @@ number_of_states(::Type{PetersFiniteState{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
 number_of_inputs(::Type{<:PetersFiniteState}) = 3
 number_of_parameters(::Type{<:PetersFiniteState}) = 4
 inplaceness(::Type{<:PetersFiniteState}) = OutOfPlace()
-has_mass_matrix(::Type{<:PetersFiniteState}) = true
 mass_matrix_type(::Type{<:PetersFiniteState}) = Constant()
 state_jacobian_type(::Type{<:PetersFiniteState}) = Varying()
 input_jacobian_type(::Type{<:PetersFiniteState}) = Varying()
@@ -133,7 +132,7 @@ function get_inputs(aero::PetersFiniteState{N,TF,SV,SA}, stru::TypicalSection,
     # extract structural state variables
     h, θ, hdot, θdot = q
     # extract parameters
-    a, b, kh, kθ, m, xθ, Ip, a, b, U, ρ = p
+    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
     # extract model constants
     bbar = aero.b
     # calculate aerodynamic loads
@@ -174,9 +173,9 @@ peters_input_jacobian(a, b, U, cbar) = hcat(U*cbar, cbar, (b/2-a*b)*cbar)
 function peters_loads(a, b, U, ρ, bbar, θ, hdot, θdot, hddot, θddot, λ)
     # calculate induced flow velocity
     λ0 = 1/2 * bbar'*λ
-    # calculate lift (excluding state rate terms)
-    L = 2*pi*ρ*U*b*(hdot + U*θ + (b/2-a*b)*θdot - λ0) + pi*ρ*b^2*(hddot + U*θdot - b*a*θddot)
-    # calculate moment (excluding state rate terms)
+    # calculate lift
+    L = 2*pi*ρ*U*b*(hdot + U*θ + (b/2-a*b)*θdot - λ0) + pi*ρ*b^2*(hddot + U*θdot - a*b*θddot)
+    # calculate moment
     M = -pi*ρ*b^3*(hddot/2 + U*θdot + b*(1/8 - a/2)*θddot)
     # return load
     return SVector(L, M)
