@@ -13,7 +13,7 @@ number_of_states(::Type{TypicalSection}) = 4
 number_of_inputs(::Type{TypicalSection}) = 2
 number_of_parameters(::Type{TypicalSection}) = 7
 inplaceness(::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{TypicalSection}) = Constant()
+mass_matrix_type(::Type{TypicalSection}) = Varying()
 state_jacobian_type(::Type{TypicalSection}) = Varying()
 input_jacobian_type(::Type{TypicalSection}) = Varying()
 input_dependence_type(::Type{TypicalSection}) = Linear()
@@ -49,10 +49,10 @@ function get_input_jacobian(::TypicalSection, q, r, p, t)
     # extract parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # return jacobian
-    return section_load_jacobian(a, b)
+    return section_input_jacobian(a, b)
 end
 
-# TODO: Add get_parameter_jacobian
+# TODO: Add parameter jacobian
 
 # --- Internal --- #
 
@@ -72,7 +72,7 @@ function section_state_jacobian(kh, kθ)
 end
 
 # load jacobian
-section_load_jacobian(a, b) = @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
+section_input_jacobian(a, b) = @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
 
 # rate jacobian (mass matrix)
 function section_mass_matrix(b, m, xθ, Ip)

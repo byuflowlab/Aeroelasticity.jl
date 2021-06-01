@@ -177,17 +177,17 @@ p1 = scatter(V, imag.(λ')/ωθ, label="",
     xlim = (0,3),
     xtick = 0.0:0.5:3.0,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
-    ylim = (0, 1.05),
-    ytick = 0.0:0.2:1.0,
+    #ylim = (0, 1.05),
+    #ytick = 0.0:0.2:1.0,
     ylabel = "\$ \\frac{\\Omega}{\\omega_\\theta} \$",
     )
 
-p2 = scatter(V, real.(λ')/ωθ, label="",a
+p2 = scatter(V, real.(λ')/ωθ, label="",
     xlim = (0,3),
     xtick = 0.0:0.5:3.0,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
-    ylim = (-0.7, 0.605),
-    ytick = -0.6:0.2:0.6,
+    #ylim = (-0.7, 0.605),
+    #ytick = -0.6:0.2:0.6,
     ylabel = "\$ \\frac{Γ}{\\omega_\\theta} \$",
     )
 
@@ -280,7 +280,7 @@ p1 = scatter(V, imag.(λ')/ωθ, label="",
     ylabel = "\$ \\frac{\\Omega}{\\omega_\\theta} \$",
     )
 
-p2 = scatter(V, real.(λ')/ωθ, label="",a
+p2 = scatter(V, real.(λ')/ωθ, label="",
     xlim = (0,3),
     xtick = 0.0:0.5:3.0,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
