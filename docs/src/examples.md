@@ -189,4 +189,4 @@ nothing #hide
 
 ![](typical-section-stability.svg)
 
-The same analysis and results are presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity" for the steady state and Peters' Finite State models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.
+The same analysis and results are presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity" for the steady state and Peters' Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.
