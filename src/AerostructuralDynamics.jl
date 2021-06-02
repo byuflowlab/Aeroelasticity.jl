@@ -1,7 +1,6 @@
 module AerostructuralDynamics
 
 using LinearAlgebra
-using SpecialFunctions
 using LinearMaps
 using StaticArrays
 import DifferentialEquations.ODEFunction
