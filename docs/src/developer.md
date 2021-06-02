@@ -79,14 +79,14 @@ We start creating our model by defining a new type.
 
 ```@example developer
 """
-    MyTypicalSection
+    MyTypicalSection <: AbstractModel
 
 Typical section structural model with state variables ``q = \\begin{bmatrix} h &
 θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, structural parameters ``p_s =
 \\begin{bmatrix} a & b & k_h & k_\\theta & m & x_\\theta & I_P \\end{bmatrix}^T``,
 and aerodynamic loads ``r = \\begin{bmatrix} L & M_\\frac{1}{4} \\end{bmatrix}^T``
 """
-struct MyTypicalSection end
+struct MyTypicalSection <: AbstractModel end
 
 nothing #hide
 ```
