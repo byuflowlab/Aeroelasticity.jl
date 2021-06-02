@@ -40,7 +40,7 @@ Author: Taylor McDonnell
      - Steady Vortex Lattice (3D) #TODO
      - Quasi-Steady Vortex Lattice (3D) #TODO
      - Unsteady Vortex Lattice (3D) #TODO
- - Verifications and/or validations of implemented models (see the [examples](@ref Examples))
+ - Verifications and/or validations of implemented models (see the [examples](https://flow.byu.edu/AerostructuralDynamics.jl/dev))
 ## Installation
 
 Enter the package manager by typing `]` and then run the following:
@@ -51,4 +51,4 @@ pkg> add https://flow.byu.edu/AerostructuralDynamics.jl
 
 ## Usage
 
-See the [examples](@ref Examples)
+See the [examples](https://flow.byu.edu/AerostructuralDynamics.jl/dev)
