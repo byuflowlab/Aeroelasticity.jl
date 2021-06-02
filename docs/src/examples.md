@@ -26,6 +26,12 @@ where ``a`` is the normalized distance from the semichord to the reference point
 
 We perform aeroelastic analyses using a variety of aerodynamic models in order to compare the various models.
 
+```@setup typical-section-stability
+using Plots
+pyplot()
+nothing #hide
+```
+
 ```@example typical-section-stability
 using AerostructuralDynamics, LinearAlgebra
 
