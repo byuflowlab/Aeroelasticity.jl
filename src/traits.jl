@@ -12,9 +12,45 @@ Supertype for all models which contain no state variables.
 """
 abstract type NoStateModel <: AbstractModel end
 
+"""
+    InPlaceness
+
+Abstract type for types which specify whether a model is in-place
+([InPlace](@ref)) or out-of-place ([OutOfPlace](@ref)).
+"""
 abstract type InPlaceness end
+
+"""
+    InPlace <: InPlaceness
+
+In-place singleton type.
+"""
 struct InPlace <: InPlaceness end
+
+"""
+    OutOfPlace <: InPlaceness
+
+Out-of-place singleton type.
+"""
 struct OutOfPlace <: InPlaceness end
+
+"""
+    inplaceness(::Type{T})
+
+Return [`InPlace()`](@ref) if functions associated with model `T` are in-place
+or [`OutOfPlace()`](@ref) if functions associated with model `T` are out-of-place.
+"""
+inplaceness(::Type{T}) where T <: AbstractModel
+
+"""
+    inplaceness(::Type{T1}, ::Type{T2}, ..., ::Type{TN})
+
+Return [`InPlace()`](@ref) if the functions associated with the input function
+for coupled models `T1`, `T2`, ... `TN` are in-place or [`OutOfPlace()`](@ref)
+if the functions associated with the input function for coupled models `T1`,
+`T2`, ... `TN` are out-of-place.
+"""
+inplaceness(::Vararg{Type,N}) where N
 
 # definition for models with no states
 inplaceness(::Type{T}) where T<:NoStateModel = OutOfPlace()
