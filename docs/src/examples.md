@@ -16,7 +16,7 @@ where ``a`` is the normalized distance from the semichord to the reference point
 We use the non-dimensional parameters
 ```math
 a = -1/5 \quad e = -1/10  \\
-r^2 = frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
+r^2 = \frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
 \mu = \frac{m}{\rho_\infty \pi b^2} \quad V = \frac{U}{b \omega_\theta}
 ```
 where ``a`` is the normalized distance from the semichord to the reference point, ``e`` is the normalized distance from the semichord to the center of mass, and ``\omega_h`` and ``\omega_\theta`` are the uncoupled natural frequencies.
