@@ -1,33 +1,35 @@
 """
-    TypicalSection <: StructuralModel
+    TypicalSection <: AbstractModel
 
 Typical section structural model with state variables ``q = \\begin{bmatrix} h &
 θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, structural parameters ``p_s =
 \\begin{bmatrix} a & b & k_h & k_\\theta & m & x_\\theta & I_P \\end{bmatrix}^T``,
 and aerodynamic loads ``r = \\begin{bmatrix} L & M_\\frac{1}{4} \\end{bmatrix}^T``
 """
-struct TypicalSection <: StructuralModel end
+struct TypicalSection <: AbstractModel end
 
-number_of_states(::TypicalSection) = 4
-number_of_inputs(::TypicalSection) = 2
-isinplace(::TypicalSection) = false
-has_mass_matrix(::TypicalSection) = true
-constant_mass_matrix(::TypicalSection) = false
-linear_input_dependence(::TypicalSection) = true
-defined_state_jacobian(::TypicalSection) = true
-defined_input_jacobian(::TypicalSection) = true
-constant_input_jacobian(::TypicalSection) = false
+# --- Traits --- #
+number_of_states(::Type{TypicalSection}) = 4
+number_of_inputs(::Type{TypicalSection}) = 2
+number_of_parameters(::Type{TypicalSection}) = 7
+inplaceness(::Type{TypicalSection}) = OutOfPlace()
+mass_matrix_type(::Type{TypicalSection}) = Varying()
+state_jacobian_type(::Type{TypicalSection}) = Varying()
+input_jacobian_type(::Type{TypicalSection}) = Varying()
+input_dependence_type(::Type{TypicalSection}) = Linear()
+
+# --- Methods --- #
 
 function get_mass_matrix(::TypicalSection, q, r, p, t)
     # extract structural parameters
     a, b, kh, kθ, m, xθ, Ip = p
-    # update mass matrix
+    # calculate mass matrix
     return section_mass_matrix(b, m, xθ, Ip)
 end
 
 function get_rates(::TypicalSection, q, r, p, t)
     # extract structural states
-    h, θ, hdot, θdot = u
+    h, θ, hdot, θdot = q
     # extract aerodynamic loads
     L, M = r
     # extract structural parameters
@@ -43,16 +45,16 @@ function get_state_jacobian(::TypicalSection, q, r, p, t)
     return section_state_jacobian(kh, kθ)
 end
 
-function get_load_jacobian(::TypicalSection, q, r, p, t)
+function get_input_jacobian(::TypicalSection, q, r, p, t)
     # extract parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # return jacobian
-    return section_load_jacobian(a, b)
+    return section_input_jacobian(a, b)
 end
 
-# TODO: Add get_parameter_jacobian
+# TODO: Add parameter jacobian
 
-# --- Internal Functions --- #
+# --- Internal --- #
 
 # left side of rate equations (used for testing)
 function section_lhs(b, m, xθ, Ip, dh, dθ, dhdot, dθdot)
@@ -70,7 +72,7 @@ function section_state_jacobian(kh, kθ)
 end
 
 # load jacobian
-section_load_jacobian(a, b) = @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
+section_input_jacobian(a, b) = @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
 
 # rate jacobian (mass matrix)
 function section_mass_matrix(b, m, xθ, Ip)
