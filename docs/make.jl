@@ -10,10 +10,10 @@ makedocs(;
     ],
     sitename = "AerostructuralDynamics.jl",
     authors = "Taylor McDonnell <taylormcd@byu.edu>",
-    devbranch = "main",
     # format = LaTeX(), # uncomment for PDF output
 )
 
 deploydocs(
     repo = "github.com/byuflowlab/AerostructuralDynamics.jl.git",
+    devbranch = "main",
 )
