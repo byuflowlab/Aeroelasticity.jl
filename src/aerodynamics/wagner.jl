@@ -81,12 +81,12 @@ function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, u, p, t)
     # extract parameters
     a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
     # construct submatrices
-    Mda = @SMatrix [0 0 0 0; 0 0 0 0]
+    Mda = @SMatrix [0 0; 0 0; 0 0]
     Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
     Mra = @SMatrix [0 0; 0 0]
     Mrs = hcat(
-        SVector(0, 0, 0, 0),
-        SVector(0, 0, 0, 0),
+        SVector(0, 0),
+        SVector(0, 0),
         -wagner_loads_hddot(b, ρ),
         -wagner_loads_θddot(a, b, ρ)
     )
@@ -103,7 +103,7 @@ function get_inputs(aero::Wagner, stru::TypicalSection, u, p, t)
     C1 = aero.C1
     C2 = aero.C2
     # calculate aerodynamic loads
-    L, M = wagner_loads(a, b, U, ρ, C1, C2, θ, hdot, θdot, hddot, θddot, λ1, λ2)
+    L, M = wagner_loads(a, b, U, ρ, C1, C2, θ, hdot, θdot, 0, 0, λ1, λ2)
     # return portion of inputs that is not dependent on the state rates
     return SVector(θ, hdot, θdot, L, M)
 end
@@ -112,9 +112,10 @@ function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) w
     # extract parameters
     a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
     # extract model constants
-    bbar = aero.b
+    C1 = aero.C1
+    C2 = aero.C2
     # compute jacobian sub-matrices
-    Jda = @SMatrix [0 0 0; 0 0 0]
+    Jda = @SMatrix [0 0; 0 0; 0 0]
     Jds = @SMatrix [0 1 0 0; 0 0 1 0; 0 0 0 1]
     Jra = wagner_loads_λ(b, U, ρ)
     Jrs = hcat(

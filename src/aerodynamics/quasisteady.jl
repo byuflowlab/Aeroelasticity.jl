@@ -119,7 +119,7 @@ end
 
 function second_order_loads(a, b, U, ρ, θdot, hddot, θddot)
     L = pi*ρ*b^2*(hddot + U*θdot - b*a*θddot)
-    M = -pi*ρ*b^3(hddot/2 + b*(1/8 - a/2)*θddot) # quarter chord moment
+    M = -pi*ρ*b^3*(hddot/2 + b*(1/8 - a/2)*θddot) # quarter chord moment
     return SVector(L, M)
 end
 
@@ -158,7 +158,7 @@ function quasisteady2_mass_matrix(a, b, U, ρ)
     L_hddot = -pi*ρ*b^2
     L_θddot = pi*ρ*a*b^3
     M_hddot = pi*ρ*b^3*(1/2)
-    M_θddot = pi*ρ*b^3*b*(1/8 - a/2)
+    M_θddot = pi*ρ*b^4*(1/8 - a/2)
     # return jacobian
     return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
 end

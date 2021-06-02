@@ -46,7 +46,7 @@ end
     fout1_q = (q) -> fout0_q(q) .+ AerostructuralDynamics.first_order_loads(a, b,
         U, ρ, q[3], q[4])
     fout2_q = (q) -> fout1_q(q) .+ AerostructuralDynamics.second_order_loads(a, b, U, ρ, q[4], 0, 0)
-    fout2_dq = (dq) -> fout1_q(q) .+ AerostructuralDynamics.second_order_loads(a, b, U, ρ, 0, q[3], q[4])
+    fout2_dq = (dq) -> fout1_q(q) .+ AerostructuralDynamics.second_order_loads(a, b, U, ρ, 0, dq[3], dq[4])
 
     @test isapprox(ForwardDiff.jacobian(fout0_q, q),
         AerostructuralDynamics.quasisteady0_jacobian(b, U, ρ))
@@ -54,7 +54,7 @@ end
         AerostructuralDynamics.quasisteady1_jacobian(a, b, U, ρ))
     @test isapprox(ForwardDiff.jacobian(fout2_q, q),
         AerostructuralDynamics.quasisteady2_jacobian(a, b, U, ρ))
-    @test isapprox(ForwardDiff.jacobian(fout2_dq, q),
+    @test isapprox(-ForwardDiff.jacobian(fout2_dq, dq),
         AerostructuralDynamics.quasisteady2_mass_matrix(a, b, U, ρ))
 
 end
@@ -71,7 +71,7 @@ end
 
     dλ1, dλ2 = dλ
     λ1, λ2 = λ
-    θdot, hddot, θddot = d
+    θ, hdot, θdot = d
     a, b, U, ρ = p
 
     C1 = model.C1

@@ -8,7 +8,7 @@ import DifferentialEquations.ODEFunction
 
 export AbstractModel
 export TypicalSection
-export Steady, QuasiSteady, Wagner, PetersFiniteState
+export Steady, QuasiSteady, Wagner, Peters
 
 export number_of_states
 export number_of_inputs

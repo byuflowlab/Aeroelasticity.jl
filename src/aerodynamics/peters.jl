@@ -1,26 +1,27 @@
 """
-    PetersFiniteState{N,TF,SV,SA} <: AbstractModel
+    Peters{N,TF,SV,SA} <: AbstractModel
 
 Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
 \\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
 ``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
 """
-struct PetersFiniteState{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: AbstractModel
+struct Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: AbstractModel
     A::TA
     b::TV
     c::TV
 end
 
 # --- Constructors --- #
-"""
-    PetersFiniteState{N,TF=Float64}()
 
-Initialize an object of type `PetersFiniteState` which has `N` aerodynamic
+"""
+    Peters{N,TF=Float64}()
+
+Initialize an object of type `Peters` which has `N` aerodynamic
 degrees of freedom.
 """
-PetersFiniteState{N}() where N = PetersFiniteState{N,Float64}()
+Peters{N}() where N = Peters{N,Float64}()
 
-function PetersFiniteState{N,TF}() where {N,TF}
+function Peters{N,TF}() where {N,TF}
 
     b = zeros(TF, N)
     for n = 1:N-1
@@ -49,24 +50,25 @@ function PetersFiniteState{N,TF}() where {N,TF}
 
     A = D + d*b' + c*d' + 1/2*c*b'
 
-    return PetersFiniteState(SMatrix{N,N,TF}(A), SVector{N,TF}(b), SVector{N,TF}(c))
+    return Peters(SMatrix{N,N,TF}(A), SVector{N,TF}(b), SVector{N,TF}(c))
 end
 
 # --- Traits --- #
-number_of_states(::Type{PetersFiniteState{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
-number_of_inputs(::Type{<:PetersFiniteState}) = 3
-number_of_parameters(::Type{<:PetersFiniteState}) = 4
-inplaceness(::Type{<:PetersFiniteState}) = OutOfPlace()
-mass_matrix_type(::Type{<:PetersFiniteState}) = Constant()
-state_jacobian_type(::Type{<:PetersFiniteState}) = Varying()
-input_jacobian_type(::Type{<:PetersFiniteState}) = Varying()
-input_dependence_type(::Type{<:PetersFiniteState}) = Linear()
+
+number_of_states(::Type{Peters{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
+number_of_inputs(::Type{<:Peters}) = 3
+number_of_parameters(::Type{<:Peters}) = 4
+inplaceness(::Type{<:Peters}) = OutOfPlace()
+mass_matrix_type(::Type{<:Peters}) = Constant()
+state_jacobian_type(::Type{<:Peters}) = Varying()
+input_jacobian_type(::Type{<:Peters}) = Varying()
+input_dependence_type(::Type{<:Peters}) = Linear()
 
 # --- Methods --- #
 
-get_mass_matrix(model::PetersFiniteState) = model.A
+get_mass_matrix(model::Peters) = model.A
 
-function get_rates(model::PetersFiniteState{N,TF,SV,SA}, λ, d, p, t) where {N,TF,SV,SA}
+function get_rates(model::Peters{N,TF,SV,SA}, λ, d, p, t) where {N,TF,SV,SA}
     # extract aerodynamic states as statically sized vector
     λ = SVector{N}(λ)
     # extract structural deflections
@@ -79,7 +81,7 @@ function get_rates(model::PetersFiniteState{N,TF,SV,SA}, λ, d, p, t) where {N,T
     return peters_rhs(a, b, U, cbar, θdot, hddot, θddot, λ)
 end
 
-function get_state_jacobian(model::PetersFiniteState, λ, d, p, t)
+function get_state_jacobian(model::Peters, λ, d, p, t)
     # extract parameters
     a, b, U, ρ = p
     # extract model constants
@@ -88,7 +90,7 @@ function get_state_jacobian(model::PetersFiniteState, λ, d, p, t)
     return peters_state_jacobian(b, U, cbar)
 end
 
-function get_input_jacobian(model::PetersFiniteState, λ, d, p, t)
+function get_input_jacobian(model::Peters, λ, d, p, t)
     # extract parameters
     a, b, U, ρ = p
     # extract model constants
@@ -102,26 +104,29 @@ end
 # --- Coupled Model Properties --- #
 
 # traits
-inplaceness(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = Varying()
-state_jacobian_type(::Type{<:PetersFiniteState}, ::Type{TypicalSection}) = Varying()
+inplaceness(::Type{<:Peters}, ::Type{TypicalSection}) = OutOfPlace()
+mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}) = Varying()
+state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Varying()
 
 # interface methods
-function get_input_mass_matrix(aero::PetersFiniteState{N,TF,SV,SA},
+function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
     # construct submatrices
-    Mda = zeros(SMatrix{3,N,TF}) # d(d)/d(dλ)
-    Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 -1] # d(d)/d(dq)
-    Mra = zeros(SMatrix{2,N,TF}) # d(r)/d(dλ)
-    Mrs = hcat(zeros(SVector{2,TF}), zeros(SVector{2,TF}),
-        -peters_loads_hddot(b, ρ), -peters_loads_θddot(a, b, ρ)) # d(r)/d(dq)
+    Mda = zeros(SMatrix{3,N,TF})
+    Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 -1]
+    Mra = zeros(SMatrix{2,N,TF})
+    Mrs = hcat(
+        zeros(SVector{2,TF}),
+        zeros(SVector{2,TF}),
+        -peters_loads_hddot(b, ρ), 
+        -peters_loads_θddot(a, b, ρ))
     # assemble mass matrix
     return [Mda Mds; Mra Mrs]
 end
 
-function get_inputs(aero::PetersFiniteState{N,TF,SV,SA}, stru::TypicalSection,
+function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     u, p, t) where {N,TF,SV,SA}
     # indices for extracting state variables
     iλ = SVector{N}(1:N)
@@ -141,7 +146,7 @@ function get_inputs(aero::PetersFiniteState{N,TF,SV,SA}, stru::TypicalSection,
     return SVector(θdot, 0, 0, L, M)
 end
 
-function get_input_state_jacobian(aero::PetersFiniteState{N,TF,SV,SA},
+function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
