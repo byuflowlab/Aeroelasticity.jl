@@ -4,7 +4,6 @@ makedocs(;
     modules = [AerostructuralDynamics],
     pages = [
         "Home" => "index.md",
-        "Getting Started" => "guide.md",
         "Examples" => "examples.md",
         "Developer Guide" => "developer.md",
         "Library" => "library.md",
