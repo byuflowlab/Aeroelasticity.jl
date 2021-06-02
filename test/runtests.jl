@@ -128,9 +128,9 @@ end
     # TODO: Test interface functions
 end
 
-@testset "Peter's Finite State" begin
+@testset "Peters' Finite State" begin
 
-    model = PetersFiniteState{4}()
+    model = Peters{4}()
 
     dλ = rand(number_of_states(model))
     λ = rand(number_of_states(model))
