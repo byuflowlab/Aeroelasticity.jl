@@ -111,8 +111,8 @@ state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Varying()
 # interface methods
 function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # construct submatrices
     Mda = zeros(SMatrix{3,N,TF})
     Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 -1]
@@ -120,7 +120,7 @@ function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     Mrs = hcat(
         zeros(SVector{2,TF}),
         zeros(SVector{2,TF}),
-        -peters_loads_hddot(b, ρ), 
+        -peters_loads_hddot(b, ρ),
         -peters_loads_θddot(a, b, ρ))
     # assemble mass matrix
     return [Mda Mds; Mra Mrs]
@@ -136,8 +136,8 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     q = u[iq]
     # extract structural state variables
     h, θ, hdot, θdot = q
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # extract model constants
     bbar = aero.b
     # calculate aerodynamic loads
@@ -148,8 +148,8 @@ end
 
 function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # extract model constants
     bbar = aero.b
     # compute jacobian sub-matrices

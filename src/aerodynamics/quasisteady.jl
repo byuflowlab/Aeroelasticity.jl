@@ -34,8 +34,8 @@ state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Varying()
 function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, u, p, t)
     # extract state variables
     h, θ, hdot, θdot = u
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # calculate aerodynamic loads
     L, M = zero_order_loads(b, U, ρ, θ)
     # return inputs
@@ -46,8 +46,8 @@ end
 function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, u, p, t)
     # extract state variables
     h, θ, hdot, θdot = u
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # calculate aerodynamic loads
     L, M = zero_order_loads(b, U, ρ, θ) .+
         first_order_loads(a, b, U, ρ, hdot, θdot)
@@ -59,8 +59,8 @@ end
 function get_inputs(aero::QuasiSteady{2}, stru::TypicalSection, u, p, t)
     # extract state variables
     h, θ, hdot, θdot = u
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # calculate aerodynamic loads
     L, M = zero_order_loads(b, U, ρ, θ) .+
         first_order_loads(a, b, U, ρ, hdot, θdot) .+
@@ -71,32 +71,32 @@ end
 
 # steady
 function get_input_state_jacobian(aero::QuasiSteady{0}, stru::TypicalSection, u, p, t)
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # return jacobian
     return quasisteady0_jacobian(b, U, ρ)
 end
 
 # quasi-steady, neglecting acceleration terms
 function get_input_state_jacobian(aero::QuasiSteady{1}, stru::TypicalSection, u, p, t)
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # return jacobian
     return quasisteady1_jacobian(a, b, U, ρ)
 end
 
 # quasi-steady, including acceleration terms
 function get_input_state_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, u, p, t)
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # return jacobian
     return quasisteady2_jacobian(a, b, U, ρ)
 end
 
 # quasi-steady, including acceleration terms
 function get_input_mass_matrix(aero::QuasiSteady{2}, stru::TypicalSection, u, p, t)
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # return jacobian
     return quasisteady2_mass_matrix(a, b, U, ρ)
 end
