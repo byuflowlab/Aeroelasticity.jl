@@ -78,8 +78,8 @@ mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Varying()
 state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Varying()
 
 function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, u, p, t)
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # construct submatrices
     Mda = @SMatrix [0 0; 0 0; 0 0]
     Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
@@ -97,8 +97,8 @@ end
 function get_inputs(aero::Wagner, stru::TypicalSection, u, p, t)
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = u
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -109,8 +109,8 @@ function get_inputs(aero::Wagner, stru::TypicalSection, u, p, t)
 end
 
 function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
-    # extract parameters
-    a, b, U, ρ, a, b, kh, kθ, m, xθ, Ip = p
+    # extract aerodynamic parameters
+    a, b, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
