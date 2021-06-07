@@ -1,6 +1,6 @@
 # Examples
 
-## Aeroelastic Analysis of the Typical Section Model
+## Two-Dimensional Aeroelastic Analysis
 
 In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.
 
@@ -26,13 +26,13 @@ where ``a`` is the normalized distance from the semichord to the reference point
 
 We perform aeroelastic analyses using a variety of aerodynamic models in order to compare the various models.
 
-```@setup typical-section-stability
+```@setup two-dimensional-stability
 using Plots
 pyplot()
 nothing #hide
 ```
 
-```@example typical-section-stability
+```@example two-dimensional-stability
 using AerostructuralDynamics, LinearAlgebra
 
 # reduced velocity range
@@ -113,7 +113,7 @@ nothing #hide
 
 We now plot the results predicted using each aerodynamic model.
 
-```@example typical-section-stability
+```@example two-dimensional-stability
 using Plots
 pyplot()
 
@@ -188,11 +188,121 @@ end
 
 p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 
-savefig(p1, "typical-section-stability.svg") #hide
+savefig(p1, "two-dimensional-stability.svg") #hide
 
 nothing #hide
 ```
 
-![](typical-section-stability.svg)
+![](two-dimensional-stability.svg)
 
 The same analysis and results are presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity" for the steady state and Peters' Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.
+
+## Three Dimensional Aeroelastic Analysis
+
+In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.
+
+```@setup three-dimensional-stability
+using Plots
+pyplot()
+nothing #hide
+```
+
+```@example three-dimensional-stability
+using AerostructuralDynamics, GXBeam, LinearAlgebra
+
+# velocity range
+U = range(1, 30, length=100) # m/s (velocity)
+
+# aerodynamic properties
+ρ = 0.088 # kg/m^3 (air density)
+
+# structural properties
+b = 16 # m (span)
+c = 1 # m (chord)
+a = 0 # fraction of chord (Spanwise reference axis location relative to semichord)
+e = 0 # fraction of chord (Center of gravity location relative to semichord)
+GJ = 1e4 # N*m^2 (torsional rigidity)
+EIyy = 4e6 # N*m^2 (chord bending rigidity)
+EIzz = 2e4 # N*m^2 (flat bending rigidity)
+μ = 0.75 # kg/m (mass per unit span)
+i11 = 0.1 # kg*m (rotational inertia per unit span)
+
+# discretization
+N = 8 # number of elements
+
+# geometry initialization
+x = range(0, b, N+1) # point x-coordinates
+y = range(0, 0, N+1) # point y-coordinates
+z = range(0, 0, N+1) # point z-coordinates
+points = [[x[i],y[i],z[i]] for i = 1:N]
+start = 1:N # starting point of each beam element
+stop = 2:N+1 # ending point of each beam element
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIyy, 1/EIzz]), N) # compliance matrix
+mass = fill(Diagonal([μ, μ, μ, i11, 0, 0]), N) # mass matrix
+assembly = GXBeam.Assembly(points, start, stop; compliance = compliance,
+    mass = mass)
+
+# boundary condition initialization
+prescribed_conditions = Dict(
+    1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
+        theta_z=0),
+)
+
+# distributed load initialization
+distributed_loads = Dict()
+for i = 1:nelem
+    distributed_loads[i] = GXBeam.DistributedLoads(assembly, i)
+end
+
+# structural system initialization
+keep_points = [1] # points at which prescribed conditions are applied
+static = false # static simulation?
+system = GXBeam.system(assembly, keep_points, static)
+
+# construct aerodynamic model
+aerodynamic_model = LiftingLine{N}(Wagner())
+
+# construct structural model
+structural_model = GeometricallyExactBeamTheory(system, assembly, prescribed_conditions,
+    distributed_loads)
+
+# combined models
+models = (aerodynamic_model, structural_model)
+
+# eigenvalue storage
+λ = zeros(ComplexF64, number_of_states(models), length(V))
+
+# loop through each velocity
+for i = 1:length(V)
+
+    # set initial guess for the state variables
+    u0_aero = zeros(number_of_states(aerodynamic_model))
+    u0_stru = zeros(number_of_states(structural_model))
+    u0 = vcat(u_aero, u_stru)
+
+    # set parameters
+    p_aero = [a, b, U[i], ρ]
+    p_stru = [a, b, kh, kθ, m, xθ, Ip]
+    p = vcat(p_aero, p_stru)
+
+    # set time
+    t = 0.0
+
+    # find state variables corresponding to steady state operating conditions
+
+
+    # calculate inputs for steady state operating conditions
+    y = get_inputs(models, u, p, t)
+
+    # calculate mass matrix for steady state operating conditions
+    M = get_mass_matrix(models, u, y, p, t)
+
+    # calculate jacobian for steady state operating conditions
+    J = get_state_jacobian(models, u, y, p, t)
+
+    # solve generalized eigenvalue problem
+    λ[ia][:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+end
+
+nothing #hide
+```
