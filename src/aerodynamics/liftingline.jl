@@ -385,12 +385,12 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         # beam element rotation parameters
         θ_elem = states.θ
 
-        # transformation matrix from global to local frame
+        # transformation matrix from global to deformed local frame
         Ct = get_C(θ)'
         Cab = beam.Cab
         CtCab = Ct*Cab
 
-        # linear and angular velocities
+        # linear and angular velocities (transform from deformed local to global frame)
         v_elem = CtCab' * GXBeam.element_linear_velocity(element, states.P, states.H)
         ω_elem = CtCab' * GXBeam.element_angular_velocity(element, states.P, states.H)
 
@@ -399,9 +399,9 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
 
         # structural state variables
         h = states.u[3] # plunge
-        θ =  # pitch
+        θ = atan(CtCab[3,1], CtCab[1,1]) # pitch (in plane parallel to Y-Z plane)
         hdot = v_elem[3] # plunge rate
-        θdot = ω_elem[2] # pitch rate
+        θdot = ω_elem[2] # pitch rate (in plane parallel to Y-Z plane)
         qi = SVector(h, θ, hdot, θdot)
 
         # combined state variables
