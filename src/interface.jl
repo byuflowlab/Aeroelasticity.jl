@@ -5,14 +5,18 @@ Return the total number of states corresponding to the model or models.
 """
 number_of_states
 
+# default to calling function using type
 number_of_states(model::TM) where TM <:AbstractModel = number_of_states(TM)
 
+# models with no states have... no states
 number_of_states(::Type{T}) where T<:NoStateModel = 0
 
+# combined models have concatenated state variables
 function number_of_states(models::NTuple{N,AbstractModel}) where N
     sum(number_of_states.(models))
 end
 
+# combined models have concatenated state variables
 function number_of_states(::Type{T}) where T<:NTuple{N,AbstractModel} where N
     sum(number_of_states.(T.parameters))
 end
@@ -24,14 +28,18 @@ Return the total number of inputs corresponding to the model or models.
 """
 number_of_inputs
 
+# default to calling function using type
 number_of_inputs(model::TM) where TM <: AbstractModel = number_of_inputs(TM)
 
+# models with no states have no inputs
 number_of_inputs(::Type{T}) where T<:NoStateModel = 0
 
+# combined models have concatenated inputs
 function number_of_inputs(models::NTuple{N,AbstractModel}) where N
     sum(number_of_inputs.(models))
 end
 
+# combined models have concatenated inputs
 function number_of_inputs(::Type{T}) where T<:NTuple{N,AbstractModel} where N
     sum(number_of_inputs.(T.parameters))
 end
@@ -43,12 +51,15 @@ Return the total number of parameters corresponding to the model or models.
 """
 number_of_parameters
 
+# default to calling function using type
 number_of_parameters(model::TM) where TM<:AbstractModel = number_of_parameters(TM)
 
+# combined models have concatenated parameters
 function number_of_parameters(models::NTuple{N,AbstractModel}) where N
     sum(number_of_parameters.(models))
 end
 
+# combined models have concatenated parameters
 function number_of_parameters(::Type{T}) where T<:NTuple{N,AbstractModel} where N
     sum(number_of_parameters.(T.parameters))
 end
@@ -793,13 +804,13 @@ end
 
     # construct all columns
     expr = quote
-        $(Di[1]) = vcat(get_input_jacobian(models[1]), $(Dij[1, 2:end]...))
+        $(Di[1]) = vcat(get_input_jacobian(models[1]), $(Dij[2:end, 1]...))
     end
     for i = 2:N
         expr = quote
             $expr
-            $(Di[i]) = vcat($(Dij[i, 1:i-1]...), get_input_jacobian(models[$i]),
-                $(Dij[i, i+1:end]...))
+            $(Di[i]) = vcat($(Dij[1:i-1, i]...), get_input_jacobian(models[$i]),
+                $(Dij[i+1:end, i]...))
         end
     end
     expr = quote

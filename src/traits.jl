@@ -80,7 +80,7 @@ Return
 
 If no method is defined for the specified type, return [`Varying`](@ref).
 """
-mass_matrix_type(::Type{T}) = Varying()
+mass_matrix_type(::Type{T}) where T = Varying()
 
 # models with no state variables have no mass matrix
 mass_matrix_type(::Type{T}) where T<:NoStateModel = Empty()
@@ -127,7 +127,7 @@ Return
 
 If no method is defined for the specified type, return [`Varying`](@ref).
 """
-state_jacobian_type(::Type{T}) = Varying()
+state_jacobian_type(::Type{T}) where T = Varying()
 
 # models with no state variables have no state jacobian
 state_jacobian_type(::Type{T}) where T<:NoStateModel = Empty()
@@ -170,7 +170,7 @@ Return
 
 If no method is defined for the specified type, return [`Varying`](@ref).
 """
-input_jacobian_type(::Type{T}) = Varying()
+input_jacobian_type(::Type{T}) where T = Varying()
 
 # models with no state variables have no input jacobian
 input_jacobian_type(::Type{T}) where T<:NoStateModel = Empty()
@@ -199,7 +199,7 @@ dependent on the associated inputs and [`Nonlinear()`](@ref) otherwise.
 
 If no method is defined for the specified type, return [`Nonlinear`](@ref).
 """
-input_dependence_type(::Type{T}) where T<:AbstractModel = Nonlinear()
+input_dependence_type(::Type{T}) where T = Nonlinear()
 input_dependence_type(::Type{T}) where T<:NoStateModel = Linear()
 
 # --- dispatch functions --- #

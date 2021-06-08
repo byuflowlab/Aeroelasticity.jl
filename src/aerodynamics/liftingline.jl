@@ -3,7 +3,7 @@
 
 Lifting line model with `N` cross sections, using the aerodynamic models in `T`.
 State variables, inputs, and parameters correspond to the state variables, inputs,
-and parameters of each of the cross sections concatenated.
+and parameters of each of the cross sections concatenated
 """
 struct LiftingLine{N,T} <: AbstractModel
     models::T
@@ -264,80 +264,97 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     iq = state_indices(stru)
     λ = view(u, iλ)
     q = view(u, iq)
-    λs = view.(Ref(λ), state_indices(aero.models))
+
+    # separate aerodynamic and structural inputs
+    iya = input_indices(aero)
+    iys = input_indices(stru)
+    ya = view(y, iy_a)
+    ys = view(y, iy_s)
 
     # separate aerodynamic and structural parameters
     ipa = parameter_indices(aero)
     ips = parameter_indices(stru)
     pa = view(p, ip_a)
     ps = view(p, ip_s)
-    pas = view.(Ref(pa), parameter_indices(aero.models))
 
-    # separate aerodynamic and structural state rates variables
-    dλ = view(du, iλ)
-    dq = view(du, iq)
-    dλs = view.(Ref(dλ), state_indices(aero.models))
+    # get cross section aerodynamic state variables
+    iλs = state_indices(aero.models)
+    λs = view.(Ref(λ), iλs)
+
+    # get cross section aerodynamic inputs
+    iyas = input_indices(aero.models)
+    yas = view.(Ref(ya), iyas)
+
+    # get cross section aerodynamic parameters
+    ipas = parameter_indices(aero.models)
+    pas = view.(Ref(pa), ipas)
 
     # extract model properties
     system = stru.system
     assembly = stru.assembly
 
     # loop through each lifting line / beam element
-    for i = 1:N
-        # aerodynamic model
-        aerodynamic_model = aero.models[i]
+    for isec = 1:N
+
+        # get aerodynamic model for this cross section
+        aerodynamic_model = aero.models[isec]
 
         # beam element properties and state variables
-        element = assembly.elements[i]
-        states = extract_element_state(system, i; x = q)
+        element = assembly.elements[isec]
+        states = extract_element_state(system, isec; x = q)
 
-        # beam element deflections and velocities
-        dP_dPi = Diagonal((@SVector ones(3)))
-        dH_dHi = Diagonal((@SVector ones(3))) .* system.mass_scaling
+        # beam element deflections and rotation parameters
+        u_elem = states.u
+        θ_elem = states.θ
 
-        dv_dPi = element.minv11 .* system.mass_scaling
-        dv_dHi = element.minv12 .* system.mass_scaling
-        dω_dPi = element.minv21 .* system.mass_scaling
-        dω_dHi = element.minv22 .* system.mass_scaling
+        # transformation matrix from local to global frame
+        Ct = get_C(θ_elem)'
+        Cab = beam.Cab
+        CtCab = Ct*Cab
+
+        # linear and angular velocities in global frame
+        v_elem = CtCab * GXBeam.element_linear_velocity(element, states.P, states.H)
+        ω_elem = CtCab * GXBeam.element_angular_velocity(element, states.P, states.H)
+
+        # aerodynamic state variables
+        Nλi = number_of_states(typeof(aerodynamic_model))
+        λi = SVector{Nai}(λs[isec])
 
         # structural state variables
-        dhdot = dv_dPi[3] # plunge acceleration
-        dθdot = dω_dHi[2] # pitch acceleration
+        h = states.u[3] # plunge (in z-direction)
+        θ = atan(CtCab[1,3], CtCab[1,1]) # pitch (in plane parallel to Y-Z plane)
+        hdot = v_elem[3] # plunge rate (in z-direction)
+        θdot = ω_elem[2] # pitch rate (in plane parallel to Y-Z plane)
         qi = SVector(h, θ, hdot, θdot)
 
         # combined state variables
         ui = vcat(λi, qi)
 
-        # aerodynamic parameters
-        pai = pas[i]
+        # section parameters
+        pi = pas[isec]
 
-        # structural parameters (currently unused by all aerodynamic models)
+        # NOTE: We don't pass any parameters for the typical section model, but
+        # these turn out to be unnecessary for computing the inputs anyway.
 
-
-        # coupled parameters
-        pi = pai
-
-        # NOTE: We currently only include aerodynamic parameters in the section
-        # parameter vector.  This would have to be changed if a 2D model uses
-        # structural parameters to calculate coupled inputs
-
-        # combined section inputs
-        Myi = get_input_mass_matrix(aero.models[i], TypicalSection(), ui, pi, t)
+        # calculate inputs for this section
+        Mi = get_input_mass_matrix(aerodynamic_model, TypicalSection(), ui, pi, t)
 
         # set section aerodynamic inputs
-        yas[i] .= view(yi, 1:length(yi)-2)
+        for i = 1:length(iyas[isec]), j = 1:length(iλas[isec])
+            M[iyas[isec][i],iλas[isec][j]] = Mi[i,j]
+        end
 
-        # set section structural inputs
-        L = yi[end-1]
-        M = yi[end]
+        # set lift and moment
+        L = yi[Nas + 1]
+        M = yi[Nas + 2]
 
-        # convert lift and moment to distributed loads
-        ys[3*(i-1)+1] = 0
-        ys[3*(i-1)+2] = 0
-        ys[3*(i-1)+3] = L
-        ys[3*(i-1)+4] = 0
-        ys[3*(i-1)+5] = M + (b/2+a*b)*L
-        ys[3*(i-1)+6] = 0
+        # convert lift and moment (per unit span) to distributed loads
+        ys[3*(isec-1)+1] = 0
+        ys[3*(isec-1)+2] = 0
+        ys[3*(isec-1)+3] = L
+        ys[3*(isec-1)+4] = 0
+        ys[3*(isec-1)+5] = M
+        ys[3*(isec-1)+6] = 0
     end
 
     return y
@@ -350,20 +367,26 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     iq = state_indices(stru)
     λ = view(u, iλ)
     q = view(u, iq)
-    λs = view.(Ref(λ), state_indices(aero.models))
 
     # separate aerodynamic and structural inputs
     iya = input_indices(aero)
     iys = input_indices(stru)
     ya = view(y, iy_a)
     ys = view(y, iy_s)
-    yas = view.(Ref(ya), input_indices(aero.models))
 
     # separate aerodynamic and structural parameters
     ipa = parameter_indices(aero)
     ips = parameter_indices(stru)
     pa = view(p, ip_a)
     ps = view(p, ip_s)
+
+    # get cross section aerodynamic state variables
+    λs = view.(Ref(λ), state_indices(aero.models))
+
+    # get cross section aerodynamic inputs
+    yas = view.(Ref(ya), input_indices(aero.models))
+
+    # get cross section aerodynamic parameters
     pas = view.(Ref(pa), parameter_indices(aero.models))
 
     # extract model properties
@@ -372,167 +395,66 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
 
     # loop through each lifting line / beam element
     for i = 1:N
-        # aerodynamic model
+
+        # get aerodynamic model for this cross section
         aerodynamic_model = aero.models[i]
 
         # beam element properties and state variables
         element = assembly.elements[i]
         states = extract_element_state(system, i; x = q)
 
-        # beam element deflections
+        # beam element deflections and rotation parameters
         u_elem = states.u
-
-        # beam element rotation parameters
         θ_elem = states.θ
 
-        # transformation matrix from global to deformed local frame
-        Ct = get_C(θ)'
+        # transformation matrix from local to global frame
+        Ct = get_C(θ_elem)'
         Cab = beam.Cab
         CtCab = Ct*Cab
 
-        # linear and angular velocities (transform from deformed local to global frame)
-        v_elem = CtCab' * GXBeam.element_linear_velocity(element, states.P, states.H)
-        ω_elem = CtCab' * GXBeam.element_angular_velocity(element, states.P, states.H)
+        # linear and angular velocities in global frame
+        v_elem = CtCab * GXBeam.element_linear_velocity(element, states.P, states.H)
+        ω_elem = CtCab * GXBeam.element_angular_velocity(element, states.P, states.H)
 
         # aerodynamic state variables
-        λi = λs[i] #TODO: make this statically sized
+        Nλi = number_of_states(typeof(aerodynamic_model))
+        λi = SVector{Nai}(λs[i])
 
         # structural state variables
-        h = states.u[3] # plunge
-        θ = atan(CtCab[3,1], CtCab[1,1]) # pitch (in plane parallel to Y-Z plane)
-        hdot = v_elem[3] # plunge rate
+        h = states.u[3] # plunge (in z-direction)
+        θ = atan(CtCab[1,3], CtCab[1,1]) # pitch (in plane parallel to Y-Z plane)
+        hdot = v_elem[3] # plunge rate (in z-direction)
         θdot = ω_elem[2] # pitch rate (in plane parallel to Y-Z plane)
         qi = SVector(h, θ, hdot, θdot)
 
         # combined state variables
         ui = vcat(λi, qi)
 
-        # aerodynamic parameters
-        pai = pas[i]
+        # section parameters
+        pi = pas[i]
 
-        # structural parameters (currently unused by all aerodynamic models)
+        # NOTE: We don't pass any parameters for the typical section model, but
+        # these turn out to be unnecessary for computing the inputs anyway.
 
-
-        # coupled parameters
-        pi = pai
-
-        # NOTE: We currently only include aerodynamic parameters in the section
-        # parameter vector.  This would have to be changed if a 2D model uses
-        # structural parameters to calculate coupled inputs
-
-        # combined section inputs
-        yi = get_inputs(aero.models[i], TypicalSection(), ui, pi, t)
+        # calculate inputs for this section
+        yi = get_inputs(aerodynamic_model, TypicalSection(), ui, pi, t)
 
         # set section aerodynamic inputs
-        yas[i] .= view(yi, 1:length(yi)-2)
+        Nas = number_of_inputs(aerodynamic_model)
+        for i = 1:Nas
+            yas[i] = yi[i]
+        end
 
-        # set section structural inputs
-        L = yi[end-1]
-        M = yi[end]
+        # set lift and moment
+        L = yi[Nas + 1]
+        M = yi[Nas + 2]
 
-        # convert lift and moment to distributed loads
+        # convert lift and moment (per unit span) to distributed loads
         ys[3*(i-1)+1] = 0
         ys[3*(i-1)+2] = 0
         ys[3*(i-1)+3] = L
         ys[3*(i-1)+4] = 0
-        ys[3*(i-1)+5] = M + (b/2+a*b)*L
-        ys[3*(i-1)+6] = 0
-    end
-
-    return y
-end
-
-function get_input_state_jacobian!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
-
-    # separate aerodynamic and structural state variables
-    iλ = state_indices(aero)
-    iq = state_indices(stru)
-    λ = view(u, iλ)
-    q = view(u, iq)
-    λs = view.(Ref(λ), state_indices(aero.models))
-
-    # separate aerodynamic and structural parameters
-    ipa = parameter_indices(aero)
-    ips = parameter_indices(stru)
-    pa = view(p, ip_a)
-    ps = view(p, ip_s)
-    pas = view.(Ref(pa), parameter_indices(aero.models))
-
-    # separate input mass matrix
-    iya = input_indices(aero)
-    iys = input_indices(stru)
-    ya = view(y, iy_a)
-    ys = view(y, iy_s)
-    yas = view.(Ref(ya), input_indices(aero.models))
-
-    # extract model properties
-    system = stru.system
-    assembly = stru.assembly
-
-    # loop through each lifting line / beam element
-    for i = 1:N
-        # aerodynamic model
-        aerodynamic_model = aero.models[i]
-
-        # beam element deflections and velocities
-        icol = system.icol_beam[i]
-        u_ui = Diagonal((@SVector ones(3)))
-        θ_θi = Diagonal((@SVector ones(3)))
-        P_Pi = Diagonal((@SVector ones(3))) .* system.mass_scaling
-        H_Hi = Diagonal((@SVector ones(3))) .* system.mass_scaling
-
-        v_Pi = element.minv11*P_Pi
-        v_Hi = element.minv12*H_Hi
-        ω_Pi = element.minv21*P_Pi
-        ω_Hi = element.minv22*H_Hi
-
-        # convert rotation parameter to Wiener-Milenkovic parameters
-        scaling = rotation_parameter_scaling(theta)
-        θ_θi *= scaling
-
-        # aerodynamic state variables
-        λi = λs[i] #TODO: make this statically sized
-
-        # structural state variables
-        h = states.u[3] # plunge
-        θ = # pitch
-        hdot = udot_elem[3] # plunge rate
-        θdot =  # pitch rate
-        qi = SVector(h, θ, hdot, θdot)
-
-        # combined state variables
-        ui = vcat(λi, qi)
-
-        # aerodynamic parameters
-        pai = pas[i]
-
-        # structural parameters (currently unused by all aerodynamic models)
-
-
-        # coupled parameters
-        pi = pai
-
-        # NOTE: We currently only include aerodynamic parameters in the section
-        # parameter vector.  This would have to be changed if a 2D model uses
-        # structural parameters to calculate coupled inputs
-
-        # combined section inputs
-        Myi = get_input_state_jacobian(aero.models[i], TypicalSection(), ui, pi, t)
-
-        # set section aerodynamic inputs
-        My[]
-        yas[iys[i], ] = Myi[1:length(yi)-2, :] * qi_
-
-        # set section structural inputs
-        L = yi[end-1]
-        M = yi[end]
-
-        # convert lift and moment to distributed loads
-        ys[3*(i-1)+1] = 0
-        ys[3*(i-1)+2] = 0
-        ys[3*(i-1)+3] = L
-        ys[3*(i-1)+4] = 0
-        ys[3*(i-1)+5] = M + (b/2+a*b)*L
+        ys[3*(i-1)+5] = M
         ys[3*(i-1)+6] = 0
     end
 

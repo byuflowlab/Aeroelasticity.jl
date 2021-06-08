@@ -87,7 +87,7 @@ function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, u, p, t)
     Mrs = hcat(
         SVector(0, 0),
         SVector(0, 0),
-        -wagner_loads_hddot(b, ρ),
+        -wagner_loads_hddot(a, b, ρ),
         -wagner_loads_θddot(a, b, ρ)
     )
     # assemble mass matrix
@@ -117,11 +117,11 @@ function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) w
     # compute jacobian sub-matrices
     Jda = @SMatrix [0 0; 0 0; 0 0]
     Jds = @SMatrix [0 1 0 0; 0 0 1 0; 0 0 0 1]
-    Jra = wagner_loads_λ(b, U, ρ)
+    Jra = wagner_loads_λ(a, b, U, ρ)
     Jrs = hcat(
         wagner_loads_h(),
-        wagner_loads_θ(b, U, ρ, C1, C2),
-        wagner_loads_hdot(b, U, ρ, C1, C2),
+        wagner_loads_θ(a, b, U, ρ, C1, C2),
+        wagner_loads_hdot(a, b, U, ρ, C1, C2),
         wagner_loads_θdot(a, b, U, ρ, C1, C2)
         )
     # return jacobian
@@ -150,29 +150,47 @@ function wagner_loads(a, b, U, ρ, C1, C2, θ, hdot, θdot, hddot, θddot, λ1, 
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # downwash at the 3/4 chord
-    wt = hdot + (1/2 - a)*b*θdot + U*θ
-    # lift
+    wt = hdot + (b/2-a*b)*θdot + U*θ
+    # lift (at reference location)
     L = 2*pi*ρ*b*U*(wt*ϕ0 + λ1 + λ2) + pi*ρ*b^2*(hddot + U*θdot - a*b*θddot)
-    # moment at the 1/4 chord
-    M = -pi*ρ*b^3*(hddot/2 + U*θdot + b*(1/8 - a/2)*θddot)
+    # moment (at reference location)
+    M = -pi*ρ*b^3*(hddot/2 + U*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
     # return load
     return SVector(L, M)
 end
 
-wagner_loads_λ(b, U, ρ) = 2*pi*ρ*b*U*(@SMatrix [1 1; 0 0])
+function wagner_loads_λ(a, b, U, ρ)
+    tmp1 = 2*pi*ρ*b*U
+    tmp2 = (b/2 + a*b)*tmp1
+    return @SMatrix [tmp1 tmp1; tmp2 tmp2]
+end
 wagner_loads_λdot() = @SMatrix [0 0; 0 0]
 wagner_loads_h() = SVector(0, 0)
-function wagner_loads_θ(b, U, ρ, C1, C2)
+function wagner_loads_θ(a, b, U, ρ, C1, C2)
     ϕ0 = 1 - C1 - C2
-    return SVector(2*pi*ρ*b*U^2*ϕ0, 0)
+    L_θ = 2*pi*ρ*b*U^2*ϕ0
+    M_θ = (b/2 + a*b)*L_θ
+    return SVector(L_θ, M_θ)
 end
-function wagner_loads_hdot(b, U, ρ, C1, C2)
+function wagner_loads_hdot(a, b, U, ρ, C1, C2)
     ϕ0 = 1 - C1 - C2
-    return SVector(2*pi*ρ*b*U*ϕ0, 0)
+    L_hdot = 2*pi*ρ*b*U*ϕ0
+    M_hdot = (b/2 + a*b)*L_hdot
+    return SVector(L_hdot, M_hdot)
 end
 function wagner_loads_θdot(a, b, U, ρ, C1, C2)
     ϕ0 = 1 - C1 - C2
-    return SVector(pi*ρ*b^2*U*(ϕ0 - 2*ϕ0*a + 1), -pi*ρ*b^3*U)
+    L_θdot = pi*ρ*b^2*U*(ϕ0 - 2*ϕ0*a + 1)
+    M_θdot = -pi*ρ*b^3*U + (b/2 + a*b)*L_θdot
+    return SVector(L_θdot, M_θdot)
 end
-wagner_loads_hddot(b, ρ) = SVector(pi*ρ*b^2, -pi/2*ρ*b^3)
-wagner_loads_θddot(a, b, ρ) = SVector(-pi*ρ*a*b^3, -pi/8*ρ*b^4*(1 - 4*a))
+function wagner_loads_hddot(a, b, ρ)
+    L_hddot = pi*ρ*b^2
+    M_hddot = -pi/2*ρ*b^3 + (b/2 + a*b)*L_hddot
+    return SVector(L_hddot, M_hddot)
+end
+function wagner_loads_θddot(a, b, ρ)
+    L_θddot = -pi*ρ*a*b^3
+    M_θddot = -pi/8*ρ*b^4*(1 - 4*a) + (b/2 + a*b)*L_θddot
+    return SVector(L_θddot, M_θddot)
+end
