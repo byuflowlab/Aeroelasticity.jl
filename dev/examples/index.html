@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · AerostructuralDynamics.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">AerostructuralDynamics.jl</span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Aeroelastic-Analysis-of-the-Typical-Section-Model"><span>Aeroelastic Analysis of the Typical Section Model</span></a></li></ul></li><li><a class="tocitem" href="../developer/">Developer Guide</a></li><li><a class="tocitem" href="../library/">Library</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/byuflowlab/AerostructuralDynamics.jl/blob/master/docs/src/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Aeroelastic-Analysis-of-the-Typical-Section-Model"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-the-Typical-Section-Model">Aeroelastic Analysis of the Typical Section Model</a><a id="Aeroelastic-Analysis-of-the-Typical-Section-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-the-Typical-Section-Model" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.</p><p><img src="../typical-section.svg" alt/></p><p>The equations of motion for this model are</p><p class="math-container">\[m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
-I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M_{\frac{1}{4}} + b \left( \frac{1}{2} + a \right) L\]</p><p>where <span>$a$</span> is the normalized distance from the semichord to the reference point, <span>$b$</span> is the semichord length, <span>$k_h$</span> is the linear spring constant, <span>$k_\theta$</span> is the torsional spring constant, <span>$m$</span> is the mass per unit span, <span>$x_\theta$</span> is the distance to the center of mass from the reference point, <span>$I_P$</span> is the moment of inertia about the reference point, <span>$L$</span> is the lift per unit span, and <span>$M_\frac{1}{4}$</span> is the quarter-chord moment per unit span.</p><p>We use the non-dimensional parameters</p><p class="math-container">\[a = -1/5 \quad e = -1/10  \\
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · AerostructuralDynamics.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">AerostructuralDynamics.jl</span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Two-Dimensional-Aeroelastic-Analysis"><span>Two-Dimensional Aeroelastic Analysis</span></a></li><li><a class="tocitem" href="#Three-Dimensional-Aeroelastic-Analysis"><span>Three Dimensional Aeroelastic Analysis</span></a></li></ul></li><li><a class="tocitem" href="../developer/">Developer Guide</a></li><li><a class="tocitem" href="../library/">Library</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/byuflowlab/AerostructuralDynamics.jl/blob/master/docs/src/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Two-Dimensional-Aeroelastic-Analysis"><a class="docs-heading-anchor" href="#Two-Dimensional-Aeroelastic-Analysis">Two-Dimensional Aeroelastic Analysis</a><a id="Two-Dimensional-Aeroelastic-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Two-Dimensional-Aeroelastic-Analysis" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.</p><p><img src="../typical-section.svg" alt/></p><p>The equations of motion for this model are</p><p class="math-container">\[m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
+I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M\]</p><p>where <span>$b$</span> is the semichord length, <span>$k_h$</span> is the linear spring constant, <span>$k_\theta$</span> is the torsional spring constant, <span>$m$</span> is the mass per unit span, <span>$x_\theta$</span> is the distance to the center of mass from the reference point, <span>$I_θ$</span> is the moment of inertia about the reference point, <span>$L$</span> is the lift per unit span, and <span>$M$</span> is the moment per unit span about the reference point.</p><p>We use the non-dimensional parameters</p><p class="math-container">\[a = -1/5 \quad e = -1/10  \\
 r^2 = \frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
 \mu = \frac{m}{\rho_\infty \pi b^2} \quad V = \frac{U}{b \omega_\theta}\]</p><p>where <span>$a$</span> is the normalized distance from the semichord to the reference point, <span>$e$</span> is the normalized distance from the semichord to the center of mass, and <span>$\omega_h$</span> and <span>$\omega_\theta$</span> are the uncoupled natural frequencies.</p><p class="math-container">\[\omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}\]</p><p>We perform aeroelastic analyses using a variety of aerodynamic models in order to compare the various models.</p><pre><code class="language-julia">using AerostructuralDynamics, LinearAlgebra
 
@@ -11,7 +11,7 @@ V = range(0, 3.1, length=5000) # (reduced velocity)
 a = -1/5 # reference point normalized location
 e = -1/10 # center of mass normalized location
 μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
-r2 = 6/25 # = Ip/(m*b^2) (radius of gyration about P)
+r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 σ = 2/5 # = ωh/ωθ (natural frequency ratio)
 xθ = e - a
 
@@ -22,10 +22,11 @@ b = 1
 
 # derived dimensional parameters
 m = μ*ρ*pi*b^2
-Ip = r2*m*b^2
+Sθ = m*xθ*b
+Iθ = r2*m*b^2
 ωh = σ*ωθ
 kh = m*ωh^2
-kθ = Ip*ωθ^2
+kθ = Iθ*ωθ^2
 
 # dimensionalized velocity
 U = V*b*ωθ
@@ -57,7 +58,7 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
 
         # parameters
         p_aero = [a, b, U[i], ρ]
-        p_stru = [a, b, kh, kθ, m, xθ, Ip]
+        p_stru = [kh, kθ, m, Sθ, Iθ]
         p = vcat(p_aero, p_stru)
 
         # time
@@ -147,4 +148,100 @@ for ia = 1:length(aerodynamic_models)
     end
 end
 
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))</code></pre><p><img src="../typical-section-stability.svg" alt/></p><p>The same analysis and results are presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot; for the steady state and Peters&#39; Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../developer/">Developer Guide »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 3 June 2021 23:41">Thursday 3 June 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))</code></pre><p><img src="../two-dimensional-stability.svg" alt/></p><p>The same analysis and results are presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot; for the steady state and Peters&#39; Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.</p><h2 id="Three-Dimensional-Aeroelastic-Analysis"><a class="docs-heading-anchor" href="#Three-Dimensional-Aeroelastic-Analysis">Three Dimensional Aeroelastic Analysis</a><a id="Three-Dimensional-Aeroelastic-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Three-Dimensional-Aeroelastic-Analysis" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.</p><pre><code class="language-">using AerostructuralDynamics, GXBeam, LinearAlgebra
+
+# velocity range
+U = range(1, 30, length=100) # m/s (velocity)
+
+# aerodynamic properties
+ρ = 0.088 # kg/m^3 (air density)
+
+# structural properties
+b = 16 # m (span)
+c = 1 # m (chord)
+a = 0 # fraction of chord (Spanwise reference axis location relative to semichord)
+e = 0 # fraction of chord (Center of gravity location relative to semichord)
+GJ = 1e4 # N*m^2 (torsional rigidity)
+EIyy = 4e6 # N*m^2 (chord bending rigidity)
+EIzz = 2e4 # N*m^2 (flat bending rigidity)
+μ = 0.75 # kg/m (mass per unit span)
+i11 = 0.1 # kg*m (rotational inertia per unit span)
+
+# discretization
+N = 8 # number of elements
+
+# geometry initialization
+x = range(0, b, N+1) # point x-coordinates
+y = range(0, 0, N+1) # point y-coordinates
+z = range(0, 0, N+1) # point z-coordinates
+points = [[x[i],y[i],z[i]] for i = 1:N]
+start = 1:N # starting point of each beam element
+stop = 2:N+1 # ending point of each beam element
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIyy, 1/EIzz]), N) # compliance matrix
+mass = fill(Diagonal([μ, μ, μ, i11, 0, 0]), N) # mass matrix
+assembly = GXBeam.Assembly(points, start, stop; compliance = compliance,
+    mass = mass)
+
+# boundary condition initialization
+prescribed_conditions = Dict(
+    1 =&gt; GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
+        theta_z=0),
+)
+
+# distributed load initialization
+distributed_loads = Dict()
+for i = 1:nelem
+    distributed_loads[i] = GXBeam.DistributedLoads(assembly, i)
+end
+
+# structural system initialization
+keep_points = [1] # points at which prescribed conditions are applied
+static = false # static simulation?
+system = GXBeam.system(assembly, keep_points, static)
+
+# construct aerodynamic model
+aerodynamic_model = LiftingLine{N}(Wagner())
+
+# construct structural model
+structural_model = GeometricallyExactBeamTheory(system, assembly, prescribed_conditions,
+    distributed_loads)
+
+# combined models
+models = (aerodynamic_model, structural_model)
+
+# eigenvalue storage
+λ = zeros(ComplexF64, number_of_states(models), length(V))
+
+# loop through each velocity
+for i = 1:length(V)
+
+    # set initial guess for the state variables
+    u0_aero = zeros(number_of_states(aerodynamic_model))
+    u0_stru = zeros(number_of_states(structural_model))
+    u0 = vcat(u_aero, u_stru)
+
+    # set parameters
+    p_aero = [a, b, U[i], ρ]
+    p_stru = [a, b, kh, kθ, m, xθ, Iθ]
+    p = vcat(p_aero, p_stru)
+
+    # set time
+    t = 0.0
+
+    # find state variables corresponding to steady state operating conditions
+
+
+    # calculate inputs for steady state operating conditions
+    y = get_inputs(models, u, p, t)
+
+    # calculate mass matrix for steady state operating conditions
+    M = get_mass_matrix(models, u, y, p, t)
+
+    # calculate jacobian for steady state operating conditions
+    J = get_state_jacobian(models, u, y, p, t)
+
+    # solve generalized eigenvalue problem
+    λ[ia][:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+end
+
+nothing #hide</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../developer/">Developer Guide »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 8 June 2021 23:26">Tuesday 8 June 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
