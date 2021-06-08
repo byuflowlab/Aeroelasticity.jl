@@ -1,295 +1,308 @@
 # Examples
 
-## Typical Section Model with Steady Aerodynamics
+## Two-Dimensional Aeroelastic Analysis
 
-```@example typical-section-steady
+In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.
+
+![](typical-section.svg)
+
+The equations of motion for this model are
+```math
+m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
+I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M_{\frac{1}{4}} + b \left( \frac{1}{2} + a \right) L
+```
+where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M_\frac{1}{4}`` is the quarter-chord moment per unit span.
+
+We use the non-dimensional parameters
+```math
+a = -1/5 \quad e = -1/10  \\
+r^2 = \frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
+\mu = \frac{m}{\rho_\infty \pi b^2} \quad V = \frac{U}{b \omega_\theta}
+```
+where ``a`` is the normalized distance from the semichord to the reference point, ``e`` is the normalized distance from the semichord to the center of mass, and ``\omega_h`` and ``\omega_\theta`` are the uncoupled natural frequencies.
+```math
+\omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}
+```
+
+We perform aeroelastic analyses using a variety of aerodynamic models in order to compare the various models.
+
+```@setup two-dimensional-stability
+using Plots
+pyplot()
+nothing #hide
+```
+
+```@example two-dimensional-stability
 using AerostructuralDynamics, LinearAlgebra
 
-# dimensionless parameters
-a = -1/5 # center of mass normalized location
-e = -1/10 # reference point normalized location
-μ = 20 # = m/(ρ*pi*b^2)
-r2 = 6/25 # = Ip/(m*b^2)
-σ = 2/5 # = ωh/ωθ
-V = range(0, 3.1, length=1000)
+# reduced velocity range
+V = range(0, 3.1, length=5000) # (reduced velocity)
+
+# non-dimensional parameters
+a = -1/5 # reference point normalized location
+e = -1/10 # center of mass normalized location
+μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
+r2 = 6/25 # = Ip/(m*b^2) (radius of gyration about P)
+σ = 2/5 # = ωh/ωθ (natural frequency ratio)
+xθ = e - a
 
 # chosen dimensional parameters
 b = 1
 ρ = 1
 ωθ = 1
 
-# dimensionalized parameters
+# derived dimensional parameters
 m = μ*ρ*pi*b^2
 Ip = r2*m*b^2
 ωh = σ*ωθ
 kh = m*ωh^2
 kθ = Ip*ωθ^2
-xθ = abs(e - a)
+
+# dimensionalized velocity
 U = V*b*ωθ
 
-# aerodynamic model
-aero = Steady()
+# aerodynamic models
+aerodynamic_models = (Steady(), QuasiSteady(), Wagner(), Peters{6}())
 
 # structural model
-stru = TypicalSection()
-
-# combined models
-models = (aero, stru)
+structural_model = TypicalSection()
 
 # eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(models), length(V))
+λ = Vector{Matrix{ComplexF64}}(undef, length(aerodynamic_models))
 
-for i = 1:length(V)
+# loop through each aerodynamic model
+for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
 
-    # state variables
-    u_aero = zeros(number_of_states(aero))
-    u_stru = zeros(number_of_states(stru))
-    u = vcat(u_aero, u_stru)
+    # combined models
+    models = (aerodynamic_model, structural_model)
 
-    # parameters
-    p_aero = [a, b, U[i], ρ]
-    p_stru = [a, b, kh, kθ, m, xθ, Ip]
-    p = vcat(p_aero, p_stru)
+    # eigenvalue storage
+    λ[ia] = zeros(ComplexF64, number_of_states(models), length(V))
 
-    # time
-    t = 0.0
+    # loop through each reduced frequency
+    for i = 1:length(V)
+        # state variables
+        u_aero = zeros(number_of_states(aerodynamic_model))
+        u_stru = zeros(number_of_states(structural_model))
+        u = vcat(u_aero, u_stru)
 
-    # calculate inputs
-    y = get_inputs(models, u, p, t)
+        # parameters
+        p_aero = [a, b, U[i], ρ]
+        p_stru = [a, b, kh, kθ, m, xθ, Ip]
+        p = vcat(p_aero, p_stru)
 
-    # mass matrix
-    M = get_mass_matrix(models, u, y, p, t)
+        # time
+        t = 0.0
 
-    # jacobian
-    J = get_state_jacobian(models, u, y, p, t)
+        # calculate inputs
+        y = get_inputs(models, u, p, t)
 
-    # solve generalized eigenvalue problem
-    λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+        # mass matrix
+        M = get_mass_matrix(models, u, y, p, t)
 
+        # jacobian
+        J = get_state_jacobian(models, u, y, p, t)
+
+        # solve generalized eigenvalue problem
+        λ[ia][:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+    end
 end
 
 nothing #hide
 ```
 
-```@example typical-section-steady
+We now plot the results predicted using each aerodynamic model.
+
+```@example two-dimensional-stability
 using Plots
 pyplot()
 
-p1 = scatter(V, imag.(λ')/ωθ, label="",
+default(
+    titlefontsize = 14,
+    legendfontsize = 11,
+    guidefontsize = 14,
+    tickfontsize = 11,
+    foreground_color_legend = nothing,
+    background_color_legend = nothing,
+    minorgrid=true,
+    framestyle = :zerolines)
+
+sp1 = plot(
+    title = "Non-Dimensional Frequency",
     xlim = (0,3.1),
-    xtick = 0.0:0.5:3.1,
+    xtick = 0.0:0.5:3.0,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     ylim = (0, 1.05),
     ytick = 0.0:0.2:1.0,
     ylabel = "\$ \\frac{\\Omega}{\\omega_\\theta} \$",
+    legend = :topright
     )
 
-p2 = scatter(V, real.(λ')/ωθ, label="",
+sp2 = plot(
+    title = "Non-Dimensional Damping",
     xlim = (0,3.1),
-    xtick = 0.0:0.5:3.1,
+    xtick = 0.0:0.5:3.0,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     ylim = (-0.7, 0.605),
     ytick = -0.6:0.2:0.6,
     ylabel = "\$ \\frac{Γ}{\\omega_\\theta} \$",
+    legend = :topleft
     )
 
-plot(p1, p2, layout = (1, 2))
+labels = ["Steady", "Quasi-Steady", "Wagner", "Peters (N=6)"]
+
+for ia = 1:length(aerodynamic_models)
+
+    scatter!(sp1, V, imag.(λ[ia][1,:])/ωθ,
+        label = labels[ia],
+        color = ia,
+        markersize = 1,
+        markerstrokewidth = 0,
+        )
+
+    for i = 2:size(λ[ia], 1)
+        scatter!(sp1, V, imag.(λ[ia][i,:])/ωθ,
+            label = "",
+            color = ia,
+            markersize = 1,
+            markerstrokewidth = 0,
+            )
+    end
+
+    scatter!(sp2, V, real.(λ[ia][1,:])/ωθ,
+        label = labels[ia],
+        color = ia,
+        markersize = 1,
+        markerstrokewidth = 0,
+        )
+
+    for i = 2:size(λ[ia], 1)
+        scatter!(sp2, V, real.(λ[ia][i,:])/ωθ,
+            label = "",
+            color = ia,
+            markersize = 1,
+            markerstrokewidth = 0,
+            )
+    end
+end
+
+p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
+
+savefig(p1, "two-dimensional-stability.svg") #hide
 
 nothing #hide
 ```
 
-## Typical Section Model with Quasi-Steady Aerodynamics
+![](two-dimensional-stability.svg)
 
-```@example typical-section-quasisteady
-using AerostructuralDynamics, LinearAlgebra
+The same analysis and results are presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity" for the steady state and Peters' Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.
 
-# dimensionless parameters
-a = -1/5 # center of mass normalized location
-e = -1/10 # reference point normalized location
-μ = 20 # = m/(ρ*pi*b^2)
-r2 = 6/25 # = Ip/(m*b^2)
-σ = 2/5 # = ωh/ωθ
-V = range(0, 3.1, length=1000)
+## Three Dimensional Aeroelastic Analysis
 
-# chosen dimensional parameters
-b = 1
-ρ = 1
-ωθ = 1
+In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.
 
-# dimensionalized parameters
-m = μ*ρ*pi*b^2
-Ip = r2*m*b^2
-ωh = σ*ωθ
-kh = m*ωh^2
-kθ = Ip*ωθ^2
-xθ = abs(e - a)
-U = V*b*ωθ
+```@setup three-dimensional-stability
+using Plots
+pyplot()
+nothing #hide
+```
 
-# aerodynamic model
-aero = QuasiSteady()
+```@example three-dimensional-stability
+using AerostructuralDynamics, GXBeam, LinearAlgebra
 
-# structural model
-stru = TypicalSection()
+# velocity range
+U = range(1, 30, length=100) # m/s (velocity)
+
+# aerodynamic properties
+ρ = 0.088 # kg/m^3 (air density)
+
+# structural properties
+b = 16 # m (span)
+c = 1 # m (chord)
+a = 0 # fraction of chord (Spanwise reference axis location relative to semichord)
+e = 0 # fraction of chord (Center of gravity location relative to semichord)
+GJ = 1e4 # N*m^2 (torsional rigidity)
+EIyy = 4e6 # N*m^2 (chord bending rigidity)
+EIzz = 2e4 # N*m^2 (flat bending rigidity)
+μ = 0.75 # kg/m (mass per unit span)
+i11 = 0.1 # kg*m (rotational inertia per unit span)
+
+# discretization
+N = 8 # number of elements
+
+# geometry initialization
+x = range(0, b, N+1) # point x-coordinates
+y = range(0, 0, N+1) # point y-coordinates
+z = range(0, 0, N+1) # point z-coordinates
+points = [[x[i],y[i],z[i]] for i = 1:N]
+start = 1:N # starting point of each beam element
+stop = 2:N+1 # ending point of each beam element
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIyy, 1/EIzz]), N) # compliance matrix
+mass = fill(Diagonal([μ, μ, μ, i11, 0, 0]), N) # mass matrix
+assembly = GXBeam.Assembly(points, start, stop; compliance = compliance,
+    mass = mass)
+
+# boundary condition initialization
+prescribed_conditions = Dict(
+    1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
+        theta_z=0),
+)
+
+# distributed load initialization
+distributed_loads = Dict()
+for i = 1:nelem
+    distributed_loads[i] = GXBeam.DistributedLoads(assembly, i)
+end
+
+# structural system initialization
+keep_points = [1] # points at which prescribed conditions are applied
+static = false # static simulation?
+system = GXBeam.system(assembly, keep_points, static)
+
+# construct aerodynamic model
+aerodynamic_model = LiftingLine{N}(Wagner())
+
+# construct structural model
+structural_model = GeometricallyExactBeamTheory(system, assembly, prescribed_conditions,
+    distributed_loads)
 
 # combined models
-models = (aero, stru)
+models = (aerodynamic_model, structural_model)
 
 # eigenvalue storage
 λ = zeros(ComplexF64, number_of_states(models), length(V))
 
+# loop through each velocity
 for i = 1:length(V)
 
-    # state variables
-    u_aero = zeros(number_of_states(aero))
-    u_stru = zeros(number_of_states(stru))
-    u = vcat(u_aero, u_stru)
+    # set initial guess for the state variables
+    u0_aero = zeros(number_of_states(aerodynamic_model))
+    u0_stru = zeros(number_of_states(structural_model))
+    u0 = vcat(u_aero, u_stru)
 
-    # parameters
+    # set parameters
     p_aero = [a, b, U[i], ρ]
     p_stru = [a, b, kh, kθ, m, xθ, Ip]
     p = vcat(p_aero, p_stru)
 
-    # time
+    # set time
     t = 0.0
 
-    # calculate inputs
+    # find state variables corresponding to steady state operating conditions
+
+
+    # calculate inputs for steady state operating conditions
     y = get_inputs(models, u, p, t)
 
-    # mass matrix
+    # calculate mass matrix for steady state operating conditions
     M = get_mass_matrix(models, u, y, p, t)
 
-    # jacobian
+    # calculate jacobian for steady state operating conditions
     J = get_state_jacobian(models, u, y, p, t)
 
     # solve generalized eigenvalue problem
-    λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
-
+    λ[ia][:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
 end
-
-nothing #hide
-```
-
-```@example typical-section-quasisteady
-using Plots
-pyplot()
-
-p1 = scatter(V, imag.(λ')/ωθ, label="",
-    xlim = (0,3.1),
-    xtick = 0.0:0.5:3.1,
-    xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
-    #ylim = (0, 1.05),
-    #ytick = 0.0:0.2:1.0,
-    ylabel = "\$ \\frac{\\Omega}{\\omega_\\theta} \$",
-    )
-
-p2 = scatter(V, real.(λ')/ωθ, label="",
-    xlim = (0,3.1),
-    xtick = 0.0:0.5:3.1,
-    xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
-    #ylim = (-0.7, 0.605),
-    #ytick = -0.6:0.2:0.6,
-    ylabel = "\$ \\frac{Γ}{\\omega_\\theta} \$",
-    )
-
-plot(p1, p2, layout = (1, 2))
-
-nothing #hide
-```
-
-## Typical Section Model with Peter's Finite State Aerodynamics
-
-```@example typical-section-peters
-using AerostructuralDynamics, LinearAlgebra
-
-# dimensionless parameters
-a = -1/5 # center of mass normalized location
-e = -1/10 # reference point normalized location
-μ = 20 # = m/(ρ*pi*b^2)
-r2 = 6/25 # = Ip/(m*b^2)
-σ = 2/5 # = ωh/ωθ
-V = range(0, 3.1, length=1000)
-
-# chosen dimensional parameters
-b = 1
-ρ = 1
-ωθ = 1
-
-# dimensionalized parameters
-m = μ*ρ*pi*b^2
-Ip = r2*m*b^2
-ωh = σ*ωθ
-kh = m*ωh^2
-kθ = Ip*ωθ^2
-xθ = abs(e - a)
-U = V*b*ωθ
-
-# aerodynamic model
-aero = PetersFiniteState{6}()
-
-# structural model
-stru = TypicalSection()
-
-# combined models
-models = (aero, stru)
-
-# eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(models), length(V))
-
-for i = 1:length(V)
-
-    # state variables
-    u_aero = zeros(number_of_states(aero))
-    u_stru = zeros(number_of_states(stru))
-    u = vcat(u_aero, u_stru)
-
-    # parameters
-    p_aero = [a, b, U[i], ρ]
-    p_stru = [a, b, kh, kθ, m, xθ, Ip]
-    p = vcat(p_aero, p_stru)
-
-    # time
-    t = 0.0
-
-    # calculate inputs
-    y = get_inputs(models, u, p, t)
-
-    # mass matrix
-    M = get_mass_matrix(models, u, y, p, t)
-
-    # jacobian
-    J = get_state_jacobian(models, u, y, p, t)
-
-    # solve generalized eigenvalue problem
-    λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
-
-end
-
-nothing #hide
-```
-
-```@example typical-section-peters
-using Plots
-pyplot()
-
-p1 = scatter(V, imag.(λ')/ωθ, label="",
-    xlim = (0,3.1),
-    xtick = 0.0:0.5:3.1,
-    xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
-    ylim = (0, 1.05),
-    ytick = 0.0:0.2:1.0,
-    ylabel = "\$ \\frac{\\Omega}{\\omega_\\theta} \$",
-    )
-
-p2 = scatter(V, real.(λ')/ωθ, label="",
-    xlim = (0,3.1),
-    xtick = 0.0:0.5:3.1,
-    xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
-    ylim = (-0.7, 0.605),
-    ytick = -0.6:0.2:0.6,
-    ylabel = "\$ \\frac{Γ}{\\omega_\\theta} \$",
-    )
-
-plot(p1, p2, layout = (1, 2))
 
 nothing #hide
 ```
