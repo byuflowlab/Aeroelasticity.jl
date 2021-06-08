@@ -504,6 +504,11 @@ function _get_state_jacobian(::Varying, ::OutOfPlace, models::NTuple{N, Abstract
     return J + D*Jy
 end
 
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian(::Varying, ::OutOfPlace, models, u, y, p, t)
+    return ForwardDiff.jacobian(u->get_rates(models, u, y, p, t), u)
+end
+
 # calculate state jacobian for a combination of models
 function _get_state_jacobian(::Varying, ::OutOfPlace, models::NTuple{N, AbstractModel},
     u, y, p, t) where N
@@ -637,8 +642,8 @@ function _get_state_jacobian!(J, ::Constant, ::OutOfPlace, models, u, y, p, t; k
 end
 
 # calculate state jacobian for a combination of models
-function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,AbstractModel},
-    u, y, p, t; Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
+function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,AbstractModel};
+    Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
 
     # get dimensions
     Nu = number_of_states.(models)
@@ -674,6 +679,13 @@ function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,Abstrac
     end
 
     return J
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian!(J, ::Varying, ::OutOfPlace, model::AbstractModel,
+    u, y, p, t)
+
+    return ForwardDiff.jacobian!(J, u->get_rates(models, u, y, p, t), u)
 end
 
 # calculate state jacobian for a combination of models
@@ -755,6 +767,11 @@ end
 # calculate input jacobian for a combination of models
 function _get_input_jacobian(::Constant, models::NTuple{N,AbstractModel}) where N
     static_input_jacobian(models)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian(J, ::Varying, ::OutOfPlace, model::AbstractModel, u, y, p, t)
+    return ForwardDiff.jacobian(y->get_rates(models, u, y, p, t), y)
 end
 
 # calculate input jacobian for a combination of models

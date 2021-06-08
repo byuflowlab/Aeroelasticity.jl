@@ -23,7 +23,7 @@ input_dependence_type(::Type{TypicalSection}) = Linear()
 function get_mass_matrix(::TypicalSection, q, r, p, t)
     # extract structural parameters
     a, b, kh, kθ, m, xθ, Ip = p
-    # update mass matrix
+    # calculate mass matrix
     return section_mass_matrix(b, m, xθ, Ip)
 end
 
