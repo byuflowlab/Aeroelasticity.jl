@@ -11,7 +11,7 @@ e = -1/10 # reference point normalized location
 μ = 20 # = m/(ρ*pi*b^2)
 r2 = 6/25 # = Ip/(m*b^2)
 σ = 2/5 # = ωh/ωθ
-V = range(0, 3, length=1000)
+V = range(0, 3.1, length=1000)
 
 # chosen dimensional parameters
 b = 1
@@ -76,8 +76,8 @@ using Plots
 pyplot()
 
 p1 = scatter(V, imag.(λ')/ωθ, label="",
-    xlim = (0,3),
-    xtick = 0.0:0.5:3.0,
+    xlim = (0,3.1),
+    xtick = 0.0:0.5:3.1,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     ylim = (0, 1.05),
     ytick = 0.0:0.2:1.0,
@@ -85,8 +85,8 @@ p1 = scatter(V, imag.(λ')/ωθ, label="",
     )
 
 p2 = scatter(V, real.(λ')/ωθ, label="",
-    xlim = (0,3),
-    xtick = 0.0:0.5:3.0,
+    xlim = (0,3.1),
+    xtick = 0.0:0.5:3.1,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     ylim = (-0.7, 0.605),
     ytick = -0.6:0.2:0.6,
@@ -109,7 +109,7 @@ e = -1/10 # reference point normalized location
 μ = 20 # = m/(ρ*pi*b^2)
 r2 = 6/25 # = Ip/(m*b^2)
 σ = 2/5 # = ωh/ωθ
-V = range(0, 3, length=1000)
+V = range(0, 3.1, length=1000)
 
 # chosen dimensional parameters
 b = 1
@@ -174,8 +174,8 @@ using Plots
 pyplot()
 
 p1 = scatter(V, imag.(λ')/ωθ, label="",
-    xlim = (0,3),
-    xtick = 0.0:0.5:3.0,
+    xlim = (0,3.1),
+    xtick = 0.0:0.5:3.1,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     #ylim = (0, 1.05),
     #ytick = 0.0:0.2:1.0,
@@ -183,8 +183,8 @@ p1 = scatter(V, imag.(λ')/ωθ, label="",
     )
 
 p2 = scatter(V, real.(λ')/ωθ, label="",
-    xlim = (0,3),
-    xtick = 0.0:0.5:3.0,
+    xlim = (0,3.1),
+    xtick = 0.0:0.5:3.1,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     #ylim = (-0.7, 0.605),
     #ytick = -0.6:0.2:0.6,
@@ -207,7 +207,7 @@ e = -1/10 # reference point normalized location
 μ = 20 # = m/(ρ*pi*b^2)
 r2 = 6/25 # = Ip/(m*b^2)
 σ = 2/5 # = ωh/ωθ
-V = range(0, 3, length=1000)
+V = range(0, 3.1, length=1000)
 
 # chosen dimensional parameters
 b = 1
@@ -272,8 +272,8 @@ using Plots
 pyplot()
 
 p1 = scatter(V, imag.(λ')/ωθ, label="",
-    xlim = (0,3),
-    xtick = 0.0:0.5:3.0,
+    xlim = (0,3.1),
+    xtick = 0.0:0.5:3.1,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     ylim = (0, 1.05),
     ytick = 0.0:0.2:1.0,
@@ -281,8 +281,8 @@ p1 = scatter(V, imag.(λ')/ωθ, label="",
     )
 
 p2 = scatter(V, real.(λ')/ωθ, label="",
-    xlim = (0,3),
-    xtick = 0.0:0.5:3.0,
+    xlim = (0,3.1),
+    xtick = 0.0:0.5:3.1,
     xlabel = "\$ \\frac{U}{b \\omega_\\theta} \$",
     ylim = (-0.7, 0.605),
     ytick = -0.6:0.2:0.6,
