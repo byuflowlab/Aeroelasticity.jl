@@ -9,9 +9,9 @@ In this example, we demonstrate how to perform a two-dimensional aeroelastic ana
 The equations of motion for this model are
 ```math
 m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
-I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M_{\frac{1}{4}} + b \left( \frac{1}{2} + a \right) L
+I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M
 ```
-where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M_\frac{1}{4}`` is the quarter-chord moment per unit span.
+where ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_θ`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.
 
 We use the non-dimensional parameters
 ```math
@@ -42,7 +42,7 @@ V = range(0, 3.1, length=5000) # (reduced velocity)
 a = -1/5 # reference point normalized location
 e = -1/10 # center of mass normalized location
 μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
-r2 = 6/25 # = Ip/(m*b^2) (radius of gyration about P)
+r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 σ = 2/5 # = ωh/ωθ (natural frequency ratio)
 xθ = e - a
 
@@ -53,10 +53,11 @@ b = 1
 
 # derived dimensional parameters
 m = μ*ρ*pi*b^2
-Ip = r2*m*b^2
+Sθ = m*xθ*b
+Iθ = r2*m*b^2
 ωh = σ*ωθ
 kh = m*ωh^2
-kθ = Ip*ωθ^2
+kθ = Iθ*ωθ^2
 
 # dimensionalized velocity
 U = V*b*ωθ
@@ -88,7 +89,7 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
 
         # parameters
         p_aero = [a, b, U[i], ρ]
-        p_stru = [a, b, kh, kθ, m, xθ, Ip]
+        p_stru = [kh, kθ, m, Sθ, Iθ]
         p = vcat(p_aero, p_stru)
 
         # time
@@ -282,7 +283,7 @@ for i = 1:length(V)
 
     # set parameters
     p_aero = [a, b, U[i], ρ]
-    p_stru = [a, b, kh, kθ, m, xθ, Ip]
+    p_stru = [a, b, kh, kθ, m, xθ, Iθ]
     p = vcat(p_aero, p_stru)
 
     # set time

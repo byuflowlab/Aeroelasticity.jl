@@ -34,7 +34,7 @@ end
 
 function get_input_jacobian(::RigidBody, q, r, p, t)
     # extract parameters
-    a, b, kh, kθ, m, xθ, Ip = p
+    m, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz = p
     # return jacobian
     return rigid_input_jacobian(mass, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz)
 end

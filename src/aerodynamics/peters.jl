@@ -120,7 +120,7 @@ function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     Mrs = hcat(
         zeros(SVector{2,TF}),
         zeros(SVector{2,TF}),
-        -peters_loads_hddot(b, ρ),
+        -peters_loads_hddot(a, b, ρ),
         -peters_loads_θddot(a, b, ρ))
     # assemble mass matrix
     return [Mda Mds; Mra Mrs]
@@ -155,11 +155,11 @@ function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
     # compute jacobian sub-matrices
     Jda = zeros(SMatrix{3,N,TF}) # d(d)/d(dλ)
     Jds = @SMatrix [0 0 0 1; 0 0 0 0; 0 0 0 0]
-    Jra = peters_loads_λ(b, U, ρ, bbar)
+    Jra = peters_loads_λ(a, b, U, ρ, bbar)
     Jrs = hcat(
         peters_loads_h(),
-        peters_loads_θ(b, U, ρ),
-        peters_loads_hdot(b, U, ρ),
+        peters_loads_θ(a, b, U, ρ),
+        peters_loads_hdot(a, b, U, ρ),
         peters_loads_θdot(a, b, U, ρ)
         )
     # return jacobian
@@ -176,24 +176,57 @@ peters_state_jacobian(b, U, cbar) = -U/b*Diagonal(one.(cbar))
 peters_input_jacobian(a, b, U, cbar) = hcat(U*cbar, cbar, (b/2-a*b)*cbar)
 
 function peters_loads(a, b, U, ρ, bbar, θ, hdot, θdot, hddot, θddot, λ)
+    tmp =
     # calculate induced flow velocity
     λ0 = 1/2 * bbar'*λ
-    # calculate lift
-    L = 2*pi*ρ*U*b*(hdot + U*θ + (b/2-a*b)*θdot - λ0) + pi*ρ*b^2*(hddot + U*θdot - a*b*θddot)
-    # calculate moment
-    M = -pi*ρ*b^3*(hddot/2 + U*θdot + b*(1/8 - a/2)*θddot)
+    # calculate lift (at reference location)
+    L = 2*pi*ρ*U*b*(hdot + U*θ + (b/2 - a*b)*θdot - λ0) +
+        pi*ρ*b^2*(hddot + U*θdot - a*b*θddot)
+    # calculate moment (at reference location)
+    M = -pi*ρ*b^3*(hddot/2 + U*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
     # return load
     return SVector(L, M)
 end
 
-peters_loads_λ(b, U, ρ, bbar) = -pi*ρ*U*b*vcat(bbar', zero(bbar)')
+function peters_loads_λ(a, b, U, ρ, bbar)
+    L_λ = -pi*ρ*U*b*bbar'
+    M_λ = (b/2 + a*b)*L_λ
+    return vcat(L_λ, M_λ)
+end
+
 function peters_loads_λdot(cbar)
     tmp = zero(cbar)'
     return vcat(tmp, tmp)
 end
+
 peters_loads_h() = SVector(0, 0)
-peters_loads_θ(b, U, ρ) = SVector(2*pi*ρ*U^2*b, 0)
-peters_loads_hdot(b, U, ρ) = SVector(2*pi*ρ*U*b, 0)
-peters_loads_θdot(a, b, U, ρ) = SVector(2*pi*ρ*b^2*U*(1 - a), -pi*ρ*b^3*U)
-peters_loads_hddot(b, ρ) = SVector(pi*ρ*b^2, -pi/2*ρ*b^3)
-peters_loads_θddot(a, b, ρ) = SVector(-pi*ρ*a*b^3, -pi/8*ρ*b^4*(1 - 4*a))
+
+function peters_loads_θ(a, b, U, ρ)
+    L_θ = 2*pi*ρ*U^2*b
+    M_θ = (b/2 + a*b)*L_θ
+    return SVector(L_θ, M_θ)
+end
+
+function peters_loads_hdot(a, b, U, ρ)
+    L_hdot = 2*pi*ρ*U*b
+    M_hdot = (b/2 + a*b)*L_hdot
+    return SVector(L_hdot, M_hdot)
+end
+
+function peters_loads_θdot(a, b, U, ρ)
+    L_θdot = 2*pi*ρ*b^2*U*(1 - a)
+    M_θdot = -pi*ρ*b^3*U + (b/2 + a*b)*L_θdot
+    return SVector(L_θdot, M_θdot)
+end
+
+function peters_loads_hddot(a, b, ρ)
+    L_hddot = pi*ρ*b^2
+    M_hddot = -pi/2*ρ*b^3 + (b/2 + a*b)*L_hddot
+    return SVector(L_hddot, M_hddot)
+end
+
+function peters_loads_θddot(a, b, ρ)
+    L_θddot = -pi*ρ*a*b^3
+    M_θddot = -pi/8*ρ*b^4*(1 - 4*a) + (b/2 + a*b)*L_θddot
+    return SVector(L_θddot, M_θddot)
+end

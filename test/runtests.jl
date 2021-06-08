@@ -15,19 +15,19 @@ using Test
     dh, dθ, dhdot, dθdot = dq
     h, θ, hdot, θdot = q
     L, M = r
-    a, b, kh, kθ, m, xθ, Ip = p
+    kh, kθ, m, Sθ, Iθ = p
 
-    fl = (dq) -> AerostructuralDynamics.section_lhs(b, m, xθ, Ip, dq...)
-    fr = (q) -> AerostructuralDynamics.section_rhs(a, b, kh, kθ, q..., L, M)
-    fin = (r) -> AerostructuralDynamics.section_rhs(a, b, kh, kθ, q..., r...)
+    fl = (dq) -> AerostructuralDynamics.section_lhs(m, Sθ, Iθ, dq...)
+    fr = (q) -> AerostructuralDynamics.section_rhs(kh, kθ, q..., L, M)
+    fin = (r) -> AerostructuralDynamics.section_rhs(kh, kθ, q..., r...)
 
     # test core jacobian functions
     @test isapprox(ForwardDiff.jacobian(fl, dq),
-        AerostructuralDynamics.section_mass_matrix(b, m, xθ, Ip))
+        AerostructuralDynamics.section_mass_matrix(m, Sθ, Iθ))
     @test isapprox(ForwardDiff.jacobian(fr, q),
         AerostructuralDynamics.section_state_jacobian(kh, kθ))
     @test isapprox(ForwardDiff.jacobian(fin, r),
-        AerostructuralDynamics.section_input_jacobian(a, b))
+        AerostructuralDynamics.section_input_jacobian())
 
     # TODO: Test interface functions
 end
@@ -42,14 +42,14 @@ end
     h, θ, hdot, θdot = q
     a, b, U, ρ = p
 
-    fout0_q = (q) -> AerostructuralDynamics.zero_order_loads(b, U, ρ, q[2])
+    fout0_q = (q) -> AerostructuralDynamics.zero_order_loads(a, b, U, ρ, q[2])
     fout1_q = (q) -> fout0_q(q) .+ AerostructuralDynamics.first_order_loads(a, b,
         U, ρ, q[3], q[4])
     fout2_q = (q) -> fout1_q(q) .+ AerostructuralDynamics.second_order_loads(a, b, U, ρ, q[4], 0, 0)
     fout2_dq = (dq) -> fout1_q(q) .+ AerostructuralDynamics.second_order_loads(a, b, U, ρ, 0, dq[3], dq[4])
 
     @test isapprox(ForwardDiff.jacobian(fout0_q, q),
-        AerostructuralDynamics.quasisteady0_jacobian(b, U, ρ))
+        AerostructuralDynamics.quasisteady0_jacobian(a, b, U, ρ))
     @test isapprox(ForwardDiff.jacobian(fout1_q, q),
         AerostructuralDynamics.quasisteady1_jacobian(a, b, U, ρ))
     @test isapprox(ForwardDiff.jacobian(fout2_q, q),
@@ -111,17 +111,17 @@ end
         hdot, θdot, hddot, θddot, λ1, λ2)
 
     @test isapprox(ForwardDiff.jacobian(fout_λ, λ),
-        AerostructuralDynamics.wagner_loads_λ(b, U, ρ))
+        AerostructuralDynamics.wagner_loads_λ(a, b, U, ρ))
     @test isapprox(ForwardDiff.derivative(fout_h, h),
         AerostructuralDynamics.wagner_loads_h())
     @test isapprox(ForwardDiff.derivative(fout_θ, θ),
-        AerostructuralDynamics.wagner_loads_θ(b, U, ρ, C1, C2))
+        AerostructuralDynamics.wagner_loads_θ(a, b, U, ρ, C1, C2))
     @test isapprox(ForwardDiff.derivative(fout_hdot, hdot),
-        AerostructuralDynamics.wagner_loads_hdot(b, U, ρ, C1, C2))
+        AerostructuralDynamics.wagner_loads_hdot(a, b, U, ρ, C1, C2))
     @test isapprox(ForwardDiff.derivative(fout_θdot, θdot),
         AerostructuralDynamics.wagner_loads_θdot(a, b, U, ρ, C1, C2))
     @test isapprox(ForwardDiff.derivative(fout_hddot, hddot),
-        AerostructuralDynamics.wagner_loads_hddot(b, ρ))
+        AerostructuralDynamics.wagner_loads_hddot(a, b, ρ))
     @test isapprox(ForwardDiff.derivative(fout_θddot, θddot),
         AerostructuralDynamics.wagner_loads_θddot(a, b, ρ))
 
@@ -176,17 +176,17 @@ end
         hdot, θdot, hddot, θddot, λ)
 
     @test isapprox(ForwardDiff.jacobian(fout_λ, λ),
-        AerostructuralDynamics.peters_loads_λ(b, U, ρ, model.b))
+        AerostructuralDynamics.peters_loads_λ(a, b, U, ρ, model.b))
     @test isapprox(ForwardDiff.derivative(fout_h, h),
         AerostructuralDynamics.peters_loads_h())
     @test isapprox(ForwardDiff.derivative(fout_θ, θ),
-        AerostructuralDynamics.peters_loads_θ(b, U, ρ))
+        AerostructuralDynamics.peters_loads_θ(a, b, U, ρ))
     @test isapprox(ForwardDiff.derivative(fout_hdot, hdot),
-        AerostructuralDynamics.peters_loads_hdot(b, U, ρ))
+        AerostructuralDynamics.peters_loads_hdot(a, b, U, ρ))
     @test isapprox(ForwardDiff.derivative(fout_θdot, θdot),
         AerostructuralDynamics.peters_loads_θdot(a, b, U, ρ))
     @test isapprox(ForwardDiff.derivative(fout_hddot, hddot),
-        AerostructuralDynamics.peters_loads_hddot(b, ρ))
+        AerostructuralDynamics.peters_loads_hddot(a, b, ρ))
     @test isapprox(ForwardDiff.derivative(fout_θddot, θddot),
         AerostructuralDynamics.peters_loads_θddot(a, b, ρ))
 
