@@ -45,6 +45,8 @@ e = -1/10 # center of mass normalized location
 r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 σ = 2/5 # = ωh/ωθ (natural frequency ratio)
 xθ = e - a
+a0 = 2*pi # lift curve slope
+α0 = 0 # zero lift angle
 
 # chosen dimensional parameters
 b = 1
@@ -88,7 +90,7 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
         u = vcat(u_aero, u_stru)
 
         # parameters
-        p_aero = [a, b, U[i], ρ]
+        p_aero = [a, b, U[i], ρ, a0, α0]
         p_stru = [kh, kθ, m, Sθ, Iθ]
         p = vcat(p_aero, p_stru)
 
