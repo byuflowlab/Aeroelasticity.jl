@@ -9,7 +9,7 @@ Steady() = QuasiSteady{0}()
 QuasiSteady() = QuasiSteady{2}()
 
 # --- Model Traits --- #
-number_of_parameters(::Type{<:QuasiSteady}) = 4
+number_of_parameters(::Type{<:QuasiSteady}) = 6
 
 # --- Coupled Model Properties --- #
 
@@ -35,9 +35,9 @@ function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, u, p, t)
     # extract state variables
     h, θ, hdot, θdot = u
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # calculate aerodynamic loads
-    L, M = zero_order_loads(a, b, U, ρ, θ)
+    L, M = quasisteady0_loads(a, b, U, ρ, a0, α0, θ)
     # return inputs
     return SVector(L, M)
 end
@@ -47,10 +47,9 @@ function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, u, p, t)
     # extract state variables
     h, θ, hdot, θdot = u
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # calculate aerodynamic loads
-    L, M = zero_order_loads(a, b, U, ρ, θ) .+
-        first_order_loads(a, b, U, ρ, hdot, θdot)
+    L, M = quasisteady1_loads(a, b, U, ρ, a0, α0, θ, hdot, θdot)
     # return inputs
     return SVector(L, M)
 end
@@ -60,11 +59,9 @@ function get_inputs(aero::QuasiSteady{2}, stru::TypicalSection, u, p, t)
     # extract state variables
     h, θ, hdot, θdot = u
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # calculate aerodynamic loads
-    L, M = zero_order_loads(a, b, U, ρ, θ) .+
-        first_order_loads(a, b, U, ρ, hdot, θdot) .+
-        second_order_loads(a, b, U, ρ, θdot, 0.0, 0.0)
+    L, M = quasisteady2_loads(a, b, U, ρ, a0, α0, θ, hdot, θdot, 0.0, 0.0)
     # return inputs
     return SVector(L, M)
 end
@@ -72,31 +69,31 @@ end
 # steady
 function get_input_state_jacobian(aero::QuasiSteady{0}, stru::TypicalSection, u, p, t)
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # return jacobian
-    return quasisteady0_jacobian(a, b, U, ρ)
+    return quasisteady0_jacobian(a, b, U, ρ, a0)
 end
 
 # quasi-steady, neglecting acceleration terms
 function get_input_state_jacobian(aero::QuasiSteady{1}, stru::TypicalSection, u, p, t)
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # return jacobian
-    return quasisteady1_jacobian(a, b, U, ρ)
+    return quasisteady1_jacobian(a, b, U, ρ, a0)
 end
 
 # quasi-steady, including acceleration terms
 function get_input_state_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, u, p, t)
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # return jacobian
-    return quasisteady2_jacobian(a, b, U, ρ)
+    return quasisteady2_jacobian(a, b, U, ρ, a0)
 end
 
 # quasi-steady, including acceleration terms
 function get_input_mass_matrix(aero::QuasiSteady{2}, stru::TypicalSection, u, p, t)
     # extract aerodynamic parameters
-    a, b, U, ρ = p
+    a, b, U, ρ, a0, α0 = p
     # return jacobian
     return quasisteady2_mass_matrix(a, b, U, ρ)
 end
@@ -105,66 +102,82 @@ end
 
 # --- Internal --- #
 
-function zero_order_loads(a, b, U, ρ, θ)
-    L = 2*pi*ρ*b*U^2*θ
+# steady state loads
+function quasisteady0_loads(a, b, U, ρ, a0, α0, θ)
+    # circulatory load factor
+    tmp = a0*ρ*U^2*b
+    # effective angle of attack (assuming small angles)
+    α = θ
+    # lift at reference point
+    L = tmp*θ
+    # moment at reference point
     M = (b/2 + a*b)*L
+
     return SVector(L, M)
 end
 
-function first_order_loads(a, b, U, ρ, hdot, θdot)
-    L = 2*pi*ρ*b*U*(hdot + (b/2 - a*b)*θdot)
-    M = -pi*ρ*b^3*U*θdot + (b/2 + a*b)*L
+# circulatory loads + added mass effects, neglecting accelerations
+function quasisteady1_loads(a, b, U, ρ, a0, α0, θ, hdot, θdot)
+    # circulatory load factor
+    tmp1 = a0*ρ*U*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # lift at reference point
+    L = tmp1*(U*θ + hdot + d*θdot - U*α0) + tmp2*U/b*θdot
+    # moment at reference point
+    M = -tmp2*U*θdot + (b/2 + a*b)*L
+
     return SVector(L, M)
 end
 
-function second_order_loads(a, b, U, ρ, θdot, hddot, θddot)
-    L = pi*ρ*b^2*(hddot + U*θdot - b*a*θddot)
-    M = -pi*ρ*b^3*(hddot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+# quasi-steady loads + added mass effects
+function quasisteady2_loads(a, b, U, ρ, a0, α0, θ, hdot, θdot, hddot, θddot)
+    # circulatory load factor
+    tmp1 = a0*ρ*U*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # lift at reference point
+    L = tmp1*(U*θ + hdot + d*θdot - U*α0) + tmp2*(hddot/b + U/b*θdot - a*θddot)
+    # moment at reference point
+    M = -tmp2*(hddot/2 + U*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+
     return SVector(L, M)
 end
 
-function quasisteady0_jacobian(a, b, U, ρ)
-    L_θ = 2*pi*ρ*b*U^2
+function quasisteady0_jacobian(a, b, U, ρ, a0)
+    L_θ = a0*ρ*U^2*b
     M_θ = (b/2 + a*b)*L_θ
     return @SMatrix [0 L_θ 0 0; 0 M_θ 0 0]
 end
 
-function quasisteady1_jacobian(a, b, U, ρ)
-    # calculate derivatives
-    tmp1 = pi*ρ*b*U
-    tmp2 = b/2 + a*b
-    L_θ = 2*tmp1*U
-    L_hdot = 2*tmp1
-    L_θdot = 2*tmp1*(b/2 - a*b)
-    M_θ = tmp2*L_θ
-    M_hdot = tmp2*L_hdot
-    M_θdot = -tmp1*b^2 + tmp2*L_θdot
-    # return jacobian
+function quasisteady1_jacobian(a, b, U, ρ, a0)
+    tmp1 = a0*ρ*U*b
+    tmp2 = pi*ρ*b^3
+    d1 = b/2 - a*b
+    d2 = b/2 + a*b
+    L_θ = tmp1*U
+    L_hdot = tmp1
+    L_θdot = tmp1*d1 + tmp2*U/b
+    M_θ = d2*L_θ
+    M_hdot = d2*L_hdot
+    M_θdot = -tmp2*U + d2*L_θdot
     return @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
 end
 
-function quasisteady2_jacobian(a, b, U, ρ)
-    # calculate derivatives
-    tmp1 = pi*ρ*b*U
-    tmp2 = b/2 + a*b
-    L_θ = 2*tmp1*U
-    L_hdot = 2*tmp1
-    L_θdot = 2*tmp1*(b/2 - a*b) + tmp1*b
-    M_θ = tmp2*L_θ
-    M_hdot = tmp2*L_hdot
-    M_θdot = -tmp1*b^2 + tmp2*L_θdot
-    # return jacobian
-    return @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
-end
+quasisteady2_jacobian(a, b, U, ρ, a0) = quasisteady1_jacobian(a, b, U, ρ, a0)
 
 function quasisteady2_mass_matrix(a, b, U, ρ)
     # calculate derivatives
-    tmp1 = pi*ρ*b^2
+    tmp1 = pi*ρ*b^3
     tmp2 = b/2 + a*b
-    L_hddot = -tmp1
-    L_θddot = tmp1*a*b
-    M_hddot = tmp1*b/2 + tmp2*L_hddot
-    M_θddot = tmp1*(b^2/8 - a*b^2/2) + tmp2*L_θddot
+    L_hddot = -tmp1/b
+    L_θddot = tmp1*a
+    M_hddot = tmp1/2 + tmp2*L_hddot
+    M_θddot = tmp1*(b/8 - a*b/2) + tmp2*L_θddot
     # return jacobian
     return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
 end

@@ -399,6 +399,10 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         # get aerodynamic model for this cross section
         aerodynamic_model = aero.models[i]
 
+        # extract aerodynamic state variables
+        Nλi = number_of_states(typeof(aerodynamic_model))
+        λi = SVector{Nai}(λs[i])
+
         # beam element properties and state variables
         element = assembly.elements[i]
         states = extract_element_state(system, i; x = q)
@@ -408,7 +412,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         θ_elem = states.θ
 
         # transformation matrix from local to global frame
-        Ct = get_C(θ_elem)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = beam.Cab
         CtCab = Ct*Cab
 
@@ -416,15 +420,25 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         v_elem = CtCab * GXBeam.element_linear_velocity(element, states.P, states.H)
         ω_elem = CtCab * GXBeam.element_angular_velocity(element, states.P, states.H)
 
-        # aerodynamic state variables
-        Nλi = number_of_states(typeof(aerodynamic_model))
-        λi = SVector{Nai}(λs[i])
+        # extract dihedral and local angle of attack
+        ϕi = atan(CtCab[2,1], CtCab[1,1])
+        θi = atan(-CtCab[3,1], sqrt(CtCab[3,2]^2 + CtCab[3,3]^2))
 
-        # structural state variables
-        h = states.u[3] # plunge (in z-direction)
-        θ = atan(CtCab[1,3], CtCab[1,1]) # pitch (in plane parallel to Y-Z plane)
-        hdot = v_elem[3] # plunge rate (in z-direction)
-        θdot = ω_elem[2] # pitch rate (in plane parallel to Y-Z plane)
+        # create transformation matrix from local to global frame
+        sϕ, cϕ = sincos(ϕi)
+        sθ, cθ = sincos(θi)
+        R = @SMatrix [cθ sθ*sϕ sθ*cϕ; 0 cϕ -sϕ; -sθ cθ*sϕ cθ*cϕ]
+
+        # transform deflections into local (aerodynamic) frame
+        ui = R'*u_elem
+        vi = R'*v_elem
+        ωi = R'*ω_elem
+
+        # calculate structural state variables for this section
+        h = ui[3] # plunge
+        θ = θi # pitch
+        hdot = vi[3] # plunge rate
+        θdot = ωi[2] # pitch rate
         qi = SVector(h, θ, hdot, θdot)
 
         # combined state variables
@@ -445,17 +459,21 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
             yas[i] = yi[i]
         end
 
-        # set lift and moment
+        # extract lift and moment
         L = yi[Nas + 1]
         M = yi[Nas + 2]
 
+        # transform lift and moment into global frame
+        Fi = R*SVector(0, 0, L)
+        Mi = R*SVector(0, M, 0)
+
         # convert lift and moment (per unit span) to distributed loads
-        ys[3*(i-1)+1] = 0
-        ys[3*(i-1)+2] = 0
-        ys[3*(i-1)+3] = L
-        ys[3*(i-1)+4] = 0
-        ys[3*(i-1)+5] = M
-        ys[3*(i-1)+6] = 0
+        ys[3*(i-1)+1] = Fi[1]
+        ys[3*(i-1)+2] = Fi[2]
+        ys[3*(i-1)+3] = Fi[3]
+        ys[3*(i-1)+4] = Mi[1]
+        ys[3*(i-1)+5] = Mi[2]
+        ys[3*(i-1)+6] = Mi[3]
     end
 
     return y
