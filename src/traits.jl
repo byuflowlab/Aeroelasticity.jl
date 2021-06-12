@@ -25,11 +25,8 @@ struct Empty <: MatrixType end
 struct Zeros <: MatrixType end
 struct Identity <: MatrixType end
 struct Constant <: MatrixType end
-struct Varying <: MatrixType end
-
-abstract type InputDependence end
-struct Linear <: InputDependence end
-struct Nonlinear <: InputDependence end
+struct Linear <: MatrixType end
+struct Nonlinear <: MatrixType end
 
 # --- Trait Functions --- #
 
@@ -75,12 +72,12 @@ Return
     identity matrix
  - [`Constant()`](@ref), if the mass matrix associated with model `T` is
     constant with respect to time
- - [`Varying()`](@ref), if the mass matrix associated with model `T` may vary
+ - [`Linear()`](@ref), if the mass matrix associated with model `T` may vary
     with respect to time
 
-If no method is defined for the specified type, return [`Varying`](@ref).
+If no method is defined for the specified type, return [`Linear`](@ref).
 """
-mass_matrix_type(::Type{T}) where T = Varying()
+mass_matrix_type(::Type{T}) where T = Linear()
 
 # models with no state variables have no mass matrix
 mass_matrix_type(::Type{T}) where T<:NoStateModel = Empty()
@@ -102,7 +99,7 @@ function mass_matrix_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
         all(isconstant.(mass_matrix_type.(model_types)))
         return Constant()
     else
-        return Varying()
+        return Linear()
     end
 end
 
@@ -121,13 +118,16 @@ Return
  - [`Constant()`](@ref), if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` is
     constant with respect to time
- - [`Varying()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - [`Linear()`](@ref), if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` may vary
-    with respect to time
+    with respect to time, but is linear with respect to the states
+ - [`Nonlinear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+    with respect to the state variables associated with model `T` may vary
+    with respect to time, and is nonlinear with respect to the states
 
-If no method is defined for the specified type, return [`Varying`](@ref).
+If no method is defined for the specified type, return [`Nonlinear`](@ref).
 """
-state_jacobian_type(::Type{T}) where T = Varying()
+state_jacobian_type(::Type{T}) where T = Nonlinear()
 
 # models with no state variables have no state jacobian
 state_jacobian_type(::Type{T}) where T<:NoStateModel = Empty()
@@ -148,8 +148,10 @@ function state_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
         all(isconstant.(input_jacobian_type.(model_types))) &&
         all(isconstant.(state_jacobian_type.(model_types)))
         return Constant()
+    elseif all(islinear.(state_jacobian_type.(model_types)))
+        return Linear()
     else
-        return Varying()
+        return Nonlinear()
     end
 end
 
@@ -165,12 +167,16 @@ Return
     with respect to the inputs is the identity matrix for model `T`
  - [`Constant()`](@ref), if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs is constant with respect to time for model `T`
- - [`Varying()`](@ref), if the jacobian of the mass matrix multiplied state rates
-    with respect to the inputs may vary with respect to time for model `T`
+ - [`Linear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+    with respect to the inputs may vary with respect to time for model `T`, and
+    is linear with respect to the inputs
+ - [`Nonlinear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+    with respect to the inputs may vary with respect to time for model `T`, and
+    is nonlinear with respect to the inputs
 
-If no method is defined for the specified type, return [`Varying`](@ref).
+If no method is defined for the specified type, return [`Nonlinear`](@ref).
 """
-input_jacobian_type(::Type{T}) where T = Varying()
+input_jacobian_type(::Type{T}) where T = Nonlinear()
 
 # models with no state variables have no input jacobian
 input_jacobian_type(::Type{T}) where T<:NoStateModel = Empty()
@@ -186,21 +192,12 @@ function input_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
         return Identity()
     elseif all(isconstant.(input_jacobian_type.(model_types)))
         return Constant()
+    elseif all(islinear.(input_jacobian_type.(model_types)))
+        return Linear()
     else
-        return Varying()
+        return Nonlinear()
     end
 end
-
-"""
-    input_dependence_type(::Type{T})
-
-Return [`Linear()`](@ref) if the state rate function for model `T` is linearly
-dependent on the associated inputs and [`Nonlinear()`](@ref) otherwise.
-
-If no method is defined for the specified type, return [`Nonlinear`](@ref).
-"""
-input_dependence_type(::Type{T}) where T = Nonlinear()
-input_dependence_type(::Type{T}) where T<:NoStateModel = Linear()
 
 # --- dispatch functions --- #
 
@@ -223,8 +220,10 @@ isconstant(::Empty) = true
 isconstant(::Zeros) = true
 isconstant(::Constant) = true
 
-function linear_input_dependence(model)
-    return _linear_input_dependence(input_dependence_type(typeof(model)))
-end
-_linear_input_dependence(::Linear) = true
-_linear_input_dependence(::Nonlinear) = false
+islinear(::MatrixType) = false
+islinear(::Empty) = true
+islinear(::Zeros) = true
+islinear(::Constant) = true
+islinear(::Linear) = true
+
+linear_input_dependence(model) = islinear(input_jacobian_type(typeof(model)))
