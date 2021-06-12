@@ -5,8 +5,9 @@ Return the total number of states corresponding to the model or models.
 """
 number_of_states
 
-# default to calling function using type
-number_of_states(model::TM) where TM <:AbstractModel = number_of_states(TM)
+# default to returning zero states
+number_of_states(::Type{TM}) where TM = 0
+number_of_states(model::TM) where TM = number_of_states(TM)
 
 # models with no states have... no states
 number_of_states(::Type{T}) where T<:NoStateModel = 0
@@ -28,8 +29,9 @@ Return the total number of inputs corresponding to the model or models.
 """
 number_of_inputs
 
-# default to calling function using type
-number_of_inputs(model::TM) where TM <: AbstractModel = number_of_inputs(TM)
+# default to returning zero inputs
+number_of_inputs(::Type{TM}) where TM = 0
+number_of_inputs(model::TM) where TM = number_of_inputs(TM)
 
 # models with no states have no inputs
 number_of_inputs(::Type{T}) where T<:NoStateModel = 0
@@ -51,17 +53,18 @@ Return the total number of parameters corresponding to the model or models.
 """
 number_of_parameters
 
-# default to calling function using type
-number_of_parameters(model::TM) where TM<:AbstractModel = number_of_parameters(TM)
+# default to returning zero parameters
+number_of_parameters(::Vararg{Type,N}) where N = 0
+number_of_parameters(models...) = number_of_parameters(typeof.(models)...)
 
 # combined models have concatenated parameters
 function number_of_parameters(models::NTuple{N,AbstractModel}) where N
-    sum(number_of_parameters.(models))
+    sum(number_of_parameters.(models)) + number_of_parameters(typeof.(models)...)
 end
 
 # combined models have concatenated parameters
 function number_of_parameters(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    sum(number_of_parameters.(T.parameters))
+    sum(number_of_parameters.(T.parameters)) + number_of_parameters(T.parameters...)
 end
 
 """
@@ -163,7 +166,7 @@ function _get_mass_matrix(::Constant, ::OutOfPlace, models::NTuple{N, AbstractMo
 end
 
 # calculate mass matrix for a combination of models
-function _get_mass_matrix(::Varying, ::OutOfPlace, models::NTuple{N, AbstractModel},
+function _get_mass_matrix(::Linear, ::OutOfPlace, models::NTuple{N, AbstractModel},
     u, y, p, t) where N
 
     # initialize mass matrix
@@ -331,8 +334,9 @@ function _get_mass_matrix!(M, ::Constant, ::InPlace, models::NTuple{N, AbstractM
 end
 
 # calculate mass matrix for a combination of models
-function _get_mass_matrix!(M, ::Varying, ::InPlace, models::NTuple{N, AbstractModel};
-    My = similar(M, number_of_inputs(models), number_of_states(models))) where N
+function _get_mass_matrix!(M, ::Linear, ::InPlace,
+    models::NTuple{N, AbstractModel}; My = similar(M, number_of_inputs(models),
+    number_of_states(models))) where N
 
     # get state and parameter indices
     iu = state_indices(models)
@@ -501,7 +505,8 @@ function _get_state_jacobian(::Constant, ::OutOfPlace, models, u, y, p, t)
 end
 
 # calculate state jacobian for a combination of models
-function _get_state_jacobian(::Varying, ::OutOfPlace, models::NTuple{N, AbstractModel}) where N
+function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}) where N
 
     # initialize mass matrix
     J = initialize_state_jacobian(models)
@@ -516,13 +521,15 @@ function _get_state_jacobian(::Varying, ::OutOfPlace, models::NTuple{N, Abstract
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_state_jacobian(::Varying, ::OutOfPlace, models, u, y, p, t)
+function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace, models,
+    u, y, p, t)
+
     return ForwardDiff.jacobian(u->get_rates(models, u, y, p, t), u)
 end
 
 # calculate state jacobian for a combination of models
-function _get_state_jacobian(::Varying, ::OutOfPlace, models::NTuple{N, AbstractModel},
-    u, y, p, t) where N
+function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, u, y, p, t) where N
 
     # initialize mass matrix
     J = initialize_state_jacobian(models, u, y, p, t)
@@ -693,15 +700,16 @@ function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,Abstrac
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_state_jacobian!(J, ::Varying, ::OutOfPlace, model::AbstractModel,
-    u, y, p, t)
+function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::OutOfPlace,
+    model::AbstractModel, u, y, p, t)
 
     return ForwardDiff.jacobian!(J, u->get_rates(models, u, y, p, t), u)
 end
 
 # calculate state jacobian for a combination of models
-function _get_state_jacobian!(J, ::Varying, ::InPlace, models::NTuple{N,AbstractModel},
-    u, y, p, t; Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
+function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, u, y, p, t;
+    Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
 
     # get dimensions
     Nu = number_of_states.(models)
@@ -781,12 +789,16 @@ function _get_input_jacobian(::Constant, models::NTuple{N,AbstractModel}) where 
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_input_jacobian(J, ::Varying, ::OutOfPlace, model::AbstractModel, u, y, p, t)
+function _get_input_jacobian(J, ::Union{Linear, Nonlinear}, ::OutOfPlace,
+    model::AbstractModel, u, y, p, t)
+
     return ForwardDiff.jacobian(y->get_rates(models, u, y, p, t), y)
 end
 
 # calculate input jacobian for a combination of models
-function _get_input_jacobian(::Varying, models::NTuple{N,AbstractModel}, u, y, p, t) where N
+function _get_input_jacobian(::Union{Linear, Nonlinear},
+    models::NTuple{N,AbstractModel}, u, y, p, t) where N
+
     varying_input_jacobian(models, u, y, p, t)
 end
 
@@ -932,7 +944,7 @@ function _get_input_mass_matrix(::Constant, ::OutOfPlace,
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_mass_matrix(::Varying, ::OutOfPlace,
+function _get_input_mass_matrix(::Linear, ::OutOfPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
     return get_input_mass_matrix(models..., u, p, t; kwargs...)
@@ -986,7 +998,7 @@ function _get_input_mass_matrix!(My, ::Constant, ::InPlace,
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function get_input_mass_matrix!(My, ::Varying, ::InPlace,
+function get_input_mass_matrix!(My, ::Linear, ::InPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
     get_input_mass_matrix!(My, models..., u, p, t; kwargs...)
@@ -1101,7 +1113,7 @@ function _get_input_state_jacobian(::Constant, ::OutOfPlace,
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_state_jacobian(::Varying, ::OutOfPlace,
+function _get_input_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
     return get_input_state_jacobian(models..., u, p, t; kwargs...)
@@ -1154,7 +1166,7 @@ function _get_input_state_jacobian!(Jy, ::Constant, ::InPlace,
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function get_input_state_jacobian!(Jy, ::Varying, ::InPlace,
+function get_input_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
     get_input_state_jacobian!(Jy, models..., u, p, t; kwargs...)

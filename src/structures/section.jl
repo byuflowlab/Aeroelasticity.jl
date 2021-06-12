@@ -13,10 +13,9 @@ number_of_states(::Type{TypicalSection}) = 4
 number_of_inputs(::Type{TypicalSection}) = 2
 number_of_parameters(::Type{TypicalSection}) = 5
 inplaceness(::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{TypicalSection}) = Varying()
-state_jacobian_type(::Type{TypicalSection}) = Varying()
+mass_matrix_type(::Type{TypicalSection}) = Linear()
+state_jacobian_type(::Type{TypicalSection}) = Linear()
 input_jacobian_type(::Type{TypicalSection}) = Constant()
-input_dependence_type(::Type{TypicalSection}) = Linear()
 
 # --- Methods --- #
 
