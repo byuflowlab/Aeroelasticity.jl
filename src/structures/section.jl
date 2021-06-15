@@ -19,13 +19,6 @@ input_jacobian_type(::Type{TypicalSection}) = Constant()
 
 # --- Methods --- #
 
-function get_mass_matrix(::TypicalSection, q, r, p, t)
-    # extract structural parameters
-    kh, kθ, m, Sθ, Iθ = p
-    # calculate mass matrix
-    return section_mass_matrix(m, Sθ, Iθ)
-end
-
 function get_rates(::TypicalSection, q, r, p, t)
     # extract structural states
     h, θ, hdot, θdot = q
@@ -36,6 +29,15 @@ function get_rates(::TypicalSection, q, r, p, t)
     # calculate state rates
     return section_rhs(kh, kθ, h, θ, hdot, θdot, L, M)
 end
+
+function get_mass_matrix(::TypicalSection, q, r, p, t)
+    # extract structural parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # calculate mass matrix
+    return section_mass_matrix(m, Sθ, Iθ)
+end
+
+# --- Performance Overloads --- #
 
 function get_state_jacobian(::TypicalSection, q, r, p, t)
     # extract parameters
@@ -49,9 +51,19 @@ function get_input_jacobian(::TypicalSection)
     return section_input_jacobian()
 end
 
+function get_mass_matrix_product(::TypicalSection, dq, q, r, p, t)
+    # extract structural parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # extract state rates
+    dh, dθ, dhdot, dθdot = dq
+    # calculate mass matrix product
+    return section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)
+end
+
 # TODO: Add parameter jacobian
 
-# --- Internal --- #
+
+# --- Internal Methods --- #
 
 # left side of rate equations (used for testing)
 function section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)

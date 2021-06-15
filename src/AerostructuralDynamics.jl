@@ -32,12 +32,16 @@ export get_mass_matrix, get_mass_matrix!
 export get_rates, get_rates!
 export get_state_jacobian, get_state_jacobian!
 
+export get_mass_matrix_product, get_mass_matrix_product!
+export get_input_jacobian, get_input_jacobian!
+
 include("traits.jl")
 include("interface.jl")
 include("structures/section.jl")
 include("structures/gxbeam.jl")
+include("aerodynamics/liftingline.jl")
 include("aerodynamics/quasisteady.jl")
 include("aerodynamics/wagner.jl")
 include("aerodynamics/peters.jl")
-include("aerodynamics/liftingline.jl")
+
 end

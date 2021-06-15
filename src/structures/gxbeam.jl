@@ -4,6 +4,9 @@
 Geometrically exact beam theory model, as implemented by the GXBeam package.
 State variables are as defined by GXBeam. Inputs correspond to the (non-follower)
 distributed aerodynamic loads on each beam element with distributed loads.
+When coupled with an aerodynamic model, the local beam y and z-axes should be
+aligned with the negative chordwise and positive normal directions, respectively.
+
 At this point in time, this model doesn't accept any parameters.
 """
 struct GEBT{TF, TV, TM} <: AbstractModel

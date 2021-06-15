@@ -81,30 +81,16 @@ end
 
 # TODO: Add parameter jacobian
 
-# --- Coupled Model Properties --- #
+# --- Typical Section Coupling --- #
 
-# traits
+# --- traits --- #
+
 inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
 mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Linear()
 state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
 number_of_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 1
 
-function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
-    # extract aerodynamic parameters
-    a, b, ρ = p
-    # construct submatrices
-    Mda = @SMatrix [0 0; 0 0; 0 0]
-    Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
-    Mra = @SMatrix [0 0; 0 0]
-    Mrs = hcat(
-        SVector(0, 0),
-        SVector(0, 0),
-        -wagner_loads_hddot(a, b, ρ),
-        -wagner_loads_θddot(a, b, ρ)
-    )
-    # assemble mass matrix
-    return [Mda Mds; Mra Mrs]
-end
+# --- methods --- #
 
 function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract state variables
@@ -123,6 +109,25 @@ function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     # return portion of inputs that is not dependent on the state rates
     return SVector(u, v, θdot, L, M)
 end
+
+function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
+    # extract aerodynamic parameters
+    a, b, ρ = p
+    # construct submatrices
+    Mda = @SMatrix [0 0; 0 0; 0 0]
+    Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
+    Mra = @SMatrix [0 0; 0 0]
+    Mrs = hcat(
+        SVector(0, 0),
+        SVector(0, 0),
+        -wagner_loads_hddot(a, b, ρ),
+        -wagner_loads_θddot(a, b, ρ)
+    )
+    # assemble mass matrix
+    return [Mda Mds; Mra Mrs]
+end
+
+# --- performance overloads --- #
 
 function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
     # extract aerodynamic, structural, and aerostructural parameters
@@ -145,6 +150,90 @@ function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) w
 end
 
 # TODO: Parameter jacobian
+
+# --- Lifting Line Section Coupling --- #
+
+# --- traits --- #
+
+inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection}) = OutOfPlace()
+mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Linear()
+state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Nonlinear()
+number_of_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection}) = 1
+
+# --- methods --- #
+
+function get_inputs(aero::Wagner, stru::LiftingLineSection, s, p, t)
+    # extract state variables
+    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
+    # extract parameters
+    a, b, ρ, a0, α0 = p
+    # extract relevant velocities
+    u = vx
+    v = vz
+    vdot = 0 # included in mass matrix
+    θdot = ωy
+    θddot = 0 # included in mass matrix
+    # extract model constants
+    C1 = aero.C1
+    C2 = aero.C2
+    # calculate aerodynamic loads
+    L, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, vdot, θdot, θddot, λ1, λ2)
+    # forces and moments per unit span
+    f = SVector(L, 0, 0)
+    m = SVector(0, M, 0)
+    # return portion of inputs that is not dependent on the state rates
+    return vcat(u, v, θdot, f, m)
+end
+
+function get_input_mass_matrix(aero::Wagner, stru::LiftingLineSection, s, p, t)
+    # extract state variables
+    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
+    # extract parameters
+    a, b, ρ, a0, α0 = p
+    # extract relevant velocities
+    u = vx
+    # construct submatrices
+    Mda = @SMatrix [0 0; 0 0; 0 0]
+    Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
+    Mra = @SMatrix [0 0; 0 0]
+    # calculate loads
+    L_udot, M_udot = wagner_loads_udot()
+    L_vdot, M_vdot = wagner_loads_vdot(a, b, ρ)
+    L_θddot, M_θddot = wagner_loads_θddot(a, b, ρ, a0, u)
+    Mrs = @SMatrix [-L_udot 0 -L_vdot 0 -L_θddot 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
+        0 0 0 0 0 0; -M_udot 0 -M_vdot 0 -M_θddot 0; 0 0 0 0 0 0]
+    # assemble mass matrix
+    return [Mda Mds; Mra Mrs]
+end
+
+# --- performance overloads --- #
+
+function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection, u, p, t) where {N,TF,SV,SA}
+    # extract state variables
+    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
+    # extract aerodynamic, structural, and aerostructural parameters
+    a, b, ρ, a0, α0 = p
+    # extract relevant velocities
+    u = vx
+    v = vz
+    vdot = 0 # included in mass matrix
+    θdot = ωy
+    θddot = 0 # included in mass matrix
+    # extract model constants
+    C1 = aero.C1
+    C2 = aero.C2
+    # compute input jacobian sub-matrices
+    Jda = @SMatrix [0 0; 0 0; 0 0]
+    Jds = @SMatrix [1 0 0 0 0 0; 0 0 1 0 0 0; 0 0 0 0 1 0]
+    Jra = wagner_loads_λ(a, b, ρ, a0, u)
+    L_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
+    L_v, M_v = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
+    L_θdot, M_θdot = wagner_loads_θdot(a, b, ρ, a0, C1, C2, u)
+    Jrs = @SMatrix [L_u 0 L_v 0 L_θdot 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
+        0 0 0 0 0 0; M_u 0 M_v 0 M_θdot 0; 0 0 0 0 0 0]
+    # return jacobian
+    return [Jda Jds; Jra Jrs]
+end
 
 # --- Internal Methods --- #
 
@@ -196,37 +285,99 @@ function wagner_loads_λ(a, b, ρ, a0, u)
     return @SMatrix [tmp1 tmp1; tmp2 tmp2]
 end
 wagner_loads_λdot() = @SMatrix [0 0; 0 0]
+
+function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
+    # circulatory load factor
+    tmp1 = a0*ρ*u*b
+    tmp1_u = a0*ρ*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # Wagner's function at t = 0.0
+    ϕ0 = 1 - C1 - C2
+    # lift at reference point
+    L_u = tmp1_u*((-v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*θdot
+    # moment at reference point
+    M_u = -tmp2*θdot + (b/2 + a*b)*L_u
+
+    return SVector(L_u, M_u)
+end
+
+function wagner_loads_v(a, b, ρ, a0, C1, C2, u)
+    # Wagner's function at t = 0.0
+    ϕ0 = 1 - C1 - C2
+    # lift at reference point
+    L_v = -a0*ρ*u*b*ϕ0
+    # moment at reference point
+    M_v = (b/2 + a*b)*L_v
+
+    return SVector(L_v, M_v)
+end
+
+wagner_loads_udot() = SVector(0, 0)
+
+function wagner_loads_vdot(a, b, ρ)
+    # non-circulatory load factor
+    tmp = pi*ρ*b^3
+    # lift at reference point
+    L_vdot = -tmp/b
+    # moment at reference point
+    M_vdot = tmp/2 + (b/2 + a*b)*L_vdot
+
+    return SVector(L_vdot, M_vdot)
+end
+
+function wagner_loads_θdot(a, b, ρ, a0, C1, C2, u)
+    # circulatory load factor
+    tmp1 = a0*ρ*u*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # Wagner's function at t = 0.0
+    ϕ0 = 1 - C1 - C2
+    # lift at reference point
+    L_θdot = tmp1*d*ϕ0 + tmp2*u/b
+    # moment at reference point
+    M_θdot = -tmp2*u + (b/2 + a*b)*L_θdot
+
+    return SVector(L_θdot, M_θdot)
+end
+
+function wagner_loads_θddot(a, b, ρ, a0, u)
+    # circulatory load factor
+    tmp1 = a0*ρ*u*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # lift at reference point
+    L_θddot = -a*tmp2
+    # moment at reference point
+    M_θddot = -tmp2*b*(1/8 - a/2) + (b/2 + a*b)*L_θddot
+
+    return SVector(L_θddot, M_θddot)
+end
+
 wagner_loads_h() = SVector(0, 0)
+
 function wagner_loads_θ(a, b, ρ, a0, C1, C2, u)
     ϕ0 = 1 - C1 - C2
     L_θ = a0*ρ*b*u^2*ϕ0
     M_θ = (b/2 + a*b)*L_θ
     return SVector(L_θ, M_θ)
 end
+
 function wagner_loads_hdot(a, b, ρ, a0, C1, C2, u)
     ϕ0 = 1 - C1 - C2
     L_hdot = a0*ρ*u*b*ϕ0
     M_hdot = (b/2 + a*b)*L_hdot
     return SVector(L_hdot, M_hdot)
 end
-function wagner_loads_θdot(a, b, ρ, a0, C1, C2, u)
-    tmp = pi*ρ*b^3
-    ϕ0 = 1 - C1 - C2
-    L_θdot = a0*ρ*u*b*(b/2 - a*b)*ϕ0 + tmp*u/b
-    M_θdot = -tmp*u + (b/2 + a*b)*L_θdot
-    return SVector(L_θdot, M_θdot)
-end
+
 function wagner_loads_hddot(a, b, ρ)
     tmp1 = pi*ρ*b^3
     tmp2 = b/2 + a*b
     L_hddot = tmp1/b
     M_hddot = -tmp1/2 + tmp2*L_hddot
     return SVector(L_hddot, M_hddot)
-end
-function wagner_loads_θddot(a, b, ρ)
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_θddot = -tmp1*a
-    M_θddot = -tmp1*(b/8 - a*b/2) + tmp2*L_θddot
-    return SVector(L_θddot, M_θddot)
 end
