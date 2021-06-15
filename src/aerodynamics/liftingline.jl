@@ -284,7 +284,7 @@ function mass_matrix_type(::Type{LiftingLine{N,T}}, ::Type{GEBT}) where {N,T}
     end
 end
 
-function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{GEBT}) where {N,T}
+function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,T}
     model_types = T.parameters
     if all(isempty.(state_jacobian_type.(model_types, Ref(TypicalSection))))
         return Empty()
@@ -525,7 +525,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
 
         # get forces/moments per unit length
         fi = SVector(yi[Nyai[i]+1], yi[Nyai[i]+2], yi[Nyai[i]+3])
-        mi = SVector(yi[Nyai[i]+4]. yi[Nyai[i]+5], yi[Nyai[i]+6])
+        mi = SVector(yi[Nyai[i]+4], yi[Nyai[i]+5], yi[Nyai[i]+6])
 
         # convert to element frame of reference
         f_elem = SVector(fi[2], -fi[1], fi[3])
