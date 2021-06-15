@@ -9,6 +9,18 @@ struct LiftingLine{N,T} <: AbstractModel
     models::T
 end
 
+"""
+    LiftingLineSection <: AbstractModel
+
+Lifting line section model with state variables ``q = \\begin{bmatrix} v_x & v_y &
+v_z & \\omega_x & \\omega_y & \\omega_z \\end{bmatrix}^T``, inputs
+``r = \\begin{bmatrix} L' & Y' & D' & Mx, My, Mz \\end{bmatrix}^T``, and zero
+parameters.  Two-dimensional aerodynamic models may be extended to
+three-dimensional models by coupling with this model.  Note that
+this model has no rate equations of its own.
+"""
+struct LiftingLineSection <: AbstractModel end
+
 # --- Constructors --- #
 
 """
@@ -16,9 +28,9 @@ end
 
 Construct a lifting line aerodynamic model given a tuple of aerodynamic models.
 """
-LiftingLine(models::NTuple{N,T}) where {N,T} = LiftingLine{N,T}(models)
+LiftingLine(models::T) where T<:NTuple{N,Any} where N = LiftingLine{N,T}(models)
 
-LiftingLine{N}(models::NTuple{N,T}) where {N,T} = LiftingLine{N,T}(models)
+LiftingLine{N}(models::T) where T<:NTuple{N,Any} where N = LiftingLine{N,T}(models)
 
 """
     LiftingLine{N}(model)
@@ -31,9 +43,9 @@ function LiftingLine{N}(model) where {N,T}
 end
 
 # --- Traits --- #
-number_of_states(model::LiftingLine) = number_of_states(model.models)
-number_of_inputs(model::LiftingLine) = number_of_inputs(model.models)
-number_of_parameters(model::LiftingLine) = number_of_parameters(model.models)
+number_of_states(model::LiftingLine) = sum(number_of_states.(model.models))
+number_of_inputs(model::LiftingLine) = sum(number_of_inputs.(model.models))
+number_of_parameters(model::LiftingLine) = sum(number_of_parameters.(model.models))
 inplaceness(::Type{LiftingLine{N,T}}) where {N,T} = InPlace()
 
 function mass_matrix_type(::Type{LiftingLine{N,T}}) where {N,T}
@@ -46,8 +58,10 @@ function mass_matrix_type(::Type{LiftingLine{N,T}}) where {N,T}
         return Identity()
     elseif all(isconstant.(mass_matrix_type.(model_types)))
         return Constant()
+    elseif all(islinear.(mass_matrix_type.(model_types)))
+        return Linear()
     else
-        return Varying()
+        return Nonlinear()
     end
 end
 
@@ -61,8 +75,10 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}) where {N,T}
         return Identity()
     elseif all(isconstant.(state_jacobian_type.(model_types)))
         return Constant()
+    elseif all(islinear.(state_jacobian_type.(model_types)))
+        return Linear()
     else
-        return Varying()
+        return Nonlinear()
     end
 end
 
@@ -76,14 +92,7 @@ function input_jacobian_type(::Type{LiftingLine{N,T}}) where {N,T}
         return Identity()
     elseif all(isconstant.(input_jacobian_type.(model_types)))
         return Constant()
-    else
-        return Varying()
-    end
-end
-
-function input_dependence_type(::Type{LiftingLine{N,T}}) where {N,T}
-    model_types = (T.parameters...,)
-    if all(_linear_input_dependence.(model_types))
+    elseif all(islinear.(input_jacobian_type.(model_types)))
         return Linear()
     else
         return Nonlinear()
@@ -123,7 +132,7 @@ function get_mass_matrix!(M, model::LiftingLine, u, y, p, t)
 
     Ms = view.(Ref(M), iu, iu)
 
-    get_mass_matrix!.(Ms, models, us, ys, ps)
+    get_mass_matrix!.(Ms, models, us, ys, ps, t)
 
     return M
 end
@@ -142,7 +151,7 @@ function get_rates!(du, model::LiftingLine, u, y, p, t)
 
     dus = view.(Ref(du), iu)
 
-    get_rates!.(dus, models, us, ys, ps)
+    get_rates!.(dus, models, us, ys, ps, t)
 
     return du
 end
@@ -178,44 +187,74 @@ function get_state_jacobian!(J, model::LiftingLine, u, y, p, t)
 
     Js = view.(Ref(J), iu, iu)
 
-    get_state_jacobian!.(Js, models, us, ys, ps)
+    get_state_jacobian!.(Js, models, us, ys, ps, t)
 
     return J
 end
 
-function get_input_jacobian!(Jy, model::LiftingLine)
+function get_input_jacobian(model::LiftingLine)
 
-    models = model.models
+    f! = (y, x) -> input_jacobian_product!(y, x, model)
 
-    iu = state_indices(model.models)
-    iy = input_indices(model.models)
+    M = number_of_states(model)
 
-    Jys = view.(Ref(Jy), iu, iy)
+    N = number_of_inputs(model)
 
-    get_state_jacobian!.(Jys, models)
+    Jy = LinearMap(f!, M, N; ismutating=true)
 
     return Jy
 end
 
-function get_input_jacobian!(Jy, model::LiftingLine, u, y, p, t)
+function get_input_jacobian(model::LiftingLine, λ, d, p, t)
 
-    Jy .= 0
+    f! = (y, x) -> input_jacobian_product!(y, x, model, λ, d, p, t)
+
+    M = number_of_states(model)
+
+    N = number_of_inputs(model)
+
+    Jy = LinearMap(f!, M, N; ismutating=true)
+
+    return Jy
+end
+
+function input_jacobian_product!(y, x, model::LiftingLine)
+
+    models = model.models
+
+    iy = state_indices(models)
+    ix = input_indices(models)
+
+    Jyi = get_input_jacobian.(models)
+
+    yi = view.(Ref(y), iy)
+    xi = view.(Ref(x), ix)
+
+    mul!.(yi, Jyi, xi)
+
+    return y
+end
+
+function input_jacobian_product!(y, x, model::LiftingLine, λ, d, p, t)
 
     models = model.models
 
     iu = state_indices(models)
-    iy = input_indices(models)
+    id = input_indices(models)
     ip = parameter_indices(models)
 
-    us = getindex.(Ref(u), iu)
-    ys = getindex.(Ref(y), iy)
-    ps = getindex.(Ref(p), ip)
+    xi = view.(Ref(x), id)
+    yi = view.(Ref(y), iu)
 
-    Jys = view.(Ref(Jy), iu, iy)
+    λi = view.(Ref(λ), iu)
+    di = view.(Ref(d), id)
+    pi = view.(Ref(p), ip)
 
-    get_state_jacobian!.(Jys, models, us, ys, ps)
+    Jyi = get_input_jacobian.(models, λi, di, pi, t)
 
-    return Jy
+    mul!.(yi, Jyi, xi)
+
+    return y
 end
 
 # TODO: Add parameter jacobian
@@ -229,132 +268,144 @@ end
 
 function mass_matrix_type(::Type{LiftingLine{N,T}}, ::Type{GEBT}) where {N,T}
     model_types = T.parameters
-    if all(isempty.(mass_matrix_type.(model_types, Ref(GEBT))))
+    if all(isempty.(mass_matrix_type.(model_types, Ref(TypicalSection))))
         return Empty()
-    elseif all(iszero.(mass_matrix_type.(model_types, Ref(GEBT))))
+    elseif all(iszero.(mass_matrix_type.(model_types, Ref(TypicalSection))))
         return Zeros()
-    elseif all(isidentity.(mass_matrix_type.(model_types, Ref(GEBT))))
+    elseif all(isidentity.(mass_matrix_type.(model_types, Ref(TypicalSection))))
         return Identity()
-    elseif all(isconstant.(mass_matrix_type.(model_types, Ref(GEBT))))
+    elseif all(isconstant.(mass_matrix_type.(model_types, Ref(TypicalSection))))
         return Constant()
+    elseif all(islinear.(mass_matrix_type.(model_types, Ref(TypicalSection))))
+        return Linear()
     else
-        return Varying()
+        return Nonlinear()
     end
 end
 
 function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{GEBT}) where {N,T}
     model_types = T.parameters
-    if all(isempty.(state_jacobian_type.(model_types, Ref(GEBT))))
+    if all(isempty.(state_jacobian_type.(model_types, Ref(TypicalSection))))
         return Empty()
-    elseif all(iszero.(state_jacobian_type.(model_types, Ref(GEBT))))
+    elseif all(iszero.(state_jacobian_type.(model_types, Ref(TypicalSection))))
         return Zeros()
-    elseif all(isidentity.(state_jacobian_type.(model_types, Ref(GEBT))))
+    elseif all(isidentity.(state_jacobian_type.(model_types, Ref(TypicalSection))))
         return Identity()
-    elseif all(isconstant.(state_jacobian_type.(model_types, Ref(GEBT))))
+    elseif all(isconstant.(state_jacobian_type.(model_types, Ref(TypicalSection))))
         return Constant()
+    elseif all(islinear.(state_jacobian_type.(model_types, Ref(TypicalSection))))
+        return Linear()
     else
-        return Varying()
+        return Nonlinear()
     end
 end
 
 function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
 
-    # separate aerodynamic and structural state variables
+    iv1 = SVector(1, 2, 3)
+    iv2 = SVector(4, 5, 6)
+
+    # aerodynamic state variables, inputs, and parameters
     iλ = state_indices(aero)
-    iq = state_indices(stru)
-    λ = view(u, iλ)
-    q = view(u, iq)
-
-    # separate aerodynamic and structural inputs
     iya = input_indices(aero)
-    iys = input_indices(stru)
-    ya = view(y, iy_a)
-    ys = view(y, iy_s)
-
-    # separate aerodynamic and structural parameters
     ipa = parameter_indices(aero)
-    ips = parameter_indices(stru)
+
+    λ = view(u, iλ)
+    ya = view(y, iy_a)
     pa = view(p, ip_a)
+
+    # structural state variables, inputs, and parameters
+    iq = state_indices(stru)
+    iys = input_indices(stru)
+    ips = parameter_indices(stru)
+
+    q = view(u, iq)
+    ys = view(y, iy_s)
     ps = view(p, ip_s)
 
-    # get cross section aerodynamic state variables
+    # section aerodynamic state variables, inputs, and parameters
     iλs = state_indices(aero.models)
-    λs = view.(Ref(λ), iλs)
-
-    # get cross section aerodynamic inputs
     iyas = input_indices(aero.models)
-    yas = view.(Ref(ya), iyas)
-
-    # get cross section aerodynamic parameters
     ipas = parameter_indices(aero.models)
+
+    λs = view.(Ref(λ), iλs)
+    yas = view.(Ref(ya), iyas)
     pas = view.(Ref(pa), ipas)
 
-    # extract model properties
+    # structural model properties
     system = stru.system
     assembly = stru.assembly
 
     # loop through each lifting line / beam element
-    for isec = 1:N
+    for i = 1:N
 
-        # get aerodynamic model for this cross section
-        aerodynamic_model = aero.models[isec]
+        # extract aerodynamic model and state variables
+        aerodynamic_model = aero.models[i]
+        λi = λs[i]
 
-        # beam element properties and state variables
-        element = assembly.elements[isec]
-        states = extract_element_state(system, isec; x = q)
+        # extract structural element properties and state variables
+        element = assembly.elements[i]
+        states = extract_element_state(system, i; x = q)
 
-        # beam element deflections and rotation parameters
-        u_elem = states.u
-        θ_elem = states.θ
-
-        # transformation matrix from local to global frame
-        Ct = get_C(θ_elem)'
+        # calculate transformation matrix from local to global frame
+        Ct = GXBeam.get_C(states.theta)'
         Cab = beam.Cab
         CtCab = Ct*Cab
 
-        # linear and angular velocities in global frame
-        v_elem = CtCab * GXBeam.element_linear_velocity(element, states.P, states.H)
-        ω_elem = CtCab * GXBeam.element_angular_velocity(element, states.P, states.H)
+        # calculate linear and angular velocities
+        v_elem = GXBeam.element_linear_velocity(element, states.P, states.H)
+        ω_elem = GXBeam.element_angular_velocity(element, states.P, states.H)
+        qi = vcat(v_elem, ω_elem)
 
-        # aerodynamic state variables
-        Nλi = number_of_states(typeof(aerodynamic_model))
-        λi = SVector{Nai}(λs[isec])
+        dv_dP = element.minv11 * system.mass_scaling
+        dv_dH = element.minv12 * system.mass_scaling
+        dω_dP = element.minv21 * system.mass_scaling
+        dω_dP = element.minv22 * system.mass_scaling
 
-        # structural state variables
-        h = states.u[3] # plunge (in z-direction)
-        θ = atan(CtCab[1,3], CtCab[1,1]) # pitch (in plane parallel to Y-Z plane)
-        hdot = v_elem[3] # plunge rate (in z-direction)
-        θdot = ω_elem[2] # pitch rate (in plane parallel to Y-Z plane)
-        qi = SVector(h, θ, hdot, θdot)
+        # calculate section aerodynamic input mass matrices
+        d_dλ, d_dqi = section_aerodynamic_input_mass_matrices(aerodynamic_model,
+            λi, qi, pas[i], t)
 
-        # combined state variables
-        ui = vcat(λi, qi)
+        d_dv = d_dqi[:, iv1]
+        d_dω = d_dqi[:, iv2]
 
-        # section parameters
-        pi = pas[isec]
+        d_dP = d_dv * dv_dP + d_dω * dω_dP
+        d_dH = d_dv * dv_dH + d_dω * dω_dH
 
-        # NOTE: We don't pass any parameters for the typical section model, but
-        # these turn out to be unnecessary for computing the inputs anyway.
+        # calculate section structural input mass matrices
+        r_dλ, r_dqi = section_aerodynamic_load_mass_matrices(aerodynamic_model,
+            λi, qi, pas[i], t)
 
-        # calculate inputs for this section
-        Mi = get_input_mass_matrix(aerodynamic_model, TypicalSection(), ui, pi, t)
+        r_dv = r_dqi[:, iv1]
+        r_dω = r_dqi[:, iv2]
 
-        # set section aerodynamic inputs
-        for i = 1:length(iyas[isec]), j = 1:length(iλas[isec])
-            M[iyas[isec][i],iλas[isec][j]] = Mi[i,j]
-        end
+        r_dP = r_dv * dv_dP + r_dω * dω_dP
+        r_dH = r_dv * dv_dH + r_dω * dω_dH
 
-        # set lift and moment
-        L = yi[Nas + 1]
-        M = yi[Nas + 2]
+        # extract force and moment per unit length
+        f_dλi = r_dλ[iv1, :]
+        f_dP = r_dP[iv1, :]
+        f_dH = r_dH[iv1, :]
 
-        # convert lift and moment (per unit span) to distributed loads
-        ys[3*(isec-1)+1] = 0
-        ys[3*(isec-1)+2] = 0
-        ys[3*(isec-1)+3] = L
-        ys[3*(isec-1)+4] = 0
-        ys[3*(isec-1)+5] = M
-        ys[3*(isec-1)+6] = 0
+        m_dλi = r_dλ[iv2, :]
+        m_dP = r_dP[iv2, :]
+        m_dH = r_dH[iv2, :]
+
+        iP = iq[SVector(icol+12, icol+13, icol+14)]
+        iH = iq[SVector(icol+15, icol+16, icol+17)]
+
+        ifi = 6*(i-1) .+ iv1
+        imi = 6*(i-1) .+ iv2
+        # save results
+        My[iyas[i], iλs[i]] .= d_dλi
+        My[iyas[i], iP] .= d_dPi
+        My[iyas[i], iH] .= d_dHi
+        My[ifi, iλs[i]] .= CtCab*f_dλi
+        My[imi, iλs[i]] .= CtCab*m_dλi
+        My[ifi, iP] .= CtCab*f_dPi
+        My[imi, iP] .= CtCab*m_dPi
+        My[ifi, iH] .= CtCab*f_dHi
+        My[imi, iH] .= CtCab*m_dHi
     end
 
     return y
@@ -362,118 +413,73 @@ end
 
 function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
 
-    # separate aerodynamic and structural state variables
+    # aerodynamic state variables, inputs, and parameters
     iλ = state_indices(aero)
-    iq = state_indices(stru)
-    λ = view(u, iλ)
-    q = view(u, iq)
-
-    # separate aerodynamic and structural inputs
     iya = input_indices(aero)
-    iys = input_indices(stru)
-    ya = view(y, iy_a)
-    ys = view(y, iy_s)
-
-    # separate aerodynamic and structural parameters
     ipa = parameter_indices(aero)
-    ips = parameter_indices(stru)
+
+    λ = view(u, iλ)
+    ya = view(y, iy_a)
     pa = view(p, ip_a)
+
+    # structural state variables, inputs, and parameters
+    iq = state_indices(stru)
+    iys = input_indices(stru)
+    ips = parameter_indices(stru)
+
+    q = view(u, iq)
+    ys = view(y, iy_s)
     ps = view(p, ip_s)
 
-    # get cross section aerodynamic state variables
-    λs = view.(Ref(λ), state_indices(aero.models))
+    # section aerodynamic state variables, inputs, and parameters
+    iλs = state_indices(aero.models)
+    iyas = input_indices(aero.models)
+    ipas = parameter_indices(aero.models)
 
-    # get cross section aerodynamic inputs
-    yas = view.(Ref(ya), input_indices(aero.models))
+    λs = view.(Ref(λ), iλs)
+    yas = view.(Ref(ya), iyas)
+    pas = view.(Ref(pa), ipas)
 
-    # get cross section aerodynamic parameters
-    pas = view.(Ref(pa), parameter_indices(aero.models))
-
-    # extract model properties
+    # structural model properties
     system = stru.system
     assembly = stru.assembly
 
     # loop through each lifting line / beam element
     for i = 1:N
 
-        # get aerodynamic model for this cross section
+        # extract aerodynamic model and state variables
         aerodynamic_model = aero.models[i]
+        λi = λs[i]
 
-        # extract aerodynamic state variables
-        Nλi = number_of_states(typeof(aerodynamic_model))
-        λi = SVector{Nai}(λs[i])
-
-        # beam element properties and state variables
+        # extract structural element properties and state variables
         element = assembly.elements[i]
         states = extract_element_state(system, i; x = q)
 
-        # beam element deflections and rotation parameters
-        u_elem = states.u
-        θ_elem = states.θ
-
-        # transformation matrix from local to global frame
-        Ct = GXBeam.get_C(θ_elem)'
+        # calculate transformation matrix from local to global frame
+        Ct = GXBeam.get_C(states.theta)'
         Cab = beam.Cab
         CtCab = Ct*Cab
 
-        # linear and angular velocities in global frame
-        v_elem = CtCab * GXBeam.element_linear_velocity(element, states.P, states.H)
-        ω_elem = CtCab * GXBeam.element_angular_velocity(element, states.P, states.H)
+        # calculate linear and angular velocity
+        v_elem = GXBeam.element_linear_velocity(element, states.P, states.H)
+        ω_elem = GXBeam.element_angular_velocity(element, states.P, states.H)
+        qi = vcat(v_elem, ω_elem)
 
-        # extract dihedral and local angle of attack
-        ϕi = atan(CtCab[2,1], CtCab[1,1])
-        θi = atan(-CtCab[3,1], sqrt(CtCab[3,2]^2 + CtCab[3,3]^2))
+        # calculate aerodynamic inputs (in local frame)
+        d = section_aerodynamic_inputs(aerodynamic_model, λi, qi, pas[i], t)
 
-        # create transformation matrix from local to global frame
-        sϕ, cϕ = sincos(ϕi)
-        sθ, cθ = sincos(θi)
-        R = @SMatrix [cθ sθ*sϕ sθ*cϕ; 0 cϕ -sϕ; -sθ cθ*sϕ cθ*cϕ]
+        # calculate aerodynamic loads (in local frame)
+        r = section_aerodynamic_loads(aerodynamic_model, λi, qi, pas[i], t)
 
-        # transform deflections into local (aerodynamic) frame
-        ui = R'*u_elem
-        vi = R'*v_elem
-        ωi = R'*ω_elem
+        # extract force and moment per unit length
+        f = SVector(r[1], r[2], r[3])
+        m = SVector(r[4], r[5], r[6])
 
-        # calculate structural state variables for this section
-        h = ui[3] # plunge
-        θ = θi # pitch
-        hdot = vi[3] # plunge rate
-        θdot = ωi[2] # pitch rate
-        qi = SVector(h, θ, hdot, θdot)
+        # save results
+        ys[iyas[i]] = d # aerodynamic inputs (in local frame)
+        ys[6*(i-1)+1 : 6*(i-1)+3] = CtCab*f # aerodynamic loads (in global frame)
+        ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*m # aerodynamic loads (in global frame)
 
-        # combined state variables
-        ui = vcat(λi, qi)
-
-        # section parameters
-        pi = pas[i]
-
-        # NOTE: We don't pass any parameters for the typical section model, but
-        # these turn out to be unnecessary for computing the inputs anyway.
-
-        # calculate inputs for this section
-        yi = get_inputs(aerodynamic_model, TypicalSection(), ui, pi, t)
-
-        # set section aerodynamic inputs
-        Nas = number_of_inputs(aerodynamic_model)
-        for i = 1:Nas
-            yas[i] = yi[i]
-        end
-
-        # extract lift and moment
-        L = yi[Nas + 1]
-        M = yi[Nas + 2]
-
-        # transform lift and moment into global frame
-        Fi = R*SVector(0, 0, L)
-        Mi = R*SVector(0, M, 0)
-
-        # convert lift and moment (per unit span) to distributed loads
-        ys[3*(i-1)+1] = Fi[1]
-        ys[3*(i-1)+2] = Fi[2]
-        ys[3*(i-1)+3] = Fi[3]
-        ys[3*(i-1)+4] = Mi[1]
-        ys[3*(i-1)+5] = Mi[2]
-        ys[3*(i-1)+6] = Mi[3]
     end
 
     return y

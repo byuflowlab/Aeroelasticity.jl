@@ -379,13 +379,14 @@ end
 Calculate the (mass matrix multiplied) state rates for the specified model or
 models.
 """
-function get_rates(models, u, y, p, t)
-    return _get_rates(inplaceness(models), models, u, y, p, t)
+function get_rates(models::T, u, y, p, t) where T
+    return _get_rates(inplaceness(T), models, u, y, p, t)
 end
 
 # dispatch to an in-place function
 function _get_rates(::InPlace, models, u, y, p, t)
-    du = similar(u)
+    TF = promote_type(eltype(u), eltype(y), eltype(p), typeof(t))
+    du = similar(u, TF)
     get_rates!(du, models, u, y, p, t)
     return du
 end
@@ -436,8 +437,8 @@ end
 
 In-place version of [`get_rates`](@ref)
 """
-function get_rates!(du, models, u, y, p, t)
-    return _get_rates!(du, inplaceness(models), models, u, y, p, t)
+function get_rates!(du, models::T, u, y, p, t) where T
+    return _get_rates!(du, inplaceness(T), models, u, y, p, t)
 end
 
 # dispatch to an out-of-place function
@@ -469,22 +470,23 @@ end
 Calculate the jacobian with respect to the state variables for the specified
 models.
 """
-function get_state_jacobian(models::TM, u, y, p, t) where TM
-    return _get_state_jacobian(state_jacobian_type(TM), inplaceness(TM), models,
+function get_state_jacobian(models::T, u, y, p, t) where T
+    return _get_state_jacobian(state_jacobian_type(T), inplaceness(T), models,
         u, y, p, t)
 end
 
 # dispatch to an in-place function
 function _get_state_jacobian(::Any, ::InPlace, models)
-    Nu = number_of_states(model)
+    Nu = number_of_states(models)
     M = zeros(Nu,Nu)
     return get_state_jacobian!(M, models)
 end
 
 # dispatch to an in-place function
 function _get_state_jacobian(::Any, ::InPlace, models, u, y, p, t)
-    Nu = number_of_states(model)
-    M = similar(u, Nu, Nu)
+    TF = promote_type(eltype(u), eltype(y), eltype(p), typeof(t))
+    Nu = number_of_states(models)
+    M = zeros(TF, Nu, Nu)
     return get_state_jacobian!(M, models, u, y, p, t)
 end
 
@@ -630,8 +632,8 @@ end
 
 In-place version of [`get_state_jacobian`](@ref)
 """
-function get_state_jacobian!(J, models, args...; kwargs...)
-    return _get_state_jacobian!(J, state_jacobian_type(models), inplaceness(models),
+function get_state_jacobian!(J, models::T, args...; kwargs...) where T
+    return _get_state_jacobian!(J, state_jacobian_type(T), inplaceness(T),
         models, args...; kwargs...)
 end
 
@@ -700,7 +702,7 @@ function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,Abstrac
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::OutOfPlace,
+function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace,
     model::AbstractModel, u, y, p, t)
 
     return ForwardDiff.jacobian!(J, u->get_rates(models, u, y, p, t), u)
@@ -789,8 +791,7 @@ function _get_input_jacobian(::Constant, models::NTuple{N,AbstractModel}) where 
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_input_jacobian(J, ::Union{Linear, Nonlinear}, ::OutOfPlace,
-    model::AbstractModel, u, y, p, t)
+function _get_input_jacobian(::Union{Linear, Nonlinear}, model::AbstractModel, u, y, p, t)
 
     return ForwardDiff.jacobian(y->get_rates(models, u, y, p, t), y)
 end

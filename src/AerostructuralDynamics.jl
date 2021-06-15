@@ -3,11 +3,15 @@ module AerostructuralDynamics
 using LinearAlgebra
 using LinearMaps
 using StaticArrays
+using ForwardDiff
+using GXBeam
 import DifferentialEquations.ODEFunction
 
 export AbstractModel
 export TypicalSection
 export Steady, QuasiSteady, Wagner, Peters
+export GEBT
+export LiftingLine
 
 export number_of_states
 export number_of_inputs
@@ -31,8 +35,9 @@ export get_state_jacobian, get_state_jacobian!
 include("traits.jl")
 include("interface.jl")
 include("structures/section.jl")
+include("structures/gxbeam.jl")
 include("aerodynamics/quasisteady.jl")
 include("aerodynamics/wagner.jl")
 include("aerodynamics/peters.jl")
-
+include("aerodynamics/liftingline.jl")
 end

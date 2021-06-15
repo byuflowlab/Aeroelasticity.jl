@@ -47,7 +47,7 @@ mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Linear()
 state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Nonlinear()
 number_of_parameters(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = 1
 
-# --- Coupled Model Methods --- #
+# --- Typical Section Coupling --- #
 
 # steady
 function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, s, p, t)
@@ -126,6 +126,81 @@ function get_input_mass_matrix(aero::QuasiSteady{2}, stru::TypicalSection, s, p,
 end
 
 # TODO: Parameter jacobian
+
+# --- Lifting Line Coupling --- #
+
+function section_aerodynamic_inputs(::QuasiSteady, λ, q, p, t)
+    return SVector{0, Float64}()
+end
+
+function section_aerodynamic_loads(::QuasiSteady{0}, λ, q, p, t)
+
+    # unpack linear and angular velocities
+    vinf = SVector(q[1], q[2], q[3])
+    ωinf = SVector(q[4], q[5], q[6])
+
+    # extract relevant velocities
+    u = vinf[1] # chordwise velocity
+    v = vinf[2] # normal velocity
+
+    # unpack parameters
+    a, b, ρ, a0, α0 = p
+
+    # calculate loads
+    L, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
+
+    f = SVector(L, 0, 0)
+    m = SVector(0, M, 0)
+
+    return vcat(f, m)
+end
+
+function section_aerodynamic_loads(::QuasiSteady{1}, λ, q, p, t)
+
+    # unpack linear and angular velocities
+    vinf = SVector(q[1], q[2], q[3])
+    ωinf = SVector(q[4], q[5], q[6])
+
+    # extract relevant velocities
+    u = vinf[1] # chordwise velocity
+    v = vinf[2] # normal velocity
+    θdot = ωinf[1] # pitch rate
+
+    # unpack parameters
+    a, b, ρ, a0, α0 = p
+
+    # calculate loads
+    L, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, θdot)
+
+    f = SVector(L, 0, 0)
+    m = SVector(0, M, 0)
+
+    return vcat(f, m)
+end
+
+function section_aerodynamic_loads(::QuasiSteady{2}, λ, q, p, t)
+
+    # unpack linear and angular velocities
+    vinf = SVector(q[1], q[2], q[3])
+    ωinf = SVector(q[4], q[5], q[6])
+
+    # extract relevant velocities
+    u = vinf[1] # chordwise velocity
+    v = vinf[2] # normal velocity
+    θdot = ωinf[1] # pitch rate
+    θddot = 0 # covered using mass matrix
+
+    # unpack parameters
+    a, b, ρ, a0, α0 = p
+
+    # calculate loads
+    L, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, vdot, θdot, θddot)
+
+    f = SVector(L, 0, 0)
+    m = SVector(0, M, 0)
+
+    return vcat(f, m)
+end
 
 # --- Internal --- #
 
