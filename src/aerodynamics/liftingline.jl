@@ -22,6 +22,11 @@ defined as functions of a 3D structural model's state variables.
 """
 struct LiftingLineSection <: AbstractModel end
 
+number_of_states(model::LiftingLineSection) = 6
+number_of_inputs(model::LiftingLineSection) = 6
+number_of_parameters(model::LiftingLineSection) = 0
+inplaceness(::Type{LiftingLineSection}) = OutOfPlace()
+
 # --- Constructors --- #
 
 """

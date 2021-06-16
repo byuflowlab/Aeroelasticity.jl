@@ -9,6 +9,7 @@ and aerodynamic loads ``r = \\begin{bmatrix} L & M \\end{bmatrix}^T``
 struct TypicalSection <: AbstractModel end
 
 # --- Traits --- #
+
 number_of_states(::Type{TypicalSection}) = 4
 number_of_inputs(::Type{TypicalSection}) = 2
 number_of_parameters(::Type{TypicalSection}) = 5
@@ -51,7 +52,9 @@ function get_input_jacobian(::TypicalSection)
     return section_input_jacobian()
 end
 
-function get_mass_matrix_product(::TypicalSection, dq, q, r, p, t)
+# --- Unit Testing Methods --- #
+
+function get_lhs(::TypicalSection, dq, q, r, p, t)
     # extract structural parameters
     kh, kθ, m, Sθ, Iθ = p
     # extract state rates
@@ -60,30 +63,27 @@ function get_mass_matrix_product(::TypicalSection, dq, q, r, p, t)
     return section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)
 end
 
-# TODO: Add parameter jacobian
-
-
 # --- Internal Methods --- #
 
-# left side of rate equations (used for testing)
+# left side of rate equations
 function section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)
     SVector(dh, dθ, m*dhdot + Sθ*dθdot, Sθ*dhdot + Iθ*dθdot)
 end
 
-# right side of rate equations (used for testing)
+# right side of rate equations
 function section_rhs(kh, kθ, h, θ, hdot, θdot, L, M)
     SVector(hdot, θdot, -kh*h - L, -kθ*θ + M)
 end
 
-# state jacobian
+# mass matrix (lhs jacobian wrt state rates)
+function section_mass_matrix(m, Sθ, Iθ)
+    @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m Sθ; 0 0 Sθ Iθ]
+end
+
+# rhs jacobian wrt states
 function section_state_jacobian(kh, kθ)
     @SMatrix [0 0 1 0; 0 0 0 1; -kh 0 0 0; 0 -kθ 0 0]
 end
 
-# load jacobian
+# rhs jacobian wrt inputs
 section_input_jacobian() = @SMatrix [0 0; 0 0; -1 0; 0 1]
-
-# rate jacobian (mass matrix)
-function section_mass_matrix(m, Sθ, Iθ)
-    @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m Sθ; 0 0 Sθ Iθ]
-end

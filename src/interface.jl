@@ -181,19 +181,6 @@ function _get_mass_matrix(::Linear, ::OutOfPlace, models::NTuple{N, AbstractMode
     return M + D*My
 end
 
-# calculate mass matrix from mass matrix product
-function _get_mass_matrix(::Undefined, ::OutOfPlace, models::T, args...) where T
-    N = number_of_states(T)
-    dui = SVector(ntuple(j -> ifelse(1 == j, 1, 0), N))
-    M = get_mass_matrix_product(models, dui, args...)
-    for i = 2:N
-        dui = SVector(ntuple(j -> ifelse(i == j, 1, 0), N))
-        out = get_mass_matrix_product(models, dui, args...)
-        M = vcat(M, out)
-    end
-    return M
-end
-
 function initialize_mass_matrix(models::NTuple{N,AbstractModel}) where N
     initialize_static_mass_matrix(models)
 end
@@ -386,258 +373,6 @@ function _get_mass_matrix!(M, ::Linear, ::InPlace,
     return M
 end
 
-# calculate mass matrix from mass matrix product
-function _get_mass_matrix!(M, ::Undefined, ::OutOfPlace, models::T, args...) where T
-    N = number_of_states(T)
-    dui = SVector(ntuple(j -> ifelse(1 == j, 1, 0), N))
-    get_mass_matrix_product!(view(M, i, :), models, dui, args...)
-    for i = 2:N
-        dui = SVector(ntuple(j -> ifelse(i == j, 1, 0), N))
-        get_mass_matrix_product!(view(M, i, :), models, dui, args...)
-    end
-    return M
-end
-
-"""
-    get_mass_matrix_product(models, du, u, y, p, t)
-
-Calculate the mass matrix product with the state rates for the specified model
-or models.
-"""
-function get_mass_matrix_product(models::T, du, u, y, p, t) where T
-    return _get_mass_matrix_product(mass_matrix_type(T), inplaceness(T), models,
-        du, u, y, p, t)
-end
-
-# dispatch to an in-place function
-function _get_mass_matrix_product(::Any, ::InPlace, models, du)
-    out = similar(du)
-    get_mass_matrix_product!(out, models, du)
-    return du
-end
-
-# dispatch to an in-place function
-function _get_mass_matrix_product(::Any, ::InPlace, models, du, u, y, p, t)
-    TF = promote_type(eltype(du), eltype(u), eltype(y), eltype(p), typeof(t))
-    out = similar(du, TF)
-    get_mass_matrix_product!(out, models, du, u, y, p, t)
-    return out
-end
-
-# return an empty vector
-function _get_mass_matrix_product(::Empty, ::OutOfPlace, models, args...)
-    return SVector{0,Float64}()
-end
-
-# return the state rates
-function _get_mass_matrix_product(::Identity, ::OutOfPlace, models, du, args...)
-    return du
-end
-
-# dispatch to `get_mass_matrix_product` without arguments
-function _get_mass_matrix_product(::Constant, ::OutOfPlace, models, du, u, y, p, t)
-    return get_mass_matrix_product(models, du)
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix_product(::Constant, ::OutOfPlace, models::NTuple{N, AbstractModel}) where N
-
-    # initialize mass matrix product
-    Mdu = initialize_mass_matrix_product(models, du)
-
-    # calculate input jacobian
-    D = input_jacobian(models)
-
-    # calculate input mass matrix product
-    Mydu = get_input_mass_matrix_product(models, du)
-
-    return Mdu + D*Mydu
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix_product(::Linear, ::OutOfPlace, models::NTuple{N, AbstractModel},
-    u, y, p, t) where N
-
-    # initialize mass matrix product
-    Mdu = initialize_mass_matrix_product(models, du, u, y, p, t)
-
-    # calculate input jacobian
-    D = get_input_jacobian(models, u, y, p, t)
-
-    # calculate input mass matrix product
-    Mydu = get_input_mass_matrix_product(models, du, u, p, t)
-
-    return Mdu + D*Mydu
-end
-
-function initialize_mass_matrix_product(models::NTuple{N,AbstractModel}) where N
-    initialize_static_mass_matrix_product(models)
-end
-
-function initialize_mass_matrix_product(models::NTuple{N,AbstractModel}, u, y, p, t) where N
-    initialize_varying_mass_matrix_product(models, u, y, p, t)
-end
-
-@generated function initialize_static_mass_matrix_product(models::NTuple{N,AbstractModel}) where N
-
-    # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
-
-    # initialize state variable names
-    outi = [Symbol("out", i) for i = 1:N]
-
-    expr = :()
-    for i = 1:N
-        expr = quote
-            $expr
-            $(outi[i]) = get_mass_matrix_product(models[$i], du[$(iu[i])])
-        end
-    end
-
-    expr = quote
-        $expr
-        out = vcat($(dui...))
-    end
-
-    return expr
-end
-
-@generated function initialize_varying_mass_matrix_product(models::NTuple{N,AbstractModel},
-    u, y, p, t) where N
-
-    # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
-
-    Ny = number_of_inputs.(models.parameters)
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny .+ 1
-    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
-
-    Np = number_of_parameters.(models.parameters)
-    ip2 = cumsum(Np)
-    ip1 = ip2 .- Np .+ 1
-    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
-
-    # initialize state variable names
-    outi = [Symbol("out", i) for i = 1:N]
-
-    expr = :()
-    for i = 1:N
-        expr = quote
-            $expr
-            $(outi[i]) = get_mass_matrix_product(models[$i], du[$(iu[i])],
-                u[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
-        end
-    end
-
-    expr = quote
-        $expr
-        out = vcat($(outi...))
-    end
-
-    return expr
-end
-
-"""
-    get_mass_matrix_product!(out, models, du, u, y, p, t)
-
-In-place version of [`get_rates`](@ref)
-"""
-function get_mass_matrix_product!(out, models::T, u, y, p, t) where T
-    return _get_mass_matrix_product!(out, inplaceness(T), models, du, u, y, p, t)
-end
-
-# dispatch to an out-of-place function
-function _get_mass_matrix_product!(out, ::Any, ::OutOfPlace, models, args...)
-    return out .= get_mass_matrix_product(models, args...)
-end
-
-# return an empty vector
-function _get_mass_matrix_product!(out, ::Empty, ::InPlace, models, args...)
-    return out
-end
-
-# return the state rates
-function _get_mass_matrix_product!(out, ::Identity, ::InPlace, models, du, args...)
-    copyto!(out, du)
-    return out
-end
-
-# dispatch to `get_mass_matrix_product` without arguments
-function _get_mass_matrix_product!(out, ::Constant, ::InPlace, models, du, u, y, p, t)
-    return get_mass_matrix_product!(out, models, du)
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix_product!(Mdu, ::Constant, ::InPlace,
-    models::NTuple{N, AbstractModel}, du;
-    Mydu = similar(Mdu, number_of_inputs(models))) where N
-
-    # get state and parameter indices
-    iu = state_indices(models)
-    iy = input_indices(models)
-
-    # calculate input mass matrix
-    get_input_mass_matrix_product!(Mydu, models, du)
-
-    # calculate mass matrix
-    for i = 1:length(models)
-        Mdui = view(Mdu, iu[i])
-        Mydui = view(Mydu, iy[i])
-        D = get_input_jacobian(models[i])
-
-        # calculate mass matrix product contributions from self
-        get_mass_matrix_product!(Mdui, models[i], view(u, iu[i]))
-
-        # add mass matrix product contribution from other models
-        mul!(Mdui, D, Mydui, 1, 1)
-    end
-
-    return Mdu
-end
-
-# calculate mass matrix product for a combination of models
-function _get_mass_matrix_product!(Mdu, ::Linear, ::InPlace,
-    models::NTuple{N, AbstractModel}; Mydu = similar(Mdu,
-    number_of_inputs(models))) where N
-
-    # get state and parameter indices
-    iu = state_indices(models)
-    iy = input_indices(models)
-    ip = parameter_indices(models)
-
-    # calculate input mass matrix
-    get_input_mass_matrix_product!(Mydu, models, u, p, t)
-
-    # calculate mass matrix
-    for i = 1:length(models)
-        dui = view(du, iu[i])
-        ui = view(u, iu[i])
-        yi = view(y, iy[i])
-        pi = view(p, ip[i])
-        Mdui = view(Mdu, iu[i])
-        Mydui = view(Mydu, iy[i])
-        D = get_input_jacobian(models[i], ui, yi, pi, t)
-
-        # calculate mass matrix product contributions from self
-        Mdui = view(out, iu[i])
-        get_mass_matrix_product!(Mdui, models[i], dui, ui, yi, pi, t)
-
-        # add mass matrix product contributions from other models
-        D = get_input_jacobian(models[i], ui, yi, pi, t)
-        Mydui = view(Mydu, iy[i])
-        mul!(Mdui, D, Mydui, 1, 1)
-    end
-
-    return Mdu
-end
-
 """
     get_rates(models, u, y, p, t)
 
@@ -775,6 +510,15 @@ function _get_state_jacobian(::Constant, ::OutOfPlace, models, u, y, p, t)
     return get_state_jacobian(models)
 end
 
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace, models,
+    u, y, p, t)
+
+    f = u -> get_rates(models, u, y, p, t)
+
+    return ForwardDiff.jacobian(f, u)
+end
+
 # calculate state jacobian for a combination of models
 function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
     models::NTuple{N, AbstractModel}) where N
@@ -789,13 +533,6 @@ function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
     Jy = get_input_state_jacobian(models)
 
     return J + D*Jy
-end
-
-# use automatic differentiation since a custom definition is absent
-function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace, models,
-    u, y, p, t)
-
-    return ForwardDiff.jacobian(u->get_rates(models, u, y, p, t), u)
 end
 
 # calculate state jacobian for a combination of models
@@ -971,10 +708,12 @@ function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,Abstrac
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace,
-    model::AbstractModel, u, y, p, t)
+function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace, model,
+    u, y, p, t)
 
-    return ForwardDiff.jacobian!(J, u->get_rates(models, u, y, p, t), u)
+    f = u -> get_rates(models, u, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, u))
 end
 
 # calculate state jacobian for a combination of models
@@ -1060,9 +799,11 @@ function _get_input_jacobian(::Constant, models::NTuple{N,AbstractModel}) where 
 end
 
 # use automatic differentiation since a custom definition is absent
-function _get_input_jacobian(::Union{Linear, Nonlinear}, model::AbstractModel, u, y, p, t)
+function _get_input_jacobian(::Union{Linear, Nonlinear}, model, u, y, p, t)
 
-    return ForwardDiff.jacobian(y->get_rates(model, u, y, p, t), y)
+    f = y -> get_rates(model, u, y, p, t)
+
+    return ForwardDiff.jacobian(f, y)
 end
 
 # calculate input jacobian for a combination of models
@@ -1325,6 +1066,8 @@ for the specified combination of models.
 """
 get_input_state_jacobian
 
+
+
 function get_input_state_jacobian(models::TM; kwargs...) where TM
     return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),
         inplaceness(TM.parameters...), models; kwargs...)
@@ -1333,6 +1076,19 @@ end
 function get_input_state_jacobian(models::TM, u, p, t; kwargs...) where TM
     return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),
         inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+end
+
+# use automatic differentiation if jacobian is not defined
+function get_input_state_jacobian(args...)
+
+    models = args[1:end-3]
+    u = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = u -> get_inputs(models, u, p, t)
+
+    return ForwardDiff.jacobian(f, u)
 end
 
 # dispatch to an in-place function
@@ -1406,6 +1162,19 @@ function get_input_state_jacobian!(Jy, models::TM, u, p, t; kwargs...) where TM
         inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
+# use automatic differentiation if jacobian is not defined
+function get_input_state_jacobian!(Jy, args...)
+
+    models = args[1:end-3]
+    u = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = u -> get_inputs(models, u, p, t)
+
+    return copyto!(Jy, ForwardDiff.jacobian(f, u))
+end
+
 # dispatch to an out-of-place function
 function _get_input_state_jacobian!(Jy, ::Any, ::OutOfPlace, models, args...; kwargs...)
     return Jy .= get_input_state_jacobian(models, args...; kwargs...)
@@ -1444,98 +1213,6 @@ function _get_input_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
     return Jy
 end
 
-# dispatch to the user-provided function for the specific combination of models
-function _get_input_state_jacobian!(Jy, ::Undefined, ::InPlace,
-    models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
-
-    get_input_state_jacobian!(Jy, models..., u, p, t; kwargs...)
-
-    return Jy
-end
-
-# """
-#     mass_matrix_operator!(models)
-#
-# Return the mass matrix corresponding to the specified combination of models as
-# a DiffEqArrayOperator.
-# """
-# function mass_matrix_operator(models)
-#
-#     # problem dimensions
-#     Nu = number_of_states(models)
-#     Ny = number_of_inputs(models)
-#
-#     # initialize mass matrices
-#     M = zeros(Nu, Nu)
-#     My = zeros(Ny, Nu)
-#
-#     function update_func(M, u, p, t)
-#         # update type of `My`
-#         My = convert(typeof(M), My)
-#         # calculate inputs
-#
-#          -> get_mass_matrix!(models, M, u, y, p, t; My = convert(typeof(M), My))
-#     end
-#
-#     return DiffEqArrayOperator(M; update_func)
-# end
-
-# function mass_matrix_operator(models)
-#
-#     # initialize mass matrix
-#     M = zeros(number_of_states(models),
-#
-#     # construct update function
-#     if linear_input_dependence(stru)
-#         Mas, Maa = init_load_mass_matrices(models)
-#         update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t,
-#             convert(typeof(M), Mas), convert(typeof(M), Maa))
-#     else
-#         update_func = (M, u, p, t) -> update_mass_matrix!(models, M, u, p, t)
-#     end
-#
-#     return DiffEqArrayOperator(M; update_func)
-# end
-
-# """
-#     rate_function(models; input_cache = zeros(number_of_inputs(models)))
-#
-# Return a function that calculates the (mass matrix multiplied) state rates for
-# the specified combination of models.
-# """
-# function rate_function(models; input_cache = zeros(number_of_inputs(models)))
-#
-#     # update inputs
-#     if isinplace(models)
-#
-#
-#
-#     if isinplace(models)
-#         f = (du, u, p, t) -> get_rates!(models, du, u, p, t)
-#     else
-#         f = (u, p, t) -> get_rates(models, u, p, t)
-#     end
-#
-#     return f
-# end
-#
-# """
-#     jacobian_function(models)
-#
-# Return a function that calculates the jacobian for the specified combination of
-# models.
-# """
-# function jacobian_function(models)
-#
-#     if isinplace(models)
-#         jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, p, t)
-#     else
-#         jac = (u, p, t) -> get_state_jacobian(models, u, p, t)
-#     end
-#
-#     return jac
-# end
-#
 # """
 #     ODEFunction(models)
 #

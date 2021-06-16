@@ -25,6 +25,7 @@ function Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
 end
 
 # --- Traits --- #
+
 number_of_states(::Type{<:Wagner}) = 2
 number_of_inputs(::Type{<:Wagner}) = 3
 number_of_parameters(::Type{<:Wagner}) = 5
@@ -50,6 +51,8 @@ function get_rates(model::Wagner, λ, d, p, t) where {N,TF,SV,SA}
     # calculate rates
     return wagner_rates(a, b, α0, C1, C2, ε1, ε2, u, v, θdot, λ1, λ2)
 end
+
+# --- Performance Overloads --- #
 
 function get_state_jacobian(model::Wagner, λ, d, p, t)
     # extract inputs
@@ -79,8 +82,6 @@ function get_input_jacobian(model::Wagner, λ, d, p, t)
     return wagner_input_jacobian(a, b, α0, C1, C2, ε1, ε2, u, v, θdot, λ1, λ2)
 end
 
-# TODO: Add parameter jacobian
-
 # --- Typical Section Coupling --- #
 
 # --- traits --- #
@@ -99,13 +100,11 @@ function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # calculate local vertical freestream velocity
     v = -u*θ - hdot
-    vdot = 0
-    θddot = 0
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
-    # calculate aerodynamic loads
-    L, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, vdot, θdot, θddot, λ1, λ2)
+    # calculate aerodynamic loads (except contribution from state rates)
+    L, M = wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
     # return portion of inputs that is not dependent on the state rates
     return SVector(u, v, θdot, L, M)
 end
@@ -149,7 +148,22 @@ function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) w
     return [Jda Jds; Jra Jrs]
 end
 
-# TODO: Parameter jacobian
+# --- unit testing methods --- #
+
+function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
+    ds, s, p, t)
+    # extract state rates
+    dλ1, dλ2, dh, dθ, dhdot, dθdot = ds
+    # extract aerodynamic, structural, and aerostructural parameters
+    a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
+    # local vertical freestream velocity
+    vdot = -dhdot
+    θddot = dθdot
+    # calculate aerodynamic loads
+    L, M = wagner_rate_loads(a, b, ρ, vdot, θddot)
+    # return inputs
+    return SVector(0, 0, 0, L, M)
+end
 
 # --- Lifting Line Section Coupling --- #
 
@@ -194,12 +208,12 @@ function get_input_mass_matrix(aero::Wagner, stru::LiftingLineSection, s, p, t)
     u = vx
     # construct submatrices
     Mda = @SMatrix [0 0; 0 0; 0 0]
-    Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
-    Mra = @SMatrix [0 0; 0 0]
+    Mds = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
+    Mra = @SMatrix [0 0; 0 0; 0 0; 0 0; 0 0; 0 0]
     # calculate loads
     L_udot, M_udot = wagner_loads_udot()
     L_vdot, M_vdot = wagner_loads_vdot(a, b, ρ)
-    L_θddot, M_θddot = wagner_loads_θddot(a, b, ρ, a0, u)
+    L_θddot, M_θddot = wagner_loads_θddot(a, b, ρ)
     Mrs = @SMatrix [-L_udot 0 -L_vdot 0 -L_θddot 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         0 0 0 0 0 0; -M_udot 0 -M_vdot 0 -M_θddot 0; 0 0 0 0 0 0]
     # assemble mass matrix
@@ -208,7 +222,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection, u, p, t) where {N,TF,SV,SA}
+function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection, s, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
     # extract aerodynamic, structural, and aerostructural parameters
@@ -216,23 +230,43 @@ function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection, u, p, 
     # extract relevant velocities
     u = vx
     v = vz
-    vdot = 0 # included in mass matrix
     θdot = ωy
-    θddot = 0 # included in mass matrix
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
     # compute input jacobian sub-matrices
-    Jda = @SMatrix [0 0; 0 0; 0 0]
-    Jds = @SMatrix [1 0 0 0 0 0; 0 0 1 0 0 0; 0 0 0 0 1 0]
-    Jra = wagner_loads_λ(a, b, ρ, a0, u)
+    out = wagner_loads_λ(a, b, ρ, a0, u)
+    L_λ, M_λ = out[1,:], out[2,:]
     L_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
     L_v, M_v = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
     L_θdot, M_θdot = wagner_loads_θdot(a, b, ρ, a0, C1, C2, u)
+    Jda = @SMatrix [0 0; 0 0; 0 0]
+    Jds = @SMatrix [1 0 0 0 0 0; 0 0 1 0 0 0; 0 0 0 0 1 0]
+    Jra = vcat(L_λ', zero(L_λ'), zero(L_λ'), zero(M_λ'), M_λ', zero(M_λ'))
     Jrs = @SMatrix [L_u 0 L_v 0 L_θdot 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         0 0 0 0 0 0; M_u 0 M_v 0 M_θdot 0; 0 0 0 0 0 0]
     # return jacobian
     return [Jda Jds; Jra Jrs]
+end
+
+# --- unit testing methods --- #
+
+function get_inputs_from_state_rates(aero::Wagner, stru::LiftingLineSection,
+    ds, s, p, t)
+    # extract state rates
+    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz = ds
+    # extract parameters
+    a, b, ρ, a0, α0 = p
+    # extract relevant velocities
+    vdot = dvz
+    θddot = dωy
+    # calculate aerodynamic loads
+    L, M = wagner_rate_loads(a, b, ρ, vdot, θddot)
+    # forces and moments per unit span
+    f = SVector(L, 0, 0)
+    m = SVector(0, M, 0)
+    # return inputs
+    return vcat(0, 0, 0, f, m)
 end
 
 # --- Internal Methods --- #
@@ -275,6 +309,34 @@ function wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, vdot, θdot, θddot, λ1,
     L = tmp1*((-v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(-vdot/b + u/b*θdot - a*θddot)
     # moment at reference point
     M = -tmp2*(-vdot/2 + u*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+
+    return SVector(L, M)
+end
+
+function wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
+    # circulatory load factor
+    tmp1 = a0*ρ*u*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # Wagner's function at t = 0.0
+    ϕ0 = 1 - C1 - C2
+    # lift at reference point
+    L = tmp1*((-v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) + tmp2*u/b*θdot
+    # moment at reference point
+    M = -tmp2*u*θdot + (b/2 + a*b)*L
+
+    return SVector(L, M)
+end
+
+function wagner_rate_loads(a, b, ρ, vdot, θddot)
+    # non-circulatory load factor
+    tmp = pi*ρ*b^3
+    # lift at reference point
+    L = tmp*(-vdot/b - a*θddot)
+    # moment at reference point
+    M = -tmp*(-vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -345,15 +407,13 @@ function wagner_loads_θdot(a, b, ρ, a0, C1, C2, u)
     return SVector(L_θdot, M_θdot)
 end
 
-function wagner_loads_θddot(a, b, ρ, a0, u)
-    # circulatory load factor
-    tmp1 = a0*ρ*u*b
+function wagner_loads_θddot(a, b, ρ)
     # non-circulatory load factor
-    tmp2 = pi*ρ*b^3
+    tmp = pi*ρ*b^3
     # lift at reference point
-    L_θddot = -a*tmp2
+    L_θddot = -a*tmp
     # moment at reference point
-    M_θddot = -tmp2*b*(1/8 - a/2) + (b/2 + a*b)*L_θddot
+    M_θddot = -tmp*b*(1/8 - a/2) + (b/2 + a*b)*L_θddot
 
     return SVector(L_θddot, M_θddot)
 end

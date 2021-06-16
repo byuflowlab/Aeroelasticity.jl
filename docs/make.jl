@@ -5,6 +5,7 @@ makedocs(;
     pages = [
         "Home" => "index.md",
         "Examples" => "examples.md",
+        "Theory" => "theory.md",
         "Developer Guide" => "developer.md",
         "Library" => "library.md",
     ],

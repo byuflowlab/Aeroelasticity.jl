@@ -4,93 +4,77 @@ using GXBeam
 using ForwardDiff
 using Test
 
+import AerostructuralDynamics.get_lhs
+import AerostructuralDynamics.get_inputs_from_state_rates
+import AerostructuralDynamics.get_input_mass_matrix
+import AerostructuralDynamics.get_input_state_jacobian
+import AerostructuralDynamics.LiftingLineSection
+
 function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf))
 
+    # sample arguments
     du = rand(number_of_states(model))
     u = rand(number_of_states(model))
     y = rand(number_of_inputs(model))
     p = rand(number_of_parameters(model))
     t = rand()
 
-    # # left hand side, state rates
-    # fdu = (du) -> get_mass_matrix_product(model, du, u, y, p, t)
-
-    # right hand side, state variables
-    fu = (u) -> get_rates(model, u, y, p, t)
-
-    # right hand side, inputs
-    fy = (y) -> get_rates(model, u, y, p, t)
-
-    # residual, state rates
-    fresid = (du) -> get_mass_matrix(model, u, y, p, t)*du - get_rates(model, u, y, p, t)
-
-    # # mass matrix test
-    # M = get_mass_matrix(model, u, y, p, t)
-    # M_fd = ForwardDiff.jacobian(fdu, du)
-    # @test isapprox(M, M_fd; atol, norm)
-
     # state jacobian test
+    fu = (u) -> get_rates(model, u, y, p, t)
     J = get_state_jacobian(model, u, y, p, t)
     J_fd = ForwardDiff.jacobian(fu, u)
     @test isapprox(J, J_fd; atol, norm)
 
     # input jacobian test
+    fy = (y) -> get_rates(model, u, y, p, t)
     Jy = get_input_jacobian(model, u, y, p, t)
     Jy_fd = ForwardDiff.jacobian(fy, y)
     @test isapprox(Array(Jy), Jy_fd; atol, norm)
 
-    # # compatability test
-    # du = qr(collect(M))\get_rates(model, u, y, p, t)
-    # lhs = get_mass_matrix_product(model, du, u, y, p, t)
-    # rhs = get_rates(models, u, y, p, t)
-    # @test isapprox(lhs, rhs; atol, norm)
+    # additional tests if left hand side is defined
+    if applicable(get_lhs, model, du, u, y, p, t)
+
+        # mass matrix test
+        fdu = (du) -> get_lhs(model, du, u, y, p, t)
+        M = get_mass_matrix(model, u, y, p, t)
+        M_fd = ForwardDiff.jacobian(fdu, similar(u))
+        @test isapprox(M, M_fd; atol, norm)
+
+        # compatability test
+        du = qr(collect(M))\get_rates(model, u, y, p, t)
+        lhs = get_lhs(model, du, u, y, p, t)
+        rhs = get_rates(model, u, y, p, t)
+        @test isapprox(lhs, rhs; atol, norm)
+
+    end
 
     return nothing
 end
 
-function run_model_tests(models...; atol = 1e-10, norm = (x)->norm(x, Inf))
+function run_coupling_tests(models...; atol = 1e-10, norm = (x)->norm(x, Inf))
 
+    # sample arguments
     du = rand(number_of_states(models))
     u = rand(number_of_states(models))
     p = rand(number_of_parameters(models))
     t = rand()
 
-    y = get_inputs(models, u, p, t)
+    # jacobian test
+    fu = (u) -> get_inputs(models, u, p, t)
+    Jy = get_input_state_jacobian(models, u, p, t)
+    Jy_fd = ForwardDiff.jacobian(fu, u)
+    @test isapprox(Jy, Jy_fd; atol, norm)
 
-    # left hand side, state rates
-    fdu = (du) -> get_mass_matrix_product(models, du, u, get_inputs(models, u, p, t), p, t)
+    # additional test if state rate contribution is defined
+    if applicable(get_inputs_from_state_rates, models..., du, u, p, t)
 
-    # right hand side, state variables
-    fu = (u) -> get_rates(models, u, get_inputs(models, u, p, t), p, t)
+        # mass matrix test
+        fdu = (du) -> -get_inputs_from_state_rates(models..., du, u, p, t)
+        My = get_input_mass_matrix(models, u, p, t)
+        My_fd = ForwardDiff.jacobian(fdu, du)
+        @test isapprox(My, My_fd; atol, norm)
 
-    # right hand side, inputs
-    fy = (y) -> get_rates(models, u, y, p, t)
-
-    # residual, state rates
-    fresid = (du) -> get_mass_matrix(models, u,
-        get_inputs(models, u, p, t), p, t)*du - get_rates(models, u,
-        get_inputs(models, u, p, t), p, t)
-
-    # # mass matrix test
-    # M = get_mass_matrix(models, u, y, p, t)
-    # M_fd = ForwardDiff.jacobian(fdu, du)
-    # @test isapprox(M, M_fd; atol, norm)
-
-    # state jacobian test
-    J = get_state_jacobian(models, u, y, p, t)
-    J_fd = ForwardDiff.jacobian(fu, u)
-    @test isapprox(J, J_fd; atol, norm)
-
-    # input jacobian test
-    Jy = get_input_jacobian(models, u, y, p, t)
-    Jy_fd = ForwardDiff.jacobian(fy, y)
-    @test isapprox(Array(Jy), Jy_fd; atol, norm)
-
-    # # compatability test
-    # du = qr(collect(M))\get_rates(models, u, y, p, t)
-    # lhs = get_mass_matrix_product(models, du, u, y, p, t)
-    # rhs = get_rates(models, u, y, p, t)
-    # @test isapprox(lhs, rhs; atol, norm)
+    end
 
     return nothing
 end
@@ -106,23 +90,31 @@ end
     run_model_tests(QuasiSteady{1}())
     run_model_tests(QuasiSteady{2}())
     # test coupling with TypicalSection()
-    run_model_tests(QuasiSteady{0}(), TypicalSection())
-    run_model_tests(QuasiSteady{1}(), TypicalSection())
-    run_model_tests(QuasiSteady{2}(), TypicalSection())
+    run_coupling_tests(QuasiSteady{0}(), TypicalSection())
+    run_coupling_tests(QuasiSteady{1}(), TypicalSection())
+    run_coupling_tests(QuasiSteady{2}(), TypicalSection())
+    # test coupling with LiftingLineSection()
+    run_coupling_tests(QuasiSteady{0}(), LiftingLineSection())
+    run_coupling_tests(QuasiSteady{1}(), LiftingLineSection())
+    run_coupling_tests(QuasiSteady{2}(), LiftingLineSection())
 end
 
 @testset "Wagner" begin
     # test on its own
     run_model_tests(Wagner())
     # test coupling with TypicalSection()
-    run_model_tests(Wagner(), TypicalSection())
+    run_coupling_tests(Wagner(), TypicalSection())
+    # test coupling with LiftingLineSection()
+    run_coupling_tests(Wagner(), LiftingLineSection())
 end
 
 @testset "Peters' Finite State" begin
     # test on its own
     run_model_tests(Peters{4}())
     # test coupling with TypicalSection()
-    run_model_tests(Peters{4}(), TypicalSection())
+    run_coupling_tests(Peters{4}(), TypicalSection())
+    # test coupling with LiftingLineSection()
+    run_coupling_tests(Peters{4}(), LiftingLineSection())
 end
 
 @testset "Geometrically Exact Beam Theory" begin
@@ -226,9 +218,9 @@ end
 
     structural_model = GEBT(system, assembly, prescribed, distributed)
 
-    run_model_tests(LiftingLine{4}(QuasiSteady{0}()), structural_model)
-    run_model_tests(LiftingLine{4}(QuasiSteady{1}()), structural_model)
-    run_model_tests(LiftingLine{4}(QuasiSteady{2}()), structural_model)
-    run_model_tests(LiftingLine{4}(Wagner()), structural_model)
-    run_model_tests(LiftingLine{4}(Peters{4}()), structural_model)
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), structural_model)
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), structural_model)
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), structural_model)
+    run_coupling_tests(LiftingLine{4}(Wagner()), structural_model)
+    run_coupling_tests(LiftingLine{4}(Peters{4}()), structural_model)
 end

@@ -1,4 +1,4 @@
-# Models
+# Theory
 
 ## Aerodynamic Models
 
@@ -152,7 +152,7 @@ When coupled with a structural model, aircraft linear and angular accelerations 
 
 ### Two-Dimensional Models
 
-#### Typical Section [`TypicalSection`](@ref)
+#### [`TypicalSection`](@ref)
 
 ![](typical-section.svg)
 
@@ -165,6 +165,6 @@ where ``a`` is the normalized distance from the semichord to the reference point
 
 ### Three-Dimensional Models
 
-#### Rigid Body [`RigidBody`](@ref)
+#### [`RigidBody`](@ref)
 
-#### Geometrically Exact Beam Theory [`GEBT`](@ref)
+#### [`GEBT`](@ref)

@@ -31,6 +31,7 @@ number_of_parameters(::Type{<:QuasiSteady}) = 5
 # --- Typical Section Coupling --- #
 
 # --- traits --- #
+
 inplaceness(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = OutOfPlace()
 mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Zeros()
 state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Nonlinear()
@@ -82,7 +83,7 @@ function get_inputs(aero::QuasiSteady{2}, stru::TypicalSection, s, p, t)
     # local vertical freestream velocity
     v = -u*θ - hdot
     # calculate aerodynamic loads
-    L, M = quasisteady2_loads_rhs(a, b, ρ, a0, α0, u, v, θdot)
+    L, M = quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, θdot)
     # return inputs
     return SVector(L, M)
 end
@@ -117,7 +118,9 @@ function get_input_state_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, s,
     return quasisteady2_jacobian(a, b, ρ, a0, u)
 end
 
-function get_input_mass_matrix_product(aero::QuasiSteady{2}, stru::TypicalSection,
+# --- unit testing methods --- #
+
+function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
     ds, s, p, t)
     # extract state rates
     dh, dθ, dhdot, dθdot = ds
@@ -127,7 +130,7 @@ function get_input_mass_matrix_product(aero::QuasiSteady{2}, stru::TypicalSectio
     vdot = -dhdot
     θddot = dθdot
     # calculate aerodynamic loads
-    L, M = quasisteady2_loads_lhs(a, b, ρ, vdot, θddot)
+    L, M = quasisteady2_rate_loads(a, b, ρ, vdot, θddot)
     # return inputs
     return SVector(L, M)
 end
@@ -135,6 +138,7 @@ end
 # --- Lifting Line Section Coupling --- #
 
 # --- traits --- #
+
 inplaceness(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = OutOfPlace()
 mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Zeros()
 state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Nonlinear()
@@ -196,7 +200,7 @@ function get_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection, s, p, t)
     v = vz
     θdot = ωy
     # calculate aerodynamic loads
-    L, M = quasisteady2_loads_rhs(a, b, ρ, a0, α0, u, v, θdot)
+    L, M = quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, θdot)
     # forces and moments per unit span
     f = SVector(L, 0, 0)
     m = SVector(0, M, 0)
@@ -235,8 +239,8 @@ function get_input_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection
     # extract relevant velocities
     u, v = vx, vz
     # calculate loads
-    L_u, M_u = quasisteady0_u(a, b, ρ, a0, α0, v)
-    L_v, M_v = quasisteady0_v(a, b, ρ, a0, α0, u)
+    L_u, M_u = quasisteady0_u(a, b, ρ, a0, v)
+    L_v, M_v = quasisteady0_v(a, b, ρ, a0, u)
     # return inputs
     return @SMatrix [L_u 0 L_v 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         M_u 0 M_v 0 0 0; 0 0 0 0 0 0]
@@ -253,12 +257,9 @@ function get_input_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection
     v = vz
     θdot = ωy
     # calculate loads
-    L_u, M_u = quasisteady1_u(a, b, ρ, a0, u, v, θdot)
+    L_u, M_u = quasisteady1_u(a, b, ρ, a0, α0, u, v, θdot)
     L_v, M_v = quasisteady1_v(a, b, ρ, a0, α0, u)
     L_θdot, M_θdot = quasisteady1_θdot(a, b, ρ, a0, u)
-    # forces and moments per unit span
-    f = SVector(L, 0, 0)
-    m = SVector(0, M, 0)
     # return inputs
     return @SMatrix [L_u 0 L_v 0 L_θdot 0; 0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         M_u 0 M_v 0 M_θdot 0; 0 0 0 0 0 0]
@@ -277,18 +278,17 @@ function get_input_state_jacobian(aero::QuasiSteady{2}, stru::LiftingLineSection
     θdot = ωy
     θddot = 0 # included in mass matrix term
     # calculate loads
-    L_u, M_u = quasisteady2_u(a, b, ρ, a0, α0, v)
+    L_u, M_u = quasisteady2_u(a, b, ρ, a0, α0, u, v, θdot)
     L_v, M_v = quasisteady2_v(a, b, ρ, a0, α0, u)
-    L_θdot, M_θdot = quasisteady2_θdot(a, b, ρ, a0, α0, u, v)
-    # forces and moments per unit span
-    f = SVector(L, 0, 0)
-    m = SVector(0, M, 0)
+    L_θdot, M_θdot = quasisteady2_θdot(a, b, ρ, a0, u)
     # return inputs
     return @SMatrix [L_u 0 L_v 0 L_θdot 0; 0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         M_u 0 M_v 0 M_θdot 0; 0 0 0 0 0 0]
 end
 
-function get_input_mass_matrix_product(aero::QuasiSteady{2}, stru::LiftingLineSection,
+# --- unit testing methods --- #
+
+function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSection,
     ds, s, p, t)
     # extract state rates
     dvx, dvy, dvz, dωx, dωy, dωz = ds
@@ -298,7 +298,7 @@ function get_input_mass_matrix_product(aero::QuasiSteady{2}, stru::LiftingLineSe
     vdot = dvz
     θddot = dωy
     # calculate aerodynamic loads
-    L, M = quasisteady2_loads_lhs(a, b, ρ, vdot, θddot)
+    L, M = quasisteady2_rate_loads(a, b, ρ, vdot, θddot)
     # forces and moments per unit span
     f = SVector(L, 0, 0)
     m = SVector(0, M, 0)
@@ -350,32 +350,19 @@ function quasisteady2_loads(a, b, ρ, a0, α0, u, v, vdot, θdot, θddot)
     return SVector(L, M)
 end
 
-# quasi-steady loads + added mass effects
-function quasisteady2_loads_rhs(a, b, ρ, a0, α0, u, v, θdot)
-    # circulatory load factor
-    tmp1 = a0*ρ*u*b
-    # non-circulatory load factor
-    tmp2 = pi*ρ*b^3
-    # constant based on geometry
-    d = b/2 - a*b
-    # lift at reference point
-    L = tmp1*(-v + d*θdot - u*α0) + tmp2*(u/b*θdot)
-    # moment at reference point
-    M = -tmp2*u*θdot + (b/2 + a*b)*L
+function quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, θdot)
 
-    return SVector(L, M)
+    return quasisteady1_loads(a, b, ρ, a0, α0, u, v, θdot)
 end
 
 # quasi-steady loads from acceleration terms
-function quasisteady2_loads_lhs(a, b, ρ, vdot, θddot)
+function quasisteady2_rate_loads(a, b, ρ, vdot, θddot)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
-    # constant based on geometry
-    d = b/2 - a*b
     # lift at reference point
-    L = tmp*(vdot/b + a*θddot)
+    L = tmp*(-vdot/b - a*θddot)
     # moment at reference point
-    M = tmp*(-vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp*(-vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -384,18 +371,6 @@ function quasisteady0_jacobian(a, b, ρ, a0, u)
     L_θ = a0*ρ*u^2*b
     M_θ = (b/2 + a*b)*L_θ
     return @SMatrix [0 L_θ 0 0; 0 M_θ 0 0]
-end
-
-function quasisteady0_u(a, b, ρ, a0, v)
-    L_u = -a0*ρ*b*v
-    M_u = (b/2 + a*b)*L
-    return SVector(L_u, M_u)
-end
-
-function quasisteady0_v(a, b, ρ, a0, u)
-    L_v = -a0*ρ*b*u
-    M_v = (b/2 + a*b)*L
-    return SVector(L_v, M_v)
 end
 
 function quasisteady1_jacobian(a, b, ρ, a0, u)
@@ -412,7 +387,33 @@ function quasisteady1_jacobian(a, b, ρ, a0, u)
     return @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
 end
 
-function quasisteady1_u(a, b, ρ, a0, u, v, θdot)
+quasisteady2_jacobian(a, b, ρ, a0, u) = quasisteady1_jacobian(a, b, ρ, a0, u)
+
+function quasisteady2_mass_matrix(a, b, ρ)
+    # calculate derivatives
+    tmp1 = pi*ρ*b^3
+    tmp2 = b/2 + a*b
+    L_hddot = -tmp1/b
+    L_θddot = tmp1*a
+    M_hddot = tmp1/2 + tmp2*L_hddot
+    M_θddot = tmp1*(b/8 - a*b/2) + tmp2*L_θddot
+    # return jacobian
+    return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
+end
+
+function quasisteady0_u(a, b, ρ, a0, v)
+    L_u = -a0*ρ*b*v
+    M_u = (b/2 + a*b)*L_u
+    return SVector(L_u, M_u)
+end
+
+function quasisteady0_v(a, b, ρ, a0, u)
+    L_v = -a0*ρ*b*u
+    M_v = (b/2 + a*b)*L_v
+    return SVector(L_v, M_v)
+end
+
+function quasisteady1_u(a, b, ρ, a0, α0, u, v, θdot)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
@@ -452,11 +453,9 @@ function quasisteady1_θdot(a, b, ρ, a0, u)
     return SVector(L_θdot, M_θdot)
 end
 
-quasisteady2_jacobian(a, b, ρ, a0, u) = quasisteady1_jacobian(a, b, ρ, a0, u)
+quasisteady2_u(a, b, ρ, a0, α0, u, v, θdot) = quasisteady1_u(a, b, ρ, a0, α0, u, v, θdot)
 
-quasisteady2_u(a, b, ρ, a0, u) = quasisteady1_u(a, b, ρ, a0, u, v, θdot)
-
-quasisteady2_v(a, b, ρ, a0, u) = quasisteady1_v(a, b, ρ, a0, α0, u)
+quasisteady2_v(a, b, ρ, a0, α0, u) = quasisteady1_v(a, b, ρ, a0, α0, u)
 
 quasisteady2_udot() = SVector(0, 0)
 
@@ -484,16 +483,4 @@ function quasisteady2_θddot(a, b, ρ, a0, u)
     M_θddot = -tmp2*b*(1/8 - a/2) + (b/2 + a*b)*L_θddot
 
     return SVector(L_θddot, M_θddot)
-end
-
-function quasisteady2_mass_matrix(a, b, ρ)
-    # calculate derivatives
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_hddot = -tmp1/b
-    L_θddot = tmp1*a
-    M_hddot = tmp1/2 + tmp2*L_hddot
-    M_θddot = tmp1*(b/8 - a*b/2) + tmp2*L_θddot
-    # return jacobian
-    return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
 end

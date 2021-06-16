@@ -8,10 +8,9 @@ using GXBeam
 import DifferentialEquations.ODEFunction
 
 export AbstractModel
-export TypicalSection
-export Steady, QuasiSteady, Wagner, Peters
-export GEBT
-export LiftingLine
+export TypicalSection, GEBT
+export Steady, QuasiSteady, Wagner, Peters, LiftingLineSection, LiftingLine
+
 
 export number_of_states
 export number_of_inputs
@@ -31,8 +30,6 @@ export get_inputs, get_inputs!
 export get_mass_matrix, get_mass_matrix!
 export get_rates, get_rates!
 export get_state_jacobian, get_state_jacobian!
-
-export get_mass_matrix_product, get_mass_matrix_product!
 export get_input_jacobian, get_input_jacobian!
 
 include("traits.jl")
