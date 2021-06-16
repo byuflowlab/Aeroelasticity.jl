@@ -1411,7 +1411,16 @@ function _get_input_state_jacobian!(Jy, ::Constant, ::InPlace,
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function get_input_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
+function _get_input_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
+
+    get_input_state_jacobian!(Jy, models..., u, p, t; kwargs...)
+
+    return Jy
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_input_state_jacobian!(Jy, ::Undefined, ::InPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
     get_input_state_jacobian!(Jy, models..., u, p, t; kwargs...)

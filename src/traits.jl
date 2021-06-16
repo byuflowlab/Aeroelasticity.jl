@@ -124,8 +124,11 @@ Return
  - [`Nonlinear()`](@ref), if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` may vary
     with respect to time, and is nonlinear with respect to the states
+ - [`ForwardDiff()`](@ref), if the jacobian of the mass matrix multiplied state
+    rates with respect to the state variables should be calculated using
+    ForwardDiff for model `T`
 
-If no method is defined for the specified type, return [`Nonlinear`](@ref).
+If no method is defined for the specified type, return [`Forward`](@ref).
 """
 state_jacobian_type(::Type{T}) where T = Nonlinear()
 
@@ -150,8 +153,10 @@ function state_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
         return Constant()
     elseif all(islinear.(state_jacobian_type.(model_types)))
         return Linear()
-    else
+    elseif all(isnonlinear.(state_jacobian_type.(model_types)))
         return Nonlinear()
+    else
+        return Undefined()
     end
 end
 
@@ -173,8 +178,11 @@ Return
  - [`Nonlinear()`](@ref), if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs may vary with respect to time for model `T`, and
     is nonlinear with respect to the inputs
+ - [`ForwardDiff()`](@ref), if no function for computing the jacobian of the
+    mass matrix multiplied state rates with respect to the inputs
+    exists for model `T`
 
-If no method is defined for the specified type, return [`Nonlinear`](@ref).
+If no method is defined for the specified type, return [`Undefined`](@ref).
 """
 input_jacobian_type(::Type{T}) where T = Nonlinear()
 
