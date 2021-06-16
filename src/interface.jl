@@ -181,6 +181,19 @@ function _get_mass_matrix(::Linear, ::OutOfPlace, models::NTuple{N, AbstractMode
     return M + D*My
 end
 
+# calculate mass matrix from mass matrix product
+function _get_mass_matrix(::Undefined, ::OutOfPlace, models::T, args...) where T
+    N = number_of_states(T)
+    dui = SVector(ntuple(j -> ifelse(1 == j, 1, 0), N))
+    M = get_mass_matrix_product(models, dui, args...)
+    for i = 2:N
+        dui = SVector(ntuple(j -> ifelse(i == j, 1, 0), N))
+        out = get_mass_matrix_product(models, dui, args...)
+        M = vcat(M, out)
+    end
+    return M
+end
+
 function initialize_mass_matrix(models::NTuple{N,AbstractModel}) where N
     initialize_static_mass_matrix(models)
 end
@@ -373,11 +386,23 @@ function _get_mass_matrix!(M, ::Linear, ::InPlace,
     return M
 end
 
+# calculate mass matrix from mass matrix product
+function _get_mass_matrix!(M, ::Undefined, ::OutOfPlace, models::T, args...) where T
+    N = number_of_states(T)
+    dui = SVector(ntuple(j -> ifelse(1 == j, 1, 0), N))
+    get_mass_matrix_product!(view(M, i, :), models, dui, args...)
+    for i = 2:N
+        dui = SVector(ntuple(j -> ifelse(i == j, 1, 0), N))
+        get_mass_matrix_product!(view(M, i, :), models, dui, args...)
+    end
+    return M
+end
+
 """
     get_mass_matrix_product(models, du, u, y, p, t)
 
-Calculate the (mass matrix multiplied) state rates for the specified model or
-models.
+Calculate the mass matrix product with the state rates for the specified model
+or models.
 """
 function get_mass_matrix_product(models::T, du, u, y, p, t) where T
     return _get_mass_matrix_product(mass_matrix_type(T), inplaceness(T), models,
