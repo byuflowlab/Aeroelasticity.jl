@@ -90,9 +90,9 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
         u = vcat(u_aero, u_stru)
 
         # parameters
-        p_aero = [a, b, ρ, a0, α0]
+        p_aero = [a, b, a0, α0]
         p_stru = [kh, kθ, m, Sθ, Iθ]
-        p_input = U[i]
+        p_input = [U[i], ρ]
         p = vcat(p_aero, p_stru, p_input)
 
         # time

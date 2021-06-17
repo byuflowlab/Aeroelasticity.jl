@@ -252,9 +252,11 @@ end
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a geometrically exact beam theory model.  This model introduces the
 freestream velocity components ``\\begin{bmatrix} V_x & V_y & V_z \\end{bmatrix}^T``
-as additional parameters.  Also note that when using this model, local reference
-frames for each beam should be oriented with the x-axis into the beam, y-axis
-forward along the chord-line, and z-axis in the airfoil normal direction.
+and density ``\\rho`` as additional parameters.
+
+** When using this model, the local frame for each beam element should be
+oriented with the x-axis along the beam's axis, the y-axis forward, and the
+z-axis normal to the surface **
 """
 couple_models(aero::LiftingLine, stru::GEBT)
 
@@ -298,7 +300,7 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,
     end
 end
 
-number_of_parameters(::Type{<:LiftingLine}, ::Type{<:GEBT}) = 3
+number_of_parameters(::Type{<:LiftingLine}, ::Type{<:GEBT}) = 4
 
 # --- methods --- #
 
@@ -337,8 +339,9 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
-    # extract freestream velocity (from additional parameters)
+    # extract freestream parameters
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
+    ρ = p[npa+nps+4]
 
     # extract model constants
     system = stru.system
@@ -356,51 +359,47 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         # get structural state variables corresponding to this element
         states = extract_element_state(system, i, q)
 
-        # transformation matrix from local element frame to global frame
+        # transformation matrix from local beam frame to the body frame
 
-        # NOTE: We assume that the local element frame is oriented with the
-        # y-axis in the negative chordwise direction and the z-axis in the
-        # (airfoil) normal direction
+        # NOTE: We assume that the local beam frame y-axis is oriented towards
+        # the leading edge and the z-axis is oriented up
 
         Ct = GXBeam.get_C(states.theta)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
-        # transformation matrix from local element frame to local wind frame
+        # transformation matrix from local beam frame to local aerodynamic frame
 
-        # NOTE: We assume the local wind frame is oriented with the x-axis
+        # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
         # in the chordwise direction and the z-axis in the (airfoil) normal
         # direction.
 
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
 
-        # transform freestream velocity from global frame to the wind frame
+        # transform freestream velocity from body frame to local aerodynamic frame
         vi = R*CtCab'*Vinf
 
-        # add velocity due to surface motion
+        # add local freestream linear velocities due to surface motion
         vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
 
-        # calculate surface angular velocities in the wind frame
+        # calculate local section angular velocities due to surface motion
         ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
-
-        # Note that vi is the **local freestream velocity** in the wind frame,
-        # wheras ωi is the **element angular velocity** in the wind frame.
 
         # calculate lifting line section inputs
         ui = vcat(λi, vi, ωi) # section state variables
-        pi = pas[i] # section parameters
+        pi = vcat(SVector{Npai[i]}(pas[i]), ρ) # section parameters
         yi = get_inputs(aero.models[i], LiftingLineSection(), ui, pi, t)
 
-        # extract and save aerodynamic model inputs (in wind frame)
+        # extract and save aerodynamic model inputs (in local aerodynamic frame)
         for iy = 1:Nyai[i]
             yas[i][iy] = yi[iy]
         end
 
-        # extract forces and moments per unit length (in wind frame)
+        # extract forces and moments per unit length (in local aerodynamic frame)
         fi = SVector(yi[Nyai[i]+1], yi[Nyai[i]+2], yi[Nyai[i]+3])
         mi = SVector(yi[Nyai[i]+4], yi[Nyai[i]+5], yi[Nyai[i]+6])
 
-        # save force and moment per unit length (in global frame)
+        # save force and moment per unit length (in body frame)
         ys[6*(i-1)+1 : 6*(i-1)+3] = CtCab*R'*fi
         ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*R'*mi
 
@@ -444,8 +443,9 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     λs = view.(Ref(λ), iλs) # aerodynamic state variables for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
-    # extract freestream velocity (from additional parameters)
+    # extract freestream parameters
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
+    ρ = p[npa+nps+4]
 
     # extract model constants
     system = stru.system
@@ -463,45 +463,41 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         # get structural state variables corresponding to this element
         states = extract_element_state(system, i, q)
 
-        # transformation matrix from local element frame to global frame
+        # transformation matrix from local beam frame to the body frame
 
-        # NOTE: We assume that the local element frame is oriented with the
-        # y-axis in the negative chordwise direction and the z-axis in the
-        # (airfoil) normal direction
+        # NOTE: We assume that the local beam frame y-axis is oriented towards
+        # the leading edge and the z-axis is oriented up
 
         Ct = GXBeam.get_C(states.theta)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
-        # transformation matrix from local element frame to local wind frame
+        # transformation matrix from local beam frame to local aerodynamic frame
 
-        # NOTE: We assume the local wind frame is oriented with the x-axis
+        # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
         # in the chordwise direction and the z-axis in the (airfoil) normal
         # direction.
 
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
 
-        # transform freestream velocity from global frame to the wind frame
+        # transform freestream velocity from body frame to local aerodynamic frame
         vi = R*CtCab'*Vinf
 
-        # add velocity due to surface motion
+        # add local freestream linear velocities due to surface motion
         vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
 
         dv_dP = -R * element.minv11 * system.mass_scaling
         dv_dH = -R * element.minv12 * system.mass_scaling
 
-        # calculate surface angular velocities in the wind frame
+        # calculate local section angular velocities due to surface motion
         ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
 
         dω_dP = R * element.minv12' * system.mass_scaling
         dω_dH = R * element.minv22 * system.mass_scaling
 
-        # Note that vi is the **local freestream velocity** in the wind frame,
-        # wheras ωi is the **element angular velocity** in the wind frame.
-
         # calculate lifting line section input mass matrix
         ui = vcat(λi, vi, ωi) # section state variables
-        pi = pas[i] # section parameters
+        pi = vcat(SVector{Npai[i]}(pas[i]), ρ) # section parameters
         Myi = get_input_mass_matrix(aero.models[i], LiftingLineSection(), ui, pi, t)
 
         # separate into component mass matrices
@@ -525,13 +521,13 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         m_dP = m_dv * dv_dP + m_dω * dω_dP
         m_dH = m_dv * dv_dH + m_dω * dω_dH
 
-        # save aerodynamic input mass matrix entries (in wind frame)
+        # save aerodynamic input mass matrix entries (in local aerodynamic frame)
         icol = system.icol_beam[i]
         My[iyas[i], iλs[i]] = d_dλ
         My[iyas[i], nλ+icol+12:nλ+icol+14] = d_dP
         My[iyas[i], nλ+icol+15:nλ+icol+17] = d_dH
 
-        # save load mass matrix entries (in global frame)
+        # save load mass matrix entries (in body frame)
         offset = nya + 6*(i-1)
         My[offset+1 : offset+3, iλs[i]] = CtCab*R'*f_dλ
         My[offset+4 : offset+6, iλs[i]] = CtCab*R'*m_dλ
@@ -595,8 +591,9 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
-    # extract freestream velocity (from additional parameters)
+    # extract freestream parameters
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
+    ρ = p[npa+nps+4]
 
     # extract model constants
     system = stru.system
@@ -616,25 +613,24 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
         states = extract_element_state(system, i, q)
         dstates = extract_element_state(system, i, dq)
 
-        # transformation matrix from local element frame to global frame
+        # transformation matrix from local beam frame to the body frame
 
-        # NOTE: We assume that the local element frame is oriented with the
-        # y-axis in the negative chordwise direction and the z-axis in the
-        # (airfoil) normal direction
+        # NOTE: We assume that the local beam frame y-axis is oriented towards
+        # the leading edge and the z-axis is oriented up
 
         Ct = GXBeam.get_C(states.theta)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
-        # transformation matrix from local element frame to local wind frame
+        # transformation matrix from local beam frame to local aerodynamic frame
 
-        # NOTE: We assume the local wind frame is oriented with the x-axis
+        # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
         # in the chordwise direction and the z-axis in the (airfoil) normal
         # direction.
 
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
 
-        # transform freestream velocity from global frame to the wind frame
+        # transform freestream velocity from body frame to local aerodynamic frame
         vi = R*CtCab'*Vinf
 
         # add velocity due to surface motion
@@ -643,34 +639,32 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
         # calculate freestream acceleration due to surface motion
         dvi = -R*GXBeam.element_linear_velocity(element, dstates.P, dstates.H)
 
-        # calculate surface angular velocities in the wind frame
+        # calculate local section angular velocities due to surface motion
         ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
 
-        # calculate surface angular accelerations in the wind frame
+        # calculate local section angular accelerations due to surface motion
         dωi = R*GXBeam.element_angular_velocity(element, dstates.P, dstates.H)
-
-        # Note that vi is the **local freestream velocity** in the wind frame,
-        # wheras ωi is the **element angular velocity** in the wind frame.
 
         # calculate lifting line section inputs from state rate contributions
         dui = vcat(dλi, dvi, dωi) # section state rates
         ui = vcat(λi, vi, ωi) # section states
-        pi = pas[i] # section parameters
+        pi = vcat(SVector{Npai[i]}(pas[i]), ρ) # section parameters
         yi = get_inputs_from_state_rates(aero.models[i], LiftingLineSection(),
             dui, ui, pi, t)
 
-        # extract and save aerodynamic model inputs (in wind frame)
+        # extract and save aerodynamic model inputs (in local aerodynamic frame)
         for iy = 1:Nyai[i]
             yas[i][iy] = yi[iy]
         end
 
-        # extract forces and moments per unit length (in wind frame)
+        # extract forces and moments per unit length (in local aerodynamic frame)
         fi = SVector(yi[Nyai[i]+1], yi[Nyai[i]+2], yi[Nyai[i]+3])
         mi = SVector(yi[Nyai[i]+4], yi[Nyai[i]+5], yi[Nyai[i]+6])
 
-        # save force and moment per unit length (in global frame)
+        # save force and moment per unit length (in body frame)
         ys[6*(i-1)+1 : 6*(i-1)+3] = CtCab*R'*fi
         ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*R'*mi
+
     end
 
     return y
