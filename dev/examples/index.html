@@ -151,22 +151,22 @@ for ia = 1:length(aerodynamic_models)
     end
 end
 
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))</code></pre><p><img src="../two-dimensional-stability.svg" alt/></p><p>The same analysis and results are presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot; for the steady state and Peters&#39; Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.</p><h2 id="Three-Dimensional-Aeroelastic-Analysis"><a class="docs-heading-anchor" href="#Three-Dimensional-Aeroelastic-Analysis">Three Dimensional Aeroelastic Analysis</a><a id="Three-Dimensional-Aeroelastic-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Three-Dimensional-Aeroelastic-Analysis" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.</p><pre><code class="language-">using AerostructuralDynamics, GXBeam, LinearAlgebra
-
-# velocity range
-U = range(1, 30, length=100) # m/s (velocity)
+p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))</code></pre><p><img src="../two-dimensional-stability.svg" alt/></p><p>The same analysis and results are presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot; for the steady state and Peters&#39; Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.</p><h2 id="Three-Dimensional-Aeroelastic-Analysis"><a class="docs-heading-anchor" href="#Three-Dimensional-Aeroelastic-Analysis">Three Dimensional Aeroelastic Analysis</a><a id="Three-Dimensional-Aeroelastic-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Three-Dimensional-Aeroelastic-Analysis" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.</p><pre><code class="language-">using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
 
 # aerodynamic properties
+Vinf = range(1, 30, length=200) # m/s (velocity)
+α = 2*pi/180 # angle of attack
 ρ = 0.088 # kg/m^3 (air density)
+a0 = 2*pi # lift slope (for each section)
+α0 = 0 # zero lift angle of attack (for each section)
 
 # structural properties
+a = 0 # normalized reference axis location relative to the semichord
 b = 16 # m (span)
 c = 1 # m (chord)
-a = 0 # fraction of chord (Spanwise reference axis location relative to semichord)
-e = 0 # fraction of chord (Center of gravity location relative to semichord)
 GJ = 1e4 # N*m^2 (torsional rigidity)
-EIyy = 4e6 # N*m^2 (chord bending rigidity)
-EIzz = 2e4 # N*m^2 (flat bending rigidity)
+EIcc = 4e6 # N*m^2 (chord bending rigidity)
+EInn = 2e4 # N*m^2 (flat bending rigidity)
 μ = 0.75 # kg/m (mass per unit span)
 i11 = 0.1 # kg*m (rotational inertia per unit span)
 
@@ -174,77 +174,143 @@ i11 = 0.1 # kg*m (rotational inertia per unit span)
 N = 8 # number of elements
 
 # geometry initialization
-x = range(0, b, N+1) # point x-coordinates
-y = range(0, 0, N+1) # point y-coordinates
-z = range(0, 0, N+1) # point z-coordinates
-points = [[x[i],y[i],z[i]] for i = 1:N]
+x = range(0, b, length=N+1) # point x-coordinates
+y = range(0, 0, length=N+1) # point y-coordinates
+z = range(0, 0, length=N+1) # point z-coordinates
+points = [[x[i],y[i],z[i]] for i = 1:N+1]
 start = 1:N # starting point of each beam element
 stop = 2:N+1 # ending point of each beam element
-compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIyy, 1/EIzz]), N) # compliance matrix
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 1/EInn]), N) # compliance matrix
 mass = fill(Diagonal([μ, μ, μ, i11, 0, 0]), N) # mass matrix
 assembly = GXBeam.Assembly(points, start, stop; compliance = compliance,
     mass = mass)
 
 # boundary condition initialization
-prescribed_conditions = Dict(
+prescribed = Dict(
+    # fixed left edge
     1 =&gt; GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
         theta_z=0),
 )
 
 # distributed load initialization
-distributed_loads = Dict()
-for i = 1:nelem
-    distributed_loads[i] = GXBeam.DistributedLoads(assembly, i)
+distributed = Dict()
+for i = 1:N
+    # distributed load on each beam element
+    distributed[i] = GXBeam.DistributedLoads(assembly, i)
 end
 
 # structural system initialization
-keep_points = [1] # points at which prescribed conditions are applied
+ipoint = [1] # points at which prescribed conditions are applied
 static = false # static simulation?
-system = GXBeam.system(assembly, keep_points, static)
+system = GXBeam.System(assembly, ipoint, static)
 
 # construct aerodynamic model
 aerodynamic_model = LiftingLine{N}(Wagner())
 
 # construct structural model
-structural_model = GeometricallyExactBeamTheory(system, assembly, prescribed_conditions,
-    distributed_loads)
+structural_model = GEBT(system, assembly, prescribed, distributed)
 
-# combined models
+# define simulation models
 models = (aerodynamic_model, structural_model)
 
 # eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(models), length(V))
+λ = zeros(ComplexF64, number_of_states(models), length(Vinf))
+
+# state variable initial guess
+u0 = zeros(number_of_states(models))
 
 # loop through each velocity
-for i = 1:length(V)
+for i = 1:length(Vinf)
 
-    # set initial guess for the state variables
-    u0_aero = zeros(number_of_states(aerodynamic_model))
-    u0_stru = zeros(number_of_states(structural_model))
-    u0 = vcat(u_aero, u_stru)
+    println(&quot;Vinf: &quot;, Vinf[i])
 
     # set parameters
-    p_aero = [a, b, U[i], ρ]
-    p_stru = [a, b, kh, kθ, m, xθ, Iθ]
-    p = vcat(p_aero, p_stru)
+    p_aero = vcat(fill([a, c/2, ρ, a0, α0], N)...)
+    p_stru = Float64[]
+    p_coupled = [0, -Vinf[i]*cos(α), Vinf[i]*sin(α)] # freestream velocity in global frame
+    p = vcat(p_aero, p_stru, p_coupled)
 
     # set time
     t = 0.0
 
     # find state variables corresponding to steady state operating conditions
+    fresid = u -&gt; get_rates(models, u, get_inputs(models, u, p, t), p, t)
+    sol = nlsolve(fresid, u0)
 
+    # set states to their steady-state values
+    u = sol.zero
 
-    # calculate inputs for steady state operating conditions
+    # calculate the inputs corresponding to steady state operating conditions
     y = get_inputs(models, u, p, t)
 
-    # calculate mass matrix for steady state operating conditions
+    # calculate the mass matrix corresponding to steady state operating conditions
     M = get_mass_matrix(models, u, y, p, t)
 
-    # calculate jacobian for steady state operating conditions
+    # calculate the jacobian corresponding to steady state operating conditions
     J = get_state_jacobian(models, u, y, p, t)
 
-    # solve generalized eigenvalue problem
-    λ[ia][:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+    # solve the generalized eigenvalue problem
+    λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+
+    # update initial guess for the state variables
+    u0 .= u
 end
 
-nothing #hide</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../theory/">Theory »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Wednesday 16 June 2021 06:05">Wednesday 16 June 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+nothing #hide</code></pre><p>We now plot the results predicted using each aerodynamic model.</p><pre><code class="language-">using Plots
+pyplot()
+
+default(
+    titlefontsize = 14,
+    legendfontsize = 11,
+    guidefontsize = 14,
+    tickfontsize = 11,
+    foreground_color_legend = nothing,
+    background_color_legend = nothing,
+    minorgrid=true,
+    framestyle = :zerolines)
+
+sp1 = plot(
+    xlim = (1, 30),
+    xtick = vcat(1, 5:5:30),
+    xlabel = &quot;Velocity (m/s)&quot;,
+    ylim = (0, 350),
+    ytick = 0.0:50:350,
+    ylabel = &quot;Frequency (rad/s)&quot;,
+    legend = :topright
+    )
+
+sp2 = plot(
+    xlim = (1, 30),
+    xtick = vcat(1, 5:5:30),
+    xlabel = &quot;Velocity (m/s)&quot;,
+    ylim = (-12, 8),
+    #ytick = -12:4:8,
+    ylabel = &quot;Damping Ratio %&quot;,
+    legend = :topleft
+    )
+
+for i = 1:size(λ, 1)
+    scatter!(sp1, Vinf, imag.(λ[i,:]),
+        label = &quot;&quot;,
+        color = 1,
+        markersize = 3,
+        markerstrokewidth = 0,
+        )
+end
+
+for i = 1:size(λ, 1)
+    scatter!(sp2, Vinf,
+        #real.(λ[i,:]),
+        real.(λ[i,:])./abs.(λ[i,:])*100,
+        label = &quot;&quot;,
+        color = 1,
+        markersize = 3,
+        markerstrokewidth = 0,
+        )
+end
+
+p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
+
+# savefig(p1, &quot;three-dimensional-stability.svg&quot;) #hide
+
+nothing #hide</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../theory/">Theory »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 17 June 2021 03:14">Thursday 17 June 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
