@@ -1,7 +1,7 @@
 """
     Wagner{TF} <: AbstractModel
 
-Aerodynamic model based on Wagner's function with state variables ``d =
+Aerodynamic model based on Wagner's function with state variables ``\\lambda =
 \\begin{bmatrix} \\lambda_1 & \\lambda_2 \\end{bmatrix}^T``, inputs ``d =
 \\begin{bmatrix} u & v & \\dot{\\theta} \\end{bmatrix}^T``
 and parameters ``p_a = \\begin{bmatrix} a & b & \\rho & a_0 & \alpha_0 \\end{bmatrix}^T``
@@ -82,7 +82,21 @@ function get_input_jacobian(model::Wagner, λ, d, p, t)
     return wagner_input_jacobian(a, b, α0, C1, C2, ε1, ε2, u, v, θdot, λ1, λ2)
 end
 
+# --- Unit Testing Methods --- #
+
+get_lhs(::Wagner, dλ, λ, d, p, t) = dλ
+
 # --- Typical Section Coupling --- #
+
+"""
+    couple_models(aero::Wagner, stru::TypicalSection)
+
+Create an aerostructural model using an unsteady aerodynamic model based on
+Wagner's function and a two-degree of freedom typical section model.  This model
+introduces the freestream velocity in the chordwise direction ``u`` as an
+additional parameter.
+"""
+couple_models(aero::Wagner, stru::TypicalSection)
 
 # --- traits --- #
 
@@ -96,10 +110,10 @@ number_of_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 1
 function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = s
-    # extract aerodynamic, structural, and aerostructural parameters
+    # extract parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # calculate local vertical freestream velocity
-    v = -u*θ - hdot
+    v = u*θ + hdot
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -136,7 +150,7 @@ function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) w
     C2 = aero.C2
     # compute jacobian sub-matrices
     Jda = @SMatrix [0 0; 0 0; 0 0]
-    Jds = @SMatrix [0 0 0 0; 0 -u -1 0; 0 0 0 1]
+    Jds = @SMatrix [0 0 0 0; 0 u 1 0; 0 0 0 1]
     Jra = wagner_loads_λ(a, b, ρ, a0, u)
     Jrs = hcat(
         wagner_loads_h(),
@@ -157,7 +171,7 @@ function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # local vertical freestream velocity
-    vdot = -dhdot
+    vdot = dhdot
     θddot = dθdot
     # calculate aerodynamic loads
     L, M = wagner_rate_loads(a, b, ρ, vdot, θddot)
@@ -166,6 +180,15 @@ function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
 end
 
 # --- Lifting Line Section Coupling --- #
+
+"""
+    couple_models(aero::Wagner, stru::LiftingLineSection)
+
+Create an aerostructural model using an unsteady aerodynamic model based
+on Wagner's function and a lifting line section model.  The existence of this
+coupling allows [`Wagner`](@ref) to be used with [`LiftingLine`](@ref).
+"""
+couple_models(aero::Wagner, stru::LiftingLineSection)
 
 # --- traits --- #
 
@@ -272,8 +295,8 @@ end
 # --- Internal Methods --- #
 
 function wagner_rates(a, b, α0, C1, C2, ε1, ε2, u, v, θdot, λ1, λ2)
-    λ1dot = -ε1*u/b*λ1 + C1*ε1*u/b*(-v + (1/2-a)*b*θdot - u*α0)
-    λ2dot = -ε2*u/b*λ2 + C2*ε2*u/b*(-v + (1/2-a)*b*θdot - u*α0)
+    λ1dot = -ε1*u/b*λ1 + C1*ε1*u/b*(v + (1/2-a)*b*θdot - u*α0)
+    λ2dot = -ε2*u/b*λ2 + C2*ε2*u/b*(v + (1/2-a)*b*θdot - u*α0)
     return SVector(λ1dot, λ2dot)
 end
 
@@ -281,13 +304,13 @@ wagner_state_jacobian(a, b, ε1, ε2, u) = @SMatrix [-ε1*u/b 0; 0 -ε2*u/b]
 
 function wagner_input_jacobian(a, b, α0, C1, C2, ε1, ε2, u, v, θdot, λ1, λ2)
 
-    tmp1 = -v/b + (1/2-a)*θdot - 2*α0*u/b
+    tmp1 = v/b + (1/2-a)*θdot - 2*α0*u/b
     λ1dot_u = -ε1/b*λ1 + C1*ε1*tmp1
     λ2dot_u = -ε2/b*λ2 + C2*ε2*tmp1
 
     tmp2 = u/b
-    λ1dot_v = -C1*ε1*tmp2
-    λ2dot_v = -C2*ε2*tmp2
+    λ1dot_v = C1*ε1*tmp2
+    λ2dot_v = C2*ε2*tmp2
 
     tmp3 = u*(1/2-a)
     λ1dot_θdot = C1*ε1*tmp3
@@ -306,9 +329,9 @@ function wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, vdot, θdot, θddot, λ1,
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # lift at reference point
-    L = tmp1*((-v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(-vdot/b + u/b*θdot - a*θddot)
+    L = tmp1*((v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*θdot - a*θddot)
     # moment at reference point
-    M = -tmp2*(-vdot/2 + u*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp2*(vdot/2 + u*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -323,7 +346,7 @@ function wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # lift at reference point
-    L = tmp1*((-v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) + tmp2*u/b*θdot
+    L = tmp1*((v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) + tmp2*u/b*θdot
     # moment at reference point
     M = -tmp2*u*θdot + (b/2 + a*b)*L
 
@@ -334,9 +357,9 @@ function wagner_rate_loads(a, b, ρ, vdot, θddot)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
-    L = tmp*(-vdot/b - a*θddot)
+    L = tmp*(vdot/b - a*θddot)
     # moment at reference point
-    M = -tmp*(-vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp*(vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -359,7 +382,7 @@ function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, θdot, λ1, λ2)
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # lift at reference point
-    L_u = tmp1_u*((-v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*θdot
+    L_u = tmp1_u*((v + d*θdot - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*θdot
     # moment at reference point
     M_u = -tmp2*θdot + (b/2 + a*b)*L_u
 
@@ -370,7 +393,7 @@ function wagner_loads_v(a, b, ρ, a0, C1, C2, u)
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # lift at reference point
-    L_v = -a0*ρ*u*b*ϕ0
+    L_v = a0*ρ*u*b*ϕ0
     # moment at reference point
     M_v = (b/2 + a*b)*L_v
 
@@ -383,11 +406,18 @@ function wagner_loads_vdot(a, b, ρ)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
-    L_vdot = -tmp/b
+    L_vdot = tmp/b
     # moment at reference point
-    M_vdot = tmp/2 + (b/2 + a*b)*L_vdot
+    M_vdot = -tmp/2 + (b/2 + a*b)*L_vdot
 
     return SVector(L_vdot, M_vdot)
+end
+
+function wagner_loads_θ(a, b, ρ, a0, C1, C2, u)
+    ϕ0 = 1 - C1 - C2
+    L_θ = a0*ρ*b*u^2*ϕ0
+    M_θ = (b/2 + a*b)*L_θ
+    return SVector(L_θ, M_θ)
 end
 
 function wagner_loads_θdot(a, b, ρ, a0, C1, C2, u)
@@ -419,25 +449,5 @@ function wagner_loads_θddot(a, b, ρ)
 end
 
 wagner_loads_h() = SVector(0, 0)
-
-function wagner_loads_θ(a, b, ρ, a0, C1, C2, u)
-    ϕ0 = 1 - C1 - C2
-    L_θ = a0*ρ*b*u^2*ϕ0
-    M_θ = (b/2 + a*b)*L_θ
-    return SVector(L_θ, M_θ)
-end
-
-function wagner_loads_hdot(a, b, ρ, a0, C1, C2, u)
-    ϕ0 = 1 - C1 - C2
-    L_hdot = a0*ρ*u*b*ϕ0
-    M_hdot = (b/2 + a*b)*L_hdot
-    return SVector(L_hdot, M_hdot)
-end
-
-function wagner_loads_hddot(a, b, ρ)
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_hddot = tmp1/b
-    M_hddot = -tmp1/2 + tmp2*L_hddot
-    return SVector(L_hddot, M_hddot)
-end
+const wagner_loads_hdot = wagner_loads_v
+const wagner_loads_hddot = wagner_loads_vdot

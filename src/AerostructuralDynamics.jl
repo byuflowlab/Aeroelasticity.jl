@@ -19,7 +19,6 @@ export number_of_parameters
 export isinplace
 export has_mass_matrix
 export constant_mass_matrix
-export linear_input_dependence
 export defined_state_jacobian
 
 export state_indices

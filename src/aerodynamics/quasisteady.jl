@@ -30,8 +30,16 @@ number_of_parameters(::Type{<:QuasiSteady}) = 5
 
 # --- Typical Section Coupling --- #
 
-# --- traits --- #
+"""
+    couple_models(aero::QuasiSteady, stru::TypicalSection)
 
+Create an aerostructural model using a quasi-steady aerodynamics model and a
+two-degree of freedom typical section model.  This model introduces the
+freestream velocity ``U`` as an additional parameter.
+"""
+couple_models(aero::QuasiSteady, stru::TypicalSection)
+
+# --- traits --- #
 inplaceness(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = OutOfPlace()
 mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Zeros()
 state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Nonlinear()
@@ -55,7 +63,7 @@ function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, s, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # local vertical freestream velocity
-    v = -u*θ
+    v = u*θ
     # calculate aerodynamic loads
     L, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # return inputs
@@ -68,7 +76,7 @@ function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, s, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # local vertical freestream velocity
-    v = -u*θ - hdot
+    v = u*θ + hdot
     # calculate aerodynamic loads
     L, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, θdot)
     # return inputs
@@ -81,7 +89,7 @@ function get_inputs(aero::QuasiSteady{2}, stru::TypicalSection, s, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # local vertical freestream velocity
-    v = -u*θ - hdot
+    v = u*θ + hdot
     # calculate aerodynamic loads
     L, M = quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, θdot)
     # return inputs
@@ -120,6 +128,18 @@ end
 
 # --- unit testing methods --- #
 
+function get_inputs_from_state_rates(aero::QuasiSteady{0}, stru::TypicalSection,
+    ds, s, p, t)
+
+    return @SVector zeros(2)
+end
+
+function get_inputs_from_state_rates(aero::QuasiSteady{1}, stru::TypicalSection,
+    ds, s, p, t)
+
+    return @SVector zeros(2)
+end
+
 function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
     ds, s, p, t)
     # extract state rates
@@ -127,7 +147,7 @@ function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # local vertical freestream velocity
-    vdot = -dhdot
+    vdot = dhdot
     θddot = dθdot
     # calculate aerodynamic loads
     L, M = quasisteady2_rate_loads(a, b, ρ, vdot, θddot)
@@ -136,6 +156,15 @@ function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
 end
 
 # --- Lifting Line Section Coupling --- #
+
+"""
+    couple_models(aero::QuasiSteady, stru::LiftingLineSection)
+
+Create an aerostructural model using a quasi-steady aerodynamics model and a
+lifting line section model.  The existence of this coupling allows
+[`QuasiSteady`](@ref) to be used with [`LiftingLine`](@ref).
+"""
+couple_models(aero::QuasiSteady, stru::LiftingLineSection)
 
 # --- traits --- #
 
@@ -210,20 +239,12 @@ end
 
 function get_input_mass_matrix(aero::QuasiSteady{2}, stru::LiftingLineSection,
     s, p, t)
-    # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
     # extract parameters
     a, b, ρ, a0, α0 = p
-    # extract relevant velocities
-    u = vx
-    v = vz
-    vdot = 0 # included in mass matrix term
-    θdot = ωy
-    θddot = 0 # included in mass matrix term
     # calculate loads
     L_udot, M_udot = quasisteady2_udot()
     L_vdot, M_vdot = quasisteady2_vdot(a, b, ρ)
-    L_θddot, M_θddot = quasisteady2_θddot(a, b, ρ, a0, u)
+    L_θddot, M_θddot = quasisteady2_θddot(a, b, ρ)
     # return input mass matrix
     return @SMatrix [-L_udot 0 -L_vdot 0 -L_θddot 0; 0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         -M_udot 0 -M_vdot 0 -M_θddot 0; 0 0 0 0 0 0]
@@ -288,6 +309,18 @@ end
 
 # --- unit testing methods --- #
 
+function get_inputs_from_state_rates(aero::QuasiSteady{0}, stru::LiftingLineSection,
+    ds, s, p, t)
+
+    return @SVector zeros(6)
+end
+
+function get_inputs_from_state_rates(aero::QuasiSteady{1}, stru::LiftingLineSection,
+    ds, s, p, t)
+    
+    return @SVector zeros(6)
+end
+
 function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSection,
     ds, s, p, t)
     # extract state rates
@@ -311,7 +344,7 @@ end
 # steady state loads
 function quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # lift at reference point
-    L = -a0*ρ*b*u*v
+    L = a0*ρ*b*u*v
     # moment at reference point
     M = (b/2 + a*b)*L
 
@@ -327,7 +360,7 @@ function quasisteady1_loads(a, b, ρ, a0, α0, u, v, θdot)
     # constant based on geometry
     d = b/2 - a*b
     # lift at reference point
-    L = tmp1*(-v + d*θdot - u*α0) + tmp2*u/b*θdot
+    L = tmp1*(v + d*θdot - u*α0) + tmp2*u/b*θdot
     # moment at reference point
     M = -tmp2*u*θdot + (b/2 + a*b)*L
 
@@ -343,9 +376,9 @@ function quasisteady2_loads(a, b, ρ, a0, α0, u, v, vdot, θdot, θddot)
     # constant based on geometry
     d = b/2 - a*b
     # lift at reference point
-    L = tmp1*(-v + d*θdot - u*α0) + tmp2*(-vdot/b + u/b*θdot - a*θddot)
+    L = tmp1*(v + d*θdot - u*α0) + tmp2*(vdot/b + u/b*θdot - a*θddot)
     # moment at reference point
-    M = -tmp2*(-vdot/2 + u*θdot + (b/8 - a*b/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp2*(vdot/2 + u*θdot + (b/8 - a*b/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -360,9 +393,9 @@ function quasisteady2_rate_loads(a, b, ρ, vdot, θddot)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
-    L = tmp*(-vdot/b - a*θddot)
+    L = tmp*(vdot/b - a*θddot)
     # moment at reference point
-    M = -tmp*(-vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp*(vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -402,13 +435,13 @@ function quasisteady2_mass_matrix(a, b, ρ)
 end
 
 function quasisteady0_u(a, b, ρ, a0, v)
-    L_u = -a0*ρ*b*v
+    L_u = a0*ρ*b*v
     M_u = (b/2 + a*b)*L_u
     return SVector(L_u, M_u)
 end
 
 function quasisteady0_v(a, b, ρ, a0, u)
-    L_v = -a0*ρ*b*u
+    L_v = a0*ρ*b*u
     M_v = (b/2 + a*b)*L_v
     return SVector(L_v, M_v)
 end
@@ -422,7 +455,7 @@ function quasisteady1_u(a, b, ρ, a0, α0, u, v, θdot)
     # constant based on geometry
     d = b/2 - a*b
     # lift at reference point
-    L_u = tmp1_u*(-v + d*θdot - u*α0) - tmp1*α0 + tmp2/b*θdot
+    L_u = tmp1_u*(v + d*θdot - u*α0) - tmp1*α0 + tmp2/b*θdot
     # moment at reference point
     M_u = -tmp2*θdot + (b/2 + a*b)*L_u
 
@@ -431,7 +464,7 @@ end
 
 function quasisteady1_v(a, b, ρ, a0, α0, u)
     # lift at reference point
-    L_v = -a0*ρ*u*b
+    L_v = a0*ρ*u*b
     # moment at reference point
     M_v = (b/2 + a*b)*L_v
 
@@ -463,24 +496,18 @@ function quasisteady2_vdot(a, b, ρ)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
-    L_vdot = -tmp/b
+    L_vdot = tmp/b
     # moment at reference point
-    M_vdot = tmp/2 + (b/2 + a*b)*L_vdot
+    M_vdot = -tmp/2 + (b/2 + a*b)*L_vdot
 
     return SVector(L_vdot, M_vdot)
 end
 
 quasisteady2_θdot(a, b, ρ, a0, u) = quasisteady1_θdot(a, b, ρ, a0, u)
 
-function quasisteady2_θddot(a, b, ρ, a0, u)
-    # circulatory load factor
-    tmp1 = a0*ρ*u*b
-    # non-circulatory load factor
-    tmp2 = pi*ρ*b^3
-    # lift at reference point
-    L_θddot = -a*tmp2
-    # moment at reference point
-    M_θddot = -tmp2*b*(1/8 - a/2) + (b/2 + a*b)*L_θddot
-
+function quasisteady2_θddot(a, b, ρ)
+    tmp = pi*ρ*b^3
+    L_θddot = -tmp*a
+    M_θddot = -tmp*(b/8 - a*b/2) + (b/2 + a*b)*L_θddot
     return SVector(L_θddot, M_θddot)
 end

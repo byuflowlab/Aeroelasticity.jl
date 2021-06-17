@@ -106,7 +106,21 @@ function get_input_jacobian(model::Peters{N,TF,SV,SA}, λ, d, p, t) where {N,TF,
     return peters_input_jacobian(a, b, cbar, u, θdot, λ)
 end
 
+# --- Unit Testing Methods --- #
+
+get_lhs(model::Peters, dλ, λ, d, p, t) = model.A*dλ
+
 # --- Typical Section Coupling --- #
+
+"""
+    couple_models(aero::Peters, stru::TypicalSection)
+
+Create an aerostructural model using the unsteady aerodynamic model defined by
+Peters et al. and a two-degree of freedom typical section model.  This model
+introduces the freestream velocity in the chordwise direction ``u`` as an
+additional parameter.
+"""
+couple_models(aero::Peters, stru::TypicalSection)
 
 # --- traits --- #
 
@@ -130,7 +144,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # calculate local vertical freestream velocity
-    v = -u*θ - hdot
+    v = u*θ + hdot
     # extract model constants
     bbar = aero.b
     # calculate aerodynamic loads
@@ -145,7 +159,7 @@ function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # construct submatrices
     Mda = zeros(SMatrix{4,N,TF})
-    Mds = @SMatrix [0 0 0 0; 0 0 1 0; 0 0 0 0; 0 0 0 -1]
+    Mds = @SMatrix [0 0 0 0; 0 0 -1 0; 0 0 0 0; 0 0 0 -1]
     Mra = zeros(SMatrix{2,N,TF})
     Mrs = hcat(
         zeros(SVector{2,TF}),
@@ -193,7 +207,7 @@ function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSect
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, ρ, a0, α0, kh, kθ, m, Sθ, Iθ, u = p
     # local vertical freestream velocity
-    vdot = -dhdot
+    vdot = dhdot
     θddot = dθdot
     # calculate aerodynamic loads
     L, M = peters_rate_loads(a, b, ρ, vdot, θddot)
@@ -202,6 +216,15 @@ function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSect
 end
 
 # --- Lifting Line Section Coupling --- #
+
+"""
+    couple_models(aero::Peters, stru::LiftingLineSection)
+
+Create an aerostructural model using a using the unsteady aerodynamic model
+defined by Peters et al. and a lifting line section model.  The existence of this
+coupling allows [`Peters`](@ref) to be used with [`LiftingLine`](@ref).
+"""
+couple_models(aero::Peters, stru::LiftingLineSection)
 
 # --- traits --- #
 
@@ -216,7 +239,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     s, p, t) where {N,TF,SV,SA}
     # indices for extracting state variables
     iλ = SVector{N}(1:N)
-    iq = SVector{4}(N+1:N+6)
+    iq = SVector{6}(N+1:N+6)
     # separate aerodynamic and structural states
     λ = s[iλ]
     q = s[iq]
@@ -233,7 +256,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     # extract model constants
     bbar = aero.b
     # calculate aerodynamic loads
-    L, M = peters_loads(a, b, ρ, a0, α0, bbar, u, v, vdot, θdot, θddot, λ)
+    L, M = peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, θdot, λ)
     # forces and moments per unit span
     f = SVector(L, 0, 0)
     m = SVector(0, M, 0)
@@ -245,7 +268,7 @@ function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     stru::LiftingLineSection, s, p, t) where {N,TF,SV,SA}
     # indices for extracting state variables
     iλ = SVector{N}(1:N)
-    iq = SVector{4}(N+1:N+6)
+    iq = SVector{6}(N+1:N+6)
     # separate aerodynamic and structural states
     λ = s[iλ]
     q = s[iq]
@@ -260,12 +283,12 @@ function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
     θdot = ωy
     θddot = 0 # included in mass matrix
     # construct submatrices
+    L_udot, M_udot = peters_loads_udot()
+    L_vdot, M_vdot = peters_loads_vdot(a, b, ρ)
+    L_θddot, M_θddot = peters_loads_θddot(a, b, ρ)
     Mda = zeros(SMatrix{4,N,TF})
     Mds = @SMatrix [0 0 0 0 0 0; 0 0 -1 0 0 0; 0 0 0 0 0 0; 0 0 0 0 -1 0]
-    Mra = zeros(SMatrix{2,N,TF})
-    L_u, M_u = peters_loads_udot()
-    L_v, M_v = peters_loads_vdot(a, b, ρ)
-    L_θdot, M_θdot = peters_loads_θddot(a, b, ρ)
+    Mra = zeros(SMatrix{6,N,TF})
     Mrs = @SMatrix [-L_udot 0 -L_vdot 0 -L_θddot 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         0 0 0 0 0 0; -M_udot 0 -M_vdot 0 -M_θddot 0; 0 0 0 0 0 0]
     # assemble mass matrix
@@ -278,7 +301,7 @@ function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
     stru::LiftingLineSection, s, p, t) where {N,TF,SV,SA}
     # indices for extracting state variables
     iλ = SVector{N}(1:N)
-    iq = SVector{4}(N+1:N+6)
+    iq = SVector{6}(N+1:N+6)
     # separate aerodynamic and structural states
     λ = s[iλ]
     q = s[iq]
@@ -294,13 +317,15 @@ function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
     θddot = 0 # included in mass matrix
     # extract model constants
     bbar = aero.b
-    # compute jacobian sub-matrices
-    Jda = zeros(SMatrix{4,N,TF}) # d(d)/d(dλ)
-    Jds = @SMatrix [1 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 1 0; 0 0 0 0 0 0]
-    Jra = peters_loads_λ(a, b, ρ, a0, bbar, u)
-    L_u, M_u = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, vdot, θdot, θddot, λ)
+    # compute input jacobian sub-matrices
+    out = peters_loads_λ(a, b, ρ, a0, bbar, u)
+    L_λ, M_λ = out[1,:], out[2,:]
+    L_u, M_u = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, θdot, λ)
     L_v, M_v = peters_loads_v(a, b, ρ, a0, u)
     L_θdot, M_θdot = peters_loads_θdot(a, b, ρ, a0, u)
+    Jda = zeros(SMatrix{4,N,TF}) # d(d)/d(dλ)
+    Jds = @SMatrix [1 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 1 0; 0 0 0 0 0 0]
+    Jra = vcat(L_λ', zero(L_λ'), zero(L_λ'), zero(M_λ'), M_λ', zero(M_λ'))
     Jrs = @SMatrix [L_u 0 L_v 0 L_θdot 0; 0 0 0 0 0 0; 0 0 0 0 0 0;
         0 0 0 0 0 0; M_u 0 M_v 0 M_θdot 0; 0 0 0 0 0 0]
     # return jacobian
@@ -309,10 +334,16 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Peters, stru::LiftingLineSection,
-    ds, s, p, t)
-    # extract state rates
-    dvx, dvy, dvz, dωx, dωy, dωz = ds
+function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA},
+    stru::LiftingLineSection, ds, s, p, t) where {N,TF,SV,SA}
+    # indices for extracting state variables
+    iλ = SVector{N}(1:N)
+    iq = SVector{6}(N+1:N+6)
+    # separate aerodynamic and structural state rates
+    dλ = ds[iλ]
+    dq = ds[iq]
+    # extract structural state variables
+    dvx, dvy, dvz, dωx, dωy, dωz = dq
     # extract parameters
     a, b, ρ, a0, α0 = p
     # extract relevant velocities
@@ -324,21 +355,21 @@ function get_inputs_from_state_rates(aero::Peters, stru::LiftingLineSection,
     f = SVector(L, 0, 0)
     m = SVector(0, M, 0)
     # return inputs
-    return vcat(f, m)
+    return vcat(0, vdot, 0, θddot, f, m)
 end
 
 # --- Internal Methods --- #
 
 peters_lhs(Abar, dλ) = Abar*dλ
 
-peters_rhs(a, b, cbar, u, vdot, θdot, θddot, λ) = cbar*(-vdot + u*θdot + (b/2-a*b)*θddot) - u/b*λ
+peters_rhs(a, b, cbar, u, vdot, θdot, θddot, λ) = cbar*(vdot + u*θdot + (b/2-a*b)*θddot) - u/b*λ
 
 peters_mass_matrix(Abar) = Abar
 
 peters_state_jacobian(b, cbar, u) = -u/b*Diagonal(one.(cbar))
 
 function peters_input_jacobian(a, b, cbar, u, θdot, λ)
-    return hcat(cbar*θdot - 1/b*λ, -cbar, u*cbar, (b/2-a*b)*cbar)
+    return hcat(cbar*θdot - 1/b*λ, cbar, u*cbar, (b/2-a*b)*cbar)
 end
 
 function peters_loads(a, b, ρ, a0, α0, bbar, u, v, vdot, θdot, θddot, λ)
@@ -351,9 +382,9 @@ function peters_loads(a, b, ρ, a0, α0, bbar, u, v, vdot, θdot, θddot, λ)
     # induced flow velocity
     λ0 = 1/2 * bbar'*λ
     # lift at reference point
-    L = tmp1*(-v + d*θdot - λ0 - u*α0) + tmp2*(-vdot/b + u/b*θdot - a*θddot)
+    L = tmp1*(v + d*θdot - λ0 - u*α0) + tmp2*(vdot/b + u/b*θdot - a*θddot)
     # moment at reference point
-    M = -tmp2*(-vdot/2 + u*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp2*(vdot/2 + u*θdot + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -368,7 +399,7 @@ function peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, θdot, λ)
     # induced flow velocity
     λ0 = 1/2 * bbar'*λ
     # lift at reference point
-    L = tmp1*(-v + d*θdot - λ0 - u*α0) + tmp2*u/b*θdot
+    L = tmp1*(v + d*θdot - λ0 - u*α0) + tmp2*u/b*θdot
     # moment at reference point
     M = -tmp2*u*θdot + (b/2 + a*b)*L
 
@@ -379,9 +410,9 @@ function peters_rate_loads(a, b, ρ, vdot, θddot)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
-    L = tmp*(-vdot/b - a*θddot)
+    L = tmp*(vdot/b - a*θddot)
     # moment at reference point
-    M = -tmp*(-vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
+    M = -tmp*(vdot/2 + b*(1/8 - a/2)*θddot) + (b/2 + a*b)*L
 
     return SVector(L, M)
 end
@@ -398,7 +429,7 @@ function peters_loads_λdot(cbar)
     return vcat(tmp, tmp)
 end
 
-function peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, vdot, θdot, θddot, λ)
+function peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, θdot, λ)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
@@ -409,7 +440,7 @@ function peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, vdot, θdot, θddot, λ)
     # induced flow velocity
     λ0 = 1/2 * bbar'*λ
     # lift at reference point
-    L_u = tmp1_u*(-v + d*θdot - λ0 - u*α0) - tmp1*α0 + tmp2/b*θdot
+    L_u = tmp1_u*(v + d*θdot - λ0 - u*α0) - tmp1*α0 + tmp2/b*θdot
     # moment at reference point
     M_u = -tmp2*θdot + (b/2 + a*b)*L_u
 
@@ -418,7 +449,7 @@ end
 
 function peters_loads_v(a, b, ρ, a0, u)
     # lift at reference point
-    L_v = -a0*ρ*u*b
+    L_v = a0*ρ*u*b
     # moment at reference point
     M_v = (b/2 + a*b)*L_v
 
@@ -431,11 +462,17 @@ function peters_loads_vdot(a, b, ρ)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
-    L_vdot = -tmp/b
+    L_vdot = tmp/b
     # moment at reference point
-    M_vdot = tmp/2 + (b/2 + a*b)*L_vdot
+    M_vdot = -tmp/2 + (b/2 + a*b)*L_vdot
 
     return SVector(L_vdot, M_vdot)
+end
+
+function peters_loads_θ(a, b, ρ, a0, u)
+    L_θ = a0*ρ*u^2*b
+    M_θ = (b/2 + a*b)*L_θ
+    return SVector(L_θ, M_θ)
 end
 
 function peters_loads_θdot(a, b, ρ, a0, u)
@@ -446,31 +483,12 @@ function peters_loads_θdot(a, b, ρ, a0, u)
 end
 
 function peters_loads_θddot(a, b, ρ)
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_θddot = -tmp1*a
-    M_θddot = -tmp1*(b/8 - a*b/2) + tmp2*L_θddot
+    tmp = pi*ρ*b^3
+    L_θddot = -tmp*a
+    M_θddot = -tmp*(b/8 - a*b/2) + (b/2 + a*b)*L_θddot
     return SVector(L_θddot, M_θddot)
 end
 
 peters_loads_h() = SVector(0, 0)
-
-function peters_loads_θ(a, b, ρ, a0, u)
-    L_θ = a0*ρ*u^2*b
-    M_θ = (b/2 + a*b)*L_θ
-    return SVector(L_θ, M_θ)
-end
-
-function peters_loads_hdot(a, b, ρ, a0, u)
-    L_hdot = a0*ρ*u*b
-    M_hdot = (b/2 + a*b)*L_hdot
-    return SVector(L_hdot, M_hdot)
-end
-
-function peters_loads_hddot(a, b, ρ)
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_hddot = tmp1/b
-    M_hddot = -tmp1/2 + tmp2*L_hddot
-    return SVector(L_hddot, M_hddot)
-end
+const peters_loads_hdot = peters_loads_v
+const peters_loads_hddot = peters_loads_vdot

@@ -225,5 +225,3 @@ islinear(::Empty) = true
 islinear(::Zeros) = true
 islinear(::Constant) = true
 islinear(::Linear) = true
-
-linear_input_dependence(model) = islinear(input_jacobian_type(typeof(model)))

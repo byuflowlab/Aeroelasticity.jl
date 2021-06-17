@@ -32,37 +32,22 @@ end
 # --- Traits --- #
 
 number_of_states(model::GEBT) = length(model.system.x)
+
 function number_of_inputs(model::GEBT)
     return 6*length(model.distributed)
 end
+
 number_of_parameters(model::GEBT) = 0
+
 inplaceness(::Type{<:GEBT}) = InPlace()
+
 mass_matrix_type(::Type{<:GEBT}) = Linear()
+
 state_jacobian_type(::Type{<:GEBT}) = Nonlinear()
+
 input_jacobian_type(::Type{<:GEBT}) = Linear()
 
 # --- Methods --- #
-
-function get_mass_matrix!(M, model::GEBT, q, r, p, t)
-
-    # extract system and assembly
-    system = model.system
-    assembly = model.assembly
-
-    # extract system constants and  pointers
-    force_scaling = system.force_scaling
-    mass_scaling = system.mass_scaling
-    irow_pt = system.irow_pt
-    irow_beam = system.irow_beam
-    irow_beam1 = system.irow_beam1
-    irow_beam2 = system.irow_beam2
-    icol_pt = system.icol_pt
-    icol_beam = system.icol_beam
-
-    # return mass matrix
-    return gxbeam_mass_matrix!(M, q, assembly, force_scaling, mass_scaling,
-        irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam)
-end
 
 function get_rates!(dq, model::GEBT, q, r, p, t)
 
@@ -101,6 +86,29 @@ function get_rates!(dq, model::GEBT, q, r, p, t)
         distributed, force_scaling, mass_scaling, irow_pt, irow_beam,
         irow_beam1, irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
 end
+
+function get_mass_matrix!(M, model::GEBT, q, r, p, t)
+
+    # extract system and assembly
+    system = model.system
+    assembly = model.assembly
+
+    # extract system constants and  pointers
+    force_scaling = system.force_scaling
+    mass_scaling = system.mass_scaling
+    irow_pt = system.irow_pt
+    irow_beam = system.irow_beam
+    irow_beam1 = system.irow_beam1
+    irow_beam2 = system.irow_beam2
+    icol_pt = system.icol_pt
+    icol_beam = system.icol_beam
+
+    # return mass matrix
+    return gxbeam_mass_matrix!(M, q, assembly, force_scaling, mass_scaling,
+        irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam)
+end
+
+# --- Performance Overloads --- #
 
 function get_state_jacobian!(J, model::GEBT, q, r, p, t)
 
@@ -165,27 +173,63 @@ function get_input_jacobian(Jr, model::GEBT, q, r, p, t)
         mass_scaling, irow_pt, element_indices)
 end
 
+# --- Unit Testing Methods --- #
+
+function get_lhs(model::GEBT, dq, q, r, p, t)
+
+    # extract system, assembly, prescribed conditions and distributed loads
+    system = model.system
+    assembly = model.assembly
+    prescribed = model.prescribed
+    distributed = model.distributed
+
+    # extract system constants and  pointers
+    force_scaling = system.force_scaling
+    mass_scaling = system.mass_scaling
+    irow_pt = system.irow_pt
+    irow_beam = system.irow_beam
+    irow_beam1 = system.irow_beam1
+    irow_beam2 = system.irow_beam2
+    icol_pt = system.icol_pt
+    icol_beam = system.icol_beam
+
+    # set origin, linear velocity, and angular velocity
+    x0 = @SVector zeros(3)
+    v0 = @SVector zeros(3)
+    ω0 = @SVector zeros(3)
+
+    # update distributed loads using input vector
+    if eltype(eltype(distributed)) <: eltype(r)
+        # use pre-allocated storage
+        update_distributed!(distributed, assembly.elements, r)
+    else
+        # allocate new storage
+        distributed = update_distributed(distributed, assembly.elements, r)
+    end
+
+    return gxbeam_lhs(q, dq, assembly, prescribed, distributed, force_scaling,
+        mass_scaling, irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt,
+        icol_beam, x0, v0, ω0)
+end
+
 # --- Internal --- #
 
-function gxbeam_lhs!(out, q, dq, assembly, prescribed, distributed,
+function gxbeam_lhs(q, dq, assembly, prescribed, distributed,
     force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1, irow_beam2,
     icol_pt, icol_beam, x0, v0, ω0)
 
-    resid = similar(out)
+    steady_residual = similar(dq)
+    dynamic_residual = similar(dq)
 
-    GXBeam.steady_state_system_residual!(resid, q, assembly, prescribed,
+    GXBeam.steady_state_system_residual!(steady_residual, q, assembly, prescribed,
         distributed, force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
         irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
 
-    GXBeam.dynamic_system_residual!(out, q, dq, assembly, prescribed, distributed,
-        force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam,
-        x0, v0, ω0)
+    GXBeam.dynamic_system_residual!(dynamic_residual, q, dq, assembly, prescribed,
+        distributed, force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
+        irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
 
-    out .*= -1
-
-    out .+= resid
-
-    return out
+    return steady_residual - dynamic_residual
 end
 
 function gxbeam_rhs!(out, u, assembly, prescribed,

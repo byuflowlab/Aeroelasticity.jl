@@ -1,12 +1,17 @@
 """
+    couple_models(models...)
+
+Function which couples multiple models together to form a coupled model.
+"""
+couple_models(models...) = models
+
+"""
     number_of_states(models)
 
 Return the total number of states corresponding to the model or models.
 """
 number_of_states
 
-# default to returning zero states
-number_of_states(::Type{TM}) where TM = 0
 number_of_states(model::TM) where TM = number_of_states(TM)
 
 # models with no states have... no states
@@ -30,7 +35,6 @@ Return the total number of inputs corresponding to the model or models.
 number_of_inputs
 
 # default to returning zero inputs
-number_of_inputs(::Type{TM}) where TM = 0
 number_of_inputs(model::TM) where TM = number_of_inputs(TM)
 
 # models with no states have no inputs
@@ -54,7 +58,6 @@ Return the total number of parameters corresponding to the model or models.
 number_of_parameters
 
 # default to returning zero parameters
-number_of_parameters(::Vararg{Type,N}) where N = 0
 number_of_parameters(models...) = number_of_parameters(typeof.(models)...)
 
 # combined models have concatenated parameters
@@ -317,15 +320,9 @@ function _get_mass_matrix!(M, ::Constant, ::InPlace, models::NTuple{N, AbstractM
             Myij = view(My, iy[i], iu[j])
             if i == j
                 get_mass_matrix!(Mij, models)
-                if linear_input_dependence(models[i])
-                    mul!(Mij, D, Myij, 1, 1)
-                end
+                mul!(Mij, D, Myij, 1, 1)
             else
-                if linear_input_dependence(models[i])
-                    mul!(Mij, D, Myij)
-                else
-                    Mij .= 0
-                end
+                mul!(Mij, D, Myij)
             end
         end
     end
@@ -335,7 +332,7 @@ end
 
 # calculate mass matrix for a combination of models
 function _get_mass_matrix!(M, ::Linear, ::InPlace,
-    models::NTuple{N, AbstractModel}; My = similar(M, number_of_inputs(models),
+    models::NTuple{N, AbstractModel}, u, y, p, t; My = similar(M, number_of_inputs(models),
     number_of_states(models))) where N
 
     # get state and parameter indices
@@ -347,25 +344,19 @@ function _get_mass_matrix!(M, ::Linear, ::InPlace,
     get_input_mass_matrix!(My, models, u, p, t)
 
     # calculate mass matrix
-    for i = 1:length(models)
+    for i = 1:N
         ui = view(u, iu[i])
         yi = view(y, iy[i])
         pi = view(p, ip[i])
         D = get_input_jacobian(models[i], ui, yi, pi, t)
-        for j = 1:length(models)
+        for j = 1:N
             Mij = view(M, iu[i], iu[j])
             Myij = view(My, iy[i], iu[j])
             if i == j
-                get_mass_matrix!(Mij, models, ui, yi, pi, t)
-                if linear_input_dependence(models[i])
-                    mul!(Mij, D, Myij, 1, 1)
-                end
+                get_mass_matrix!(Mij, models[i], ui, yi, pi, t)
+                mul!(Mij, D, Myij, 1, 1)
             else
-                if linear_input_dependence(models[i])
-                    mul!(Mij, D, Myij)
-                else
-                    Mij .= 0
-                end
+                mul!(Mij, D, Myij)
             end
         end
     end
@@ -696,7 +687,7 @@ function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,Abstrac
             Jij = view(J, iu[i], iu[j])
             Jyij = view(Jy, iy[i], iu[j])
             if i == j
-                get_state_jacobian!(Jij, models)
+                get_state_jacobian!(Jij, models[i])
                 mul!(Jij, D, Jyij, 1, 1)
             else
                 mul!(Jij, D, Jyij)
@@ -754,7 +745,7 @@ function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace,
             Jij = view(J, iu[i], iu[j])
             Jyij = view(Jy, iy[i], iu[j])
             if i == j
-                get_state_jacobian!(Jij, models, ui, yi, pi, t)
+                get_state_jacobian!(Jij, models[i], ui, yi, pi, t)
                 mul!(Jij, D, Jyij, 1, 1)
             else
                 mul!(Jij, D, Jyij)
@@ -1009,7 +1000,7 @@ function _get_input_mass_matrix!(My, ::Constant, ::InPlace,
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function get_input_mass_matrix!(My, ::Linear, ::InPlace,
+function _get_input_mass_matrix!(My, ::Linear, ::InPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
     get_input_mass_matrix!(My, models..., u, p, t; kwargs...)
@@ -1065,8 +1056,6 @@ Calculate the jacobian of the input function with respect to the state variables
 for the specified combination of models.
 """
 get_input_state_jacobian
-
-
 
 function get_input_state_jacobian(models::TM; kwargs...) where TM
     return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),

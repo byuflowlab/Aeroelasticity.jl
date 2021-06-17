@@ -41,10 +41,9 @@ function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf))
         @test isapprox(M, M_fd; atol, norm)
 
         # compatability test
-        du = qr(collect(M))\get_rates(model, u, y, p, t)
+        du = qr(collect(M), Val(true))\get_rates(model, u, y, p, t)
         lhs = get_lhs(model, du, u, y, p, t)
-        rhs = get_rates(model, u, y, p, t)
-        @test isapprox(lhs, rhs; atol, norm)
+        @test isapprox(M*du, lhs; atol, norm)
 
     end
 

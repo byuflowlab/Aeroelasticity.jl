@@ -38,6 +38,24 @@ function get_mass_matrix(::TypicalSection, q, r, p, t)
     return section_mass_matrix(m, Sθ, Iθ)
 end
 
+function get_rates!(dq, ::TypicalSection, q, r, p, t)
+    # extract structural states
+    h, θ, hdot, θdot = q
+    # extract aerodynamic loads
+    L, M = r
+    # extract structural parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # calculate state rates
+    return dq .= section_rhs(kh, kθ, h, θ, hdot, θdot, L, M)
+end
+
+function get_mass_matrix!(M, ::TypicalSection, q, r, p, t)
+    # extract structural parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # calculate mass matrix
+    return M .= section_mass_matrix(m, Sθ, Iθ)
+end
+
 # --- Performance Overloads --- #
 
 function get_state_jacobian(::TypicalSection, q, r, p, t)
@@ -45,6 +63,13 @@ function get_state_jacobian(::TypicalSection, q, r, p, t)
     kh, kθ, m, Sθ, Iθ = p
     # return jacobian
     return section_state_jacobian(kh, kθ)
+end
+
+function get_state_jacobian!(J, ::TypicalSection, q, r, p, t)
+    # extract parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # return jacobian
+    return J .= section_state_jacobian(kh, kθ)
 end
 
 function get_input_jacobian(::TypicalSection)
