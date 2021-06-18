@@ -7,8 +7,6 @@ using ForwardDiff
 using GXBeam
 import DifferentialEquations.ODEFunction
 
-import GXBeam.tilde
-
 export AbstractModel
 export TypicalSection, LiftingLineSection, RigidBody, GEBT
 export Steady, QuasiSteady, Wagner, Peters, LiftingLine
