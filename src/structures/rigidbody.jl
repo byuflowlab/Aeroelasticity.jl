@@ -15,36 +15,43 @@ number_of_inputs(::Type{RigidBody}) = 6
 number_of_parameters(::Type{RigidBody}) = 7
 inplaceness(::Type{RigidBody}) = OutOfPlace()
 mass_matrix_type(::Type{RigidBody}) = Identity()
-state_jacobian_type(::Type{RigidBody}) = Varying()
-input_jacobian_type(::Type{RigidBody}) = Varying()
+state_jacobian_type(::Type{RigidBody}) = Nonlinear()
+input_jacobian_type(::Type{RigidBody}) = Linear()
 input_dependence_type(::Type{RigidBody}) = Linear()
 
 # --- Methods --- #
 
-function get_rates(::RigidBody, q, r, p, t)
+function get_rates(::RigidBody, states, inputs, parameters, t)
     # extract states
-    x, y, z, phi, theta, psi, u, v, w, p, q, r = q
+    x, y, z, ϕ, θ, ψ, u, v, w, p, q, r = states
     # extract inputs
-    Fx, Fy, Fz, Mx, My, Mz = r
+    Fx, Fy, Fz, Mx, My, Mz = inputs
     # extract parameters
-    m, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz = p
+    m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz = parameters
     # calculate state rates
-    return rigid_rates()
+    return rigid_rates(x, y, z, ϕ, θ, ψ, u, v, w, p, q, r, Fx, Fy, Fz,
+        Mx, My, Mz, m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz)
 end
 
-function get_input_jacobian(::RigidBody, q, r, p, t)
+# --- Performance Overloads --- #
+
+#TODO: Add state jacobian
+
+function get_input_jacobian(::RigidBody, states, inputs, parameters, t)
     # extract parameters
-    m, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz = p
+    m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz = parameters
     # return jacobian
-    return rigid_input_jacobian(mass, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz)
+    return rigid_input_jacobian(m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz)
 end
 
-# TODO: Add parameter jacobian
+# --- Unit Testing Methods --- #
 
-# --- Internal --- #
+get_lhs(::RigidBody, dstates, states, inputs, parameters, t) = dstates
+
+# --- Internal Methods --- #
 
 function rigid_rates(x, y, z, ϕ, θ, ψ, u, v, w, p, q, r, Fx, Fy, Fz, Mx, My, Mz,
-    mass, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz)
+    m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz)
 
     F = SVector(Fx, Fy, Fz)
     M = SVector(Mx, My, Mz)
@@ -68,7 +75,7 @@ function rigid_rates(x, y, z, ϕ, θ, ψ, u, v, w, p, q, r, Fx, Fy, Fz, Mx, My, 
     ψdot = (q*sϕ + r*cϕ)/cθ
 
     # linear dynamics
-    vdot = F/mass - cross(Ωb, Vb)
+    vdot = F/m - cross(Ωb, Vb)
 
     # angular dynamics
     I = @SMatrix [Ixx -Ixy -Ixz; -Iyz Iyy -Iyz; -Ixz -Iyz Izz]
@@ -77,13 +84,13 @@ function rigid_rates(x, y, z, ϕ, θ, ψ, u, v, w, p, q, r, Fx, Fy, Fz, Mx, My, 
     return SVector(rdot..., ϕdot, θdot, ψdot, vdot..., ωdot...)
 end
 
-function rigid_input_jacobian(mass, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz)
+function rigid_input_jacobian(m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz)
 
     rdot_F = @SMatrix zeros(3, 3)
     ϕdot_F = @SMatrix zeros(1, 3)
     θdot_F = @SMatrix zeros(1, 3)
     ψdot_F = @SMatrix zeros(1, 3)
-    vdot_F = (@SMatrix [1 0 0; 0 1 0; 0 0 1])/mass
+    vdot_F = (@SMatrix [1 0 0; 0 1 0; 0 0 1])/m
     ωdot_F = @SMatrix zeros(3, 3)
 
     rdot_M = @SMatrix zeros(3, 3)
@@ -94,6 +101,6 @@ function rigid_input_jacobian(mass, I_xx, I_yy, I_zz, I_xz, I_xy, I_yz)
     I = @SMatrix [Ixx -Ixy -Ixz; -Iyz Iyy -Iyz; -Ixz -Iyz Izz]
     ωdot_M = I \ (@SMatrix [1 0 0; 0 1 0; 0 0 1])
 
-    return [rdot_F rdot_M; ϕdot_F ϕdot_M; θdot_F, θdot_M; ψdot_F, ψdot_M,
+    return [rdot_F rdot_M; ϕdot_F ϕdot_M; θdot_F θdot_M; ψdot_F ψdot_M;
         vdot_F vdot_M; ωdot_F ωdot_M]
 end

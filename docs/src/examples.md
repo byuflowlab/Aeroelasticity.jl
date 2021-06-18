@@ -214,37 +214,46 @@ nothing #hide
 ```@example three-dimensional-stability
 using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
 
-# aerodynamic properties
-Vinf = range(1, 30, length=200) # m/s (velocity)
+# discretization
+N = 8 # number of elements
+
+# geometric properties
+span = 16 # m
+chord = 1 # m (chord)
+xref = 0.5 # normalized reference location (from leading edge)
+xcg = 0.5 # center of gravity (from leading edge)
+
+# freestream properties
+Vinf = range(1, 30, length=50) # m/s (velocity)
 α = 2*pi/180 # angle of attack
+
+# aerodynamic section properties
+a = xref - 0.5 # normalized reference location (relative to semi-chord)
+b = chord / 2 # m (semi-chord)
 ρ = 0.088 # kg/m^3 (air density)
 a0 = 2*pi # lift slope (for each section)
 α0 = 0 # zero lift angle of attack (for each section)
 
-# structural properties
-a = 0 # normalized reference axis location relative to the semichord
-b = 16 # m (span)
-c = 1 # m (chord)
+# structural section properties
+EIcc = 2e4 # N*m^2 (flat bending rigidity)
+EInn = 4e6 # N*m^2 (chord bending rigidity)
 GJ = 1e4 # N*m^2 (torsional rigidity)
-EIcc = 4e6 # N*m^2 (chord bending rigidity)
-EInn = 2e4 # N*m^2 (flat bending rigidity)
 μ = 0.75 # kg/m (mass per unit span)
 i11 = 0.1 # kg*m (rotational inertia per unit span)
+i22 = 0.0375 # moment of inertia about beam y-axis
+i33 = 0.0625 # moment of inertia about beam z-axis
 
-# discretization
-N = 8 # number of elements
-
-# geometry initialization
-x = range(0, b, length=N+1) # point x-coordinates
-y = range(0, 0, length=N+1) # point y-coordinates
-z = range(0, 0, length=N+1) # point z-coordinates
-points = [[x[i],y[i],z[i]] for i = 1:N+1]
+# define geometry
+xpt = range(0, 0, length=N+1) # point x-coordinates (in body frame)
+ypt = range(0, span, length=N+1) # point y-coordinates (in body frame)
+zpt = range(0, 0, length=N+1) # point z-coordinates (in body frame)
+points = [[xpt[i],ypt[i],zpt[i]] for i = 1:N+1]
 start = 1:N # starting point of each beam element
 stop = 2:N+1 # ending point of each beam element
+frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
 compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 1/EInn]), N) # compliance matrix
-mass = fill(Diagonal([μ, μ, μ, i11, 0, 0]), N) # mass matrix
-assembly = GXBeam.Assembly(points, start, stop; compliance = compliance,
-    mass = mass)
+mass = fill(Diagonal([μ, μ, μ, i11, i22, i33]), N) # mass matrix
+assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
 
 # boundary condition initialization
 prescribed = Dict(
@@ -261,12 +270,10 @@ for i = 1:N
 end
 
 # structural system initialization
-ipoint = [1] # points at which prescribed conditions are applied
-static = false # static simulation?
-system = GXBeam.System(assembly, ipoint, static)
+system = GXBeam.System(assembly, keys(prescribed), false)
 
 # construct aerodynamic model
-aerodynamic_model = LiftingLine{N}(Wagner())
+aerodynamic_model = LiftingLine{N}(Peters{6}())
 
 # construct structural model
 structural_model = GEBT(system, assembly, prescribed, distributed)
@@ -285,20 +292,16 @@ for i = 1:length(Vinf)
 
     println("Vinf: ", Vinf[i])
 
-    # set parameters
-    p_aero = vcat(fill([a, c/2, ρ, a0, α0], N)...)
+    # set parameters and current time
+    p_aero = vcat(fill([a, b, a0, α0], N)...)
     p_stru = Float64[]
-    p_coupled = [0, -Vinf[i]*cos(α), Vinf[i]*sin(α)] # freestream velocity in global frame
-    p = vcat(p_aero, p_stru, p_coupled)
-
-    # set time
-    t = 0.0
+    p_additional = [-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ]
+    p = vcat(p_aero, p_stru, p_additional)
+    t = 0
 
     # find state variables corresponding to steady state operating conditions
     fresid = u -> get_rates(models, u, get_inputs(models, u, p, t), p, t)
     sol = nlsolve(fresid, u0)
-
-    # set states to their steady-state values
     u = sol.zero
 
     # calculate the inputs corresponding to steady state operating conditions
@@ -316,8 +319,6 @@ for i = 1:length(Vinf)
     # update initial guess for the state variables
     u0 .= u
 end
-
-nothing #hide
 ```
 
 We now plot the results predicted using each aerodynamic model.
@@ -340,8 +341,8 @@ sp1 = plot(
     xlim = (1, 30),
     xtick = vcat(1, 5:5:30),
     xlabel = "Velocity (m/s)",
-    ylim = (0, 350),
-    ytick = 0.0:50:350,
+    ylim = (0, 90),
+    ytick = 0.0:10:90,
     ylabel = "Frequency (rad/s)",
     legend = :topright
     )
@@ -351,13 +352,18 @@ sp2 = plot(
     xtick = vcat(1, 5:5:30),
     xlabel = "Velocity (m/s)",
     ylim = (-12, 8),
-    #ytick = -12:4:8,
+    ytick = -12:4:8,
     ylabel = "Damping Ratio %",
     legend = :topleft
     )
 
 for i = 1:size(λ, 1)
-    scatter!(sp1, Vinf, imag.(λ[i,:]),
+
+    idx = findall(x -> abs(x) < 500, λ[i,:])
+    Vi = Vinf[idx]
+    λi = λ[i,idx]
+
+    scatter!(sp1, Vi, imag.(λi),
         label = "",
         color = 1,
         markersize = 3,
@@ -366,9 +372,14 @@ for i = 1:size(λ, 1)
 end
 
 for i = 1:size(λ, 1)
-    scatter!(sp2, Vinf,
-        #real.(λ[i,:]),
-        real.(λ[i,:])./abs.(λ[i,:])*100,
+
+    idx = findall(x -> abs(x) < 500, λ[i,:])
+    Vi = Vinf[idx]
+    λi = λ[i,idx]
+
+    scatter!(sp2, Vi,
+        # real.(λi),
+        real.(λi)./abs.(λi)*100,
         label = "",
         color = 1,
         markersize = 3,
@@ -376,9 +387,5 @@ for i = 1:size(λ, 1)
         )
 end
 
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
-
-# savefig(p1, "three-dimensional-stability.svg") #hide
-
-nothing #hide
+p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)
 ```

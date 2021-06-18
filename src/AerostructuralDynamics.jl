@@ -8,9 +8,8 @@ using GXBeam
 import DifferentialEquations.ODEFunction
 
 export AbstractModel
-export TypicalSection, GEBT
-export Steady, QuasiSteady, Wagner, Peters, LiftingLineSection, LiftingLine
-
+export TypicalSection, LiftingLineSection, RigidBody, GEBT
+export Steady, QuasiSteady, Wagner, Peters, LiftingLine
 
 export number_of_states
 export number_of_inputs
@@ -34,6 +33,7 @@ export get_input_jacobian, get_input_jacobian!
 include("traits.jl")
 include("interface.jl")
 include("structures/section.jl")
+include("structures/rigidbody.jl")
 include("structures/gxbeam.jl")
 include("aerodynamics/liftingline.jl")
 include("aerodynamics/quasisteady.jl")

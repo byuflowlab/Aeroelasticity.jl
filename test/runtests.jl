@@ -116,6 +116,10 @@ end
     run_coupling_tests(Peters{4}(), LiftingLineSection())
 end
 
+@testset "Rigid Body" begin
+    run_model_tests(RigidBody())
+end
+
 @testset "Geometrically Exact Beam Theory" begin
 
     # test on its own
