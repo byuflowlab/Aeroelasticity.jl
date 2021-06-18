@@ -180,6 +180,13 @@ end
     run_model_tests(LiftingLine{N}(Wagner()))
     run_model_tests(LiftingLine{N}(Peters{4}()))
 
+    # test coupling with RigidBody
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), RigidBody())
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), RigidBody())
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), RigidBody())
+    run_coupling_tests(LiftingLine{4}(Wagner()), RigidBody())
+    run_coupling_tests(LiftingLine{4}(Peters{4}()), RigidBody())
+
     # test coupling with GXBeam
 
     x = range(0, 60, length=N+1)
