@@ -2,10 +2,11 @@
     GEBT <: AbstractModel
 
 Geometrically exact beam theory model, as implemented by the GXBeam package.
-State variables are as defined by GXBeam. Inputs correspond to the (non-follower)
-distributed aerodynamic loads on each beam element with distributed loads.
-When coupled with an aerodynamic model, the local beam y and z-axes should be
-aligned with the negative chordwise and positive normal directions, respectively.
+State variables are as defined by GXBeam. Inputs correspond to the distributed
+aerodynamic loads on each beam element with distributed loads, followed by the
+body frame linear and angular velocities.  When coupled with an aerodynamic model,
+the local beam y and z-axes should be aligned with the negative chordwise and
+positive normal directions, respectively.
 
 At this point in time, this model doesn't accept any parameters.
 """
@@ -34,7 +35,7 @@ end
 number_of_states(model::GEBT) = length(model.system.x)
 
 function number_of_inputs(model::GEBT)
-    return 6*length(model.distributed)
+    return 6*length(model.distributed) + 6
 end
 
 number_of_parameters(model::GEBT) = 0
@@ -67,11 +68,6 @@ function get_rates!(dq, model::GEBT, q, r, p, t)
     icol_pt = system.icol_pt
     icol_beam = system.icol_beam
 
-    # set origin, linear velocity, and angular velocity
-    x0 = @SVector zeros(3)
-    v0 = @SVector zeros(3)
-    ω0 = @SVector zeros(3)
-
     # update distributed loads using input vector
     if eltype(eltype(distributed)) <: eltype(r)
         # use pre-allocated storage
@@ -80,6 +76,12 @@ function get_rates!(dq, model::GEBT, q, r, p, t)
         # allocate new storage
         distributed = update_distributed(distributed, assembly.elements, r)
     end
+
+    # set origin, linear velocity, and angular velocity
+    offset = 6*length(distributed)
+    x0 = @SVector zeros(3)
+    v0 = SVector(r[offset+1], r[offset+2], r[offset+3])
+    ω0 = SVector(r[offset+4], r[offset+5], r[offset+6])
 
     # return mass matrix multiplied state rates
     return gxbeam_rates!(dq, q, assembly, prescribed,
@@ -128,11 +130,6 @@ function get_state_jacobian!(J, model::GEBT, q, r, p, t)
     icol_pt = system.icol_pt
     icol_beam = system.icol_beam
 
-    # set origin, linear velocity, and angular velocity
-    x0 = @SVector zeros(3)
-    v0 = @SVector zeros(3)
-    ω0 = @SVector zeros(3)
-
     # update distributed loads using input vector
     if eltype(eltype(distributed)) <: eltype(r)
         # use pre-allocated storage
@@ -141,6 +138,12 @@ function get_state_jacobian!(J, model::GEBT, q, r, p, t)
         # allocate new storage
         distributed = update_distributed(distributed, assembly.elements, r)
     end
+
+    # set origin, linear velocity, and angular velocity
+    offset = 6*length(distributed)
+    x0 = @SVector zeros(3)
+    v0 = SVector(r[offset+1], r[offset+2], r[offset+3])
+    ω0 = SVector(r[offset+4], r[offset+5], r[offset+6])
 
     # return jacobian of right hand side with respect to state variables
     return gxbeam_state_jacobian!(J, q, assembly, prescribed,
@@ -193,11 +196,6 @@ function get_lhs(model::GEBT, dq, q, r, p, t)
     icol_pt = system.icol_pt
     icol_beam = system.icol_beam
 
-    # set origin, linear velocity, and angular velocity
-    x0 = @SVector zeros(3)
-    v0 = @SVector zeros(3)
-    ω0 = @SVector zeros(3)
-
     # update distributed loads using input vector
     if eltype(eltype(distributed)) <: eltype(r)
         # use pre-allocated storage
@@ -206,6 +204,12 @@ function get_lhs(model::GEBT, dq, q, r, p, t)
         # allocate new storage
         distributed = update_distributed(distributed, assembly.elements, r)
     end
+
+    # set origin, linear velocity, and angular velocity
+    offset = 6*length(distributed)
+    x0 = @SVector zeros(3)
+    v0 = SVector(r[offset+1], r[offset+2], r[offset+3])
+    ω0 = SVector(r[offset+4], r[offset+5], r[offset+6])
 
     return gxbeam_lhs(q, dq, assembly, prescribed, distributed, force_scaling,
         mass_scaling, irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt,
