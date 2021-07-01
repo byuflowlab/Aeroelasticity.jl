@@ -36,7 +36,7 @@ nothing #hide
 using AerostructuralDynamics, LinearAlgebra
 
 # reduced velocity range
-V = range(0, 3.1, length=5000) # (reduced velocity)
+V = range(0, 3.1, length=5000) # = U/(b*ωθ) (reduced velocity)
 
 # non-dimensional parameters
 a = -1/5 # reference point normalized location

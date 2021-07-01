@@ -302,8 +302,8 @@ end
 # --- Internal Methods --- #
 
 function wagner_rates(a, b, α0, C1, C2, ε1, ε2, u, v, ω, λ1, λ2)
-    λ1dot = -ε1*u/b*λ1 + C1*ε1*u/b*(v + (1/2-a)*b*ω - u*α0)
-    λ2dot = -ε2*u/b*λ2 + C2*ε2*u/b*(v + (1/2-a)*b*ω - u*α0)
+    λ1dot = -ε1*u/b*λ1 + C1*ε1*u/b*(v + (b/2-a*b)*ω - u*α0)
+    λ2dot = -ε2*u/b*λ2 + C2*ε2*u/b*(v + (b/2-a*b)*ω - u*α0)
     return SVector(λ1dot, λ2dot)
 end
 

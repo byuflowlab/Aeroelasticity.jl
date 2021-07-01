@@ -1,6 +1,6 @@
 # Developer's Guide
 
-In this guide we demonstrate by example how to define aerodynamic and structural models and couple them together.
+In this guide, we define a new aerodynamic and structural model and c then couple them together to form a new aeroelastic model.  The same process may be followed to define and/or couple any number of models together.
 
 ```@contents
 Pages = ["developer.md"]
@@ -15,28 +15,28 @@ using AerostructuralDynamics, StaticArrays, LinearAlgebra
 using AerostructuralDynamics, StaticArrays, LinearAlgebra
 ```
 
-## Defining a Structural Model
+## Typical Section Model
 
-For demonstrating how to create a new structural model, we use a typical section model with two degrees of freedom, as shown in the following figure.
+The first model we will be constructing is the typical section structural model, as shown in the following figure.  
 
 ![](typical-section.svg)
 
 The equations of motion for this model are:
 
 ```math
-m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
-I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M
+m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -\mathcal{L} \\
+I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = \mathcal{M}
 ```
 
-where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M_\frac{1}{4}`` is the quarter-chord moment per unit span.
+where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.
 
 ### Theory
 
-Structural state variables in this package satisfy the ordinary differential equation (or differential algebraic equation in mass matrix form)
+State variables for all models in this package satisfy the ordinary differential equation (or differential algebraic equation in mass matrix form)
 ```math
-M_s(q,r,p_s,t)\dot{q} = f_s(q,r,p_s,t)
+M(x,y,p,t)\dot{x} = f(x,y,p,t)
 ```
-where ``M_s`` is a function which defines the structural mass matrix, ``f_s`` is a function which defines the mass matrix multiplied structural state rates, ``q`` is a vector of structural states, ``r`` is a vector of aerodynamic loads, ``p_s`` is a vector of structural parameters, and ``t`` is the current time.
+where ``M(x,y,p,t)`` is a function which defines the mass matrix corresponding to the differential equation, ``f(x, y, p, t)`` is a function which defines the mass matrix multiplied state rates, ``x`` is a vector of states, ``y`` is a vector of inputs/coupling variables, ``p`` is a vector of parameters, and ``t`` is the current time.
 
 The equations of motion for the typical section model when expressed in the form expected by this package are
 ```math
@@ -45,7 +45,7 @@ M \dot{q} = K q + D r
 where
 ```math
 q = \begin{bmatrix} h & \theta & \dot{h} & \dot{\theta} \end{bmatrix}^T \quad
-r = \begin{bmatrix} L & M_\frac{1}{4} \end{bmatrix}^T
+r = \begin{bmatrix} L & M \end{bmatrix}^T
 ```
 ```math
 M =
@@ -69,7 +69,7 @@ D =
 0 & 0 \\
 0 & 0 \\
 -1 & 0 \\
-b \left( \frac{1}{2} + a \right) & 1
+0 & 1
 \end{bmatrix}
 ```
 
@@ -81,99 +81,76 @@ We start creating our model by defining a new type.
 """
     MyTypicalSection <: AbstractModel
 
-Typical section structural model with state variables ``q = \\begin{bmatrix} h &
-θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, structural parameters ``p_s =
-\\begin{bmatrix} a & b & k_h & k_\\theta & m & x_\\theta & I_P \\end{bmatrix}^T``,
-and aerodynamic loads ``r = \\begin{bmatrix} L & M_\\frac{1}{4} \\end{bmatrix}^T``
+Typical section structural model with state variables ``\\begin{bmatrix} h &
+θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, inputs ``\\begin{bmatrix}
+\\mathcal{L} & \\mathcal{M} \\end{bmatrix}^T``, and parameters ``\\begin{bmatrix}
+k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``
 """
 struct MyTypicalSection <: AbstractModel end
 
 nothing #hide
 ```
 
-Model parameters may be stored either as fields of the newly defined type or passed directly to the solver.  In this case, we choose to define all of the structural parameters as elements of the parameter vector.  In general, model constants should be stored as fields of the struct, whereas parameters that may change should be passed to the solver through the parameter vector.
+Model parameters may be stored either as fields of the newly defined type or passed directly to the solver.  In this case, we choose to define all of the structural parameters as elements of the parameter vector.  In general, constants should be stored as fields of the newly defined type, while any variable that could be a design variables should be passed to the solver through the parameter vector.
 
-Note that the state, parameter, and aerodynamic load variable identities should be documented in the docstring of the type definition since the type definition provides the primary (and sometimes only) source of documentation for a given model.
+Note that the state, parameter, and aerodynamic load variable identities should be documented in the docstring associated with the newly defined type since the type definition provides the primary (and sometimes only) source of documentation for a given model.
 
 ### Defining Model Properties
 
 We now need to define a few model properties.
 
-To indicate the number of state variables in our model, we define a new method for the [`number_of_states`](@ref) function.  In our case, we have four structural state variables ``q = \begin{bmatrix} h & \theta & \dot{h} & \dot{\theta} \end{bmatrix}^T ``.  This method must be defined for all models.
+To indicate the number of state variables in our model, we define a new method for the [`number_of_states`](@ref) function.  In our case, we have four state variables ``q = \begin{bmatrix} h & \theta & \dot{h} & \dot{\theta} \end{bmatrix}^T ``.
 
 ```@example developer
 number_of_states(::Type{MyTypicalSection}) = 4
 nothing #hide
 ```
 
-To indicate the number of aerodynamic load inputs, we define a new method for the [`number_of_inputs`](@ref) function.  In our case, we have two aerodynamic loads ``r = \begin{bmatrix} L & M_\frac{1}{4} \end{bmatrix}^T``.  This method must be defined for all models.
+To indicate the number of inputs/coupling variables, we define a new method for the [`number_of_inputs`](@ref) function.  In our case, we have two inputs/coupling variables ``r = \begin{bmatrix} \mathcal{L} & \mathcal{M} \end{bmatrix}^T``.  We define these two variables as inputs/coupling variables since they either need to be manually specified, or must be provided by other models.  For aeroelastic systems, the inputs/coupling variables for the structural model typically correspond to the aerodynamic loads while the inputs/coupling variables for the aerodynamic model typically correspond to the structural deflections.
 
 ```@example developer
 number_of_inputs(::Type{MyTypicalSection}) = 2
 nothing #hide
 ```
 
-To indicate the number of parameters, we define a new method for the [`number_of_parameters`](@ref) function.  In our case, we have seven parameters ``p_s = \begin{bmatrix} a & b & k_h & k_\theta & m & x_\theta & I_P \end{bmatrix}^T``.  This method must be defined for all models.
+To indicate the number of parameters, we define a new method for the [`number_of_parameters`](@ref) function.  In our case, we have five parameters ``p_s = \\begin{bmatrix} k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``.
 
 ```@example developer
-number_of_parameters(::Type{MyTypicalSection}) = 7
+number_of_parameters(::Type{MyTypicalSection}) = 5
 nothing #hide
 ```
 
-To indicate whether we plan to use in-place or out-of-place functions, we define a new method for the [`inplaceness`](@ref) function.  In general, for performance reasons, in-place functions are preferred.  The one exception is for models with small amounts of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.  For this model, we use the latter approach.  This method must be defined for all models.
+To indicate whether our mode uses in-place or out-of-place functions, we define a new method for the [`inplaceness`](@ref) function.  In general, for performance reasons, in-place functions are preferred.  The one exception is for models with small amounts of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.  For this model, we use the latter approach.
 
 ```@example developer
 inplaceness(::Type{MyTypicalSection}) = OutOfPlace()
 nothing #hide
 ```
 
-To indicate mass matrix properties, we define a new method for the [`mass_matrix_type`](@ref) function.  This method must be defined for all models.
+To indicate mass matrix properties, we define a new method for the [`mass_matrix_type`](@ref) function.
 
 ```@example developer
-mass_matrix_type(::Type{MyTypicalSection}) = Varying()
+mass_matrix_type(::Type{MyTypicalSection}) = Linear()
 nothing #hide
 ```
 
-To indicate the properties of the jacobian of the state rates with respect to the state variables, we define a new method for the [`state_jacobian_type`](@ref) function.
+To indicate the properties of the jacobian of the mass matrix multiplied state rates with respect to the state variables, we define a new method for the [`state_jacobian_type`](@ref) function.  This method definition is only required if the state jacobian is manually defined.
 
 ```@example developer
-state_jacobian_type(::Type{MyTypicalSection}) = Varying()
+state_jacobian_type(::Type{MyTypicalSection}) = Linear()
 nothing #hide
 ```
 
-To indicate the properties of the jacobian of the state rates with respect to the inputs, we define a new method for the [`input_jacobian_type`](@ref) function.
+To indicate the properties of the jacobian of the mass matrix multiplied state rates with respect to the inputs, we define a new method for the [`input_jacobian_type`](@ref) function.  This method definition is only required if the state jacobian is manually defined.
 
 ```@example developer
-input_jacobian_type(::Type{MyTypicalSection}) = Varying()
+input_jacobian_type(::Type{MyTypicalSection}) = Constant()
 nothing #hide
 ```
 
-To indicate whether the state rates are linearly dependent on the aerodynamic loads, or in other words whether the governing structural equations can be expressed as  
-```math
-M_s(q,p_s,t)\dot{q} = f_s(q,p_s,t) + D_s(q,p_s,t)r
-```
-we define a new method for the [`input_dependence_type`](@ref) function.  Having a linear load dependence allows for greater flexibility when coupling the structural model with an aerodynamic model.
+### Defining Model Methods
 
-```@example developer
-input_dependence_type(::Type{MyTypicalSection}) = Linear()
-nothing #hide
-```
-
-### Mass Matrix Equation
-
-For out-of-place models, the mass matrix is calculated using the [`get_mass_matrix`](@ref) function.  For in-place models the mass matrix is calculated using the [`get_mass_matrix!`](@ref) function.  For constant mass matrices, these functions are called without the `q`, `r`, `p`, and `t` arguments.  
-
-```@example developer
-function get_mass_matrix(::MyTypicalSection, q, r, p, t)
-    # extract structural parameters
-    a, b, kh, kθ, m, xθ, Ip = p
-    # calculate mass matrix
-    return @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
-end
-nothing #hide
-```
-
-### State Rate Equation
+Now that we have defined the properties of our model, we need to define the governing equations for its state variables, if it has any.
 
 The right hand side of the governing structural differential equations is calculated using the [`get_rates`](@ref) function for out-of-place models and [`get_rates!`](@ref) function for in-place models.  
 
@@ -186,15 +163,30 @@ function get_rates(::MyTypicalSection, q, r, p, t)
     # extract structural parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # calculate state rates
-    return SVector(hdot, θdot, -kh*h - L, -kθ*θ + M + (b/2+a*b)*L)
+    return SVector(hdot, θdot, -kh*h - L, -kθ*θ + M)
 end
 
 nothing #hide
 ```
 
-### State Rate Jacobian
+Since our model uses a mass matrix, we also need to define a new method for the [`get_mass_matrix`](@ref) function (or [`get_mass_matrix!`](@ref) if the model's functions are in-place functions).
 
-The jacobian of the right hand side of the governing structural equations with respect to the state variables is calculated using the [`get_state_jacobian`](@ref) function for out-of-place models and [`get_state_jacobian!`](@ref) function for in-place models.
+```@example developer
+function get_mass_matrix(::MyTypicalSection, q, r, p, t)
+    # extract structural parameters
+    a, b, kh, kθ, m, xθ, Ip = p
+    # calculate mass matrix
+    return @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m m*b*xθ; 0 0 m*b*xθ Ip]
+end
+nothing #hide
+```
+
+## Performance Overloads
+
+The code we have presented so far fully defines the governing equations for the structural state variables of the typical section model.  At this point, if the jacobian of the governing differential equations of the typical section model with respect to the state variables, inputs, and/or parameters is needed by a differential equations solver and/or for a stability analysis, it will be
+calculated automatically using the [ForwardDiff](@ref) package.  Alternatively, jacobians may be specified manually, in order to avoid the computational expenses associated with automatic differentiation.
+
+The jacobian of the right hand side of the governing equations with respect to the state variables may be manually defined using the [`get_state_jacobian`](@ref) function for out-of-place models and [`get_state_jacobian!`](@ref) function for in-place models.
 
 ```@example developer
 function get_state_jacobian(::MyTypicalSection, q, r, p, t)
@@ -203,26 +195,17 @@ function get_state_jacobian(::MyTypicalSection, q, r, p, t)
     # return jacobian
     return @SMatrix [0 0 1 0; 0 0 0 1; -kh 0 0 0; 0 -kθ 0 0]
 end
-
 nothing #hide
 ```
 
-### Input Jacobian
-
-The jacobian of the right hand side of the governing structural equations with respect to the inputs is defined using the [`get_input_jacobian`](@ref) function.  There is no out-of-place form for this function, however, it may be constructed as a either a linear map (if large) or static array (if small) in order to avoid allocations.  
+The jacobian of the right hand side of the governing equations with respect to the inputs is defined using the [`get_input_jacobian`](@ref) function.  There is no out-of-place form for this function, however, it may be constructed as either a linear map (if large) or static array (if small) in order to avoid allocations.
 
 ```@example developer
-function get_input_jacobian(::MyTypicalSection, q, r, p, t)
-    # extract parameters
-    a, b, kh, kθ, m, xθ, Ip = p
-    # return jacobian
-    return @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
-end
-
+get_input_jacobian(::MyTypicalSection) = @SMatrix [0 0; 0 0; -1 0; 0 1]
 nothing #hide
 ```
 
-### Structural Model Code
+### Typical Section Model Code
 
 Putting it all together, a complete representation of our typical section model for use with this package may be defined using the following block of code.
 
@@ -230,10 +213,10 @@ Putting it all together, a complete representation of our typical section model 
 """
     MyTypicalSection <: AbstractModel
 
-Typical section structural model with state variables ``q = \\begin{bmatrix} h &
-θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, structural parameters ``p_s =
-\\begin{bmatrix} a & b & k_h & k_\\theta & m & x_\\theta & I_P \\end{bmatrix}^T``,
-and aerodynamic loads ``r = \\begin{bmatrix} L & M_\\frac{1}{4} \\end{bmatrix}^T``
+Typical section structural model with state variables ``\\begin{bmatrix} h &
+θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, inputs ``\\begin{bmatrix}
+\\mathcal{L} & \\mathcal{M} \\end{bmatrix}^T``, and parameters ``\\begin{bmatrix}
+k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``
 """
 struct MyTypicalSection <: AbstractModel end
 
@@ -241,12 +224,11 @@ struct MyTypicalSection <: AbstractModel end
 
 number_of_states(::Type{MyTypicalSection}) = 4
 number_of_inputs(::Type{MyTypicalSection}) = 2
-number_of_parameters(::Type{MyTypicalSection}) = 7
+number_of_parameters(::Type{MyTypicalSection}) = 5
 inplaceness(::Type{MyTypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{MyTypicalSection}) = Varying()
-state_jacobian_type(::Type{MyTypicalSection}) = Varying()
-input_jacobian_type(::Type{MyTypicalSection}) = Varying()
-input_dependence_type(::Type{MyTypicalSection}) = Linear()
+mass_matrix_type(::Type{MyTypicalSection}) = Linear()
+state_jacobian_type(::Type{MyTypicalSection}) = Linear()
+input_jacobian_type(::Type{MyTypicalSection}) = Constant()
 
 # --- Methods --- #
 
@@ -265,8 +247,10 @@ function get_rates(::MyTypicalSection, q, r, p, t)
     # extract structural parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # calculate state rates
-    return SVector(hdot, θdot, -kh*h - L, -kθ*θ + M + (b/2+a*b)*L)
+    return SVector(hdot, θdot, -kh*h - L, -kθ*θ + M)
 end
+
+# --- Performance Overloads --- #
 
 function get_state_jacobian(::MyTypicalSection, q, r, p, t)
     # extract parameters
@@ -279,21 +263,19 @@ function get_input_jacobian(::MyTypicalSection, q, r, p, t)
     # extract parameters
     a, b, kh, kθ, m, xθ, Ip = p
     # return jacobian
-    return @SMatrix [0 0; 0 0; -1 0; b/2+a*b 1]
+    return @SMatrix [0 0; 0 0; -1 0; 0 1]
 end
 
 nothing #hide
 ```
 
-## Defining an Aerodynamic Model
+## Peters' Finite State Model
 
-For demonstrating how to create a new aerodynamic model, we use Peters' finite state aerodynamic model.
-
-The governing differential equation for the aerodynamic states is
+The second model we will be constructing is Peters' finite state unsteady aerodynamics model.  The governing differential equations for this model are
 ```math
-\bar{A}\dot{\lambda} + \frac{U}{b}\lambda = \bar{c}\left[ \ddot{h} + U\dot{\theta} + b \left(\frac{1}{2} - a\right) \ddot{\theta} \right]
+\bar{A}\dot{\lambda} + \frac{u}{b}\lambda = \bar{c}\left[ \dot{v} + u\omega + b \left(\frac{1}{2} - a\right) \dot{\omega} \right]
 ```
-where
+where ``u`` is the local freestream velocity in the chordwise direction, ``v`` is the local freestream velocity in the normal direction, ``\omega`` is the local freestream angular velocity, and
 ```math
 \bar{A} = \bar{D} + \bar{d} \bar{b}^T + \bar{c} \bar{d}^T + \frac{1}{2} \bar{c}  \bar{b}^T \\
 \bar{D}_{nm} = \begin{cases}
@@ -314,14 +296,6 @@ where
 0 & n \neq 1
 \end{cases}
 ```
-
-### Theory
-
-Aerodynamic state variables in this package satisfy the ordinary differential equation (or differential algebraic equation in mass matrix form)
-```math
-M_{a}(λ,d,p_a,t)\dot{\lambda} = f_a(λ,d,p_a,t)
-```
-where ``M_a`` is a function which defines the aerodynamic mass matrix, ``f_a`` is a function which defines the mass matrix multiplied aerodynamic state rates, ``\lambda`` is a vector of structural states, ``d`` is a vector of structural deflections, ``p_a`` is a vector of aerodynamic parameters, and ``t`` is the current time.
 
 The equations of motion for Peters' finite state model, when expressed in the form expected by this package are:
 ```math
