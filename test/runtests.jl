@@ -4,13 +4,23 @@ using GXBeam
 using ForwardDiff
 using Test
 
-import AerostructuralDynamics.get_lhs
-import AerostructuralDynamics.get_inputs_from_state_rates
-import AerostructuralDynamics.get_input_mass_matrix
-import AerostructuralDynamics.get_input_state_jacobian
-import AerostructuralDynamics.LiftingLineSection
+const AD = AerostructuralDynamics
 
-function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf))
+function has_mass_matrix(model)
+    matrix_type = AerostructuralDynamics.mass_matrix_type(typeof(model))
+    empty_matrix = AerostructuralDynamics.isempty(matrix_type)
+    identity_matrix = AerostructuralDynamics.isidentity(matrix_type)
+    return !(empty_matrix || identity_matrix)
+end
+
+function has_input_mass_matrix(models...)
+    input_matrix_type = AerostructuralDynamics.mass_matrix_type(typeof.(models)...)
+    zero_matrix = AerostructuralDynamics.iszero(input_matrix_type)
+    return !zero_matrix
+end
+
+function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf),
+    test_mass_matrix = has_mass_matrix(model))
 
     # sample arguments
     du = rand(number_of_states(model))
@@ -32,17 +42,17 @@ function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf))
     @test isapprox(Array(Jy), Jy_fd; atol, norm)
 
     # additional tests if left hand side is defined
-    if applicable(get_lhs, model, du, u, y, p, t)
+    if test_mass_matrix
 
         # mass matrix test
-        fdu = (du) -> get_lhs(model, du, u, y, p, t)
+        fdu = (du) -> AD.get_lhs(model, du, u, y, p, t)
         M = get_mass_matrix(model, u, y, p, t)
         M_fd = ForwardDiff.jacobian(fdu, similar(u))
         @test isapprox(M, M_fd; atol, norm)
 
         # compatability test
         du = qr(collect(M), Val(true))\get_rates(model, u, y, p, t)
-        lhs = get_lhs(model, du, u, y, p, t)
+        lhs = AD.get_lhs(model, du, u, y, p, t)
         @test isapprox(M*du, lhs; atol, norm)
 
     end
@@ -50,7 +60,8 @@ function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf))
     return nothing
 end
 
-function run_coupling_tests(models...; atol = 1e-10, norm = (x)->norm(x, Inf))
+function run_coupling_tests(models...; atol = 1e-10, norm = (x)->norm(x, Inf),
+    test_mass_matrix = has_input_mass_matrix(models...))
 
     # sample arguments
     du = rand(number_of_states(models))
@@ -60,16 +71,16 @@ function run_coupling_tests(models...; atol = 1e-10, norm = (x)->norm(x, Inf))
 
     # jacobian test
     fu = (u) -> get_inputs(models, u, p, t)
-    Jy = get_input_state_jacobian(models, u, p, t)
+    Jy = AD.get_input_state_jacobian(models, u, p, t)
     Jy_fd = ForwardDiff.jacobian(fu, u)
     @test isapprox(Jy, Jy_fd; atol, norm)
 
     # additional test if state rate contribution is defined
-    if applicable(get_inputs_from_state_rates, models..., du, u, p, t)
+    if test_mass_matrix
 
         # mass matrix test
-        fdu = (du) -> -get_inputs_from_state_rates(models..., du, u, p, t)
-        My = get_input_mass_matrix(models, u, p, t)
+        fdu = (du) -> -AD.get_inputs_from_state_rates(models..., du, u, p, t)
+        My = AD.get_input_mass_matrix(models, u, p, t)
         My_fd = ForwardDiff.jacobian(fdu, du)
         @test isapprox(My, My_fd; atol, norm)
 
@@ -93,9 +104,9 @@ end
     run_coupling_tests(QuasiSteady{1}(), TypicalSection())
     run_coupling_tests(QuasiSteady{2}(), TypicalSection())
     # test coupling with LiftingLineSection()
-    run_coupling_tests(QuasiSteady{0}(), LiftingLineSection())
-    run_coupling_tests(QuasiSteady{1}(), LiftingLineSection())
-    run_coupling_tests(QuasiSteady{2}(), LiftingLineSection())
+    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection())
+    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection())
+    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection())
 end
 
 @testset "Wagner" begin
@@ -104,7 +115,7 @@ end
     # test coupling with TypicalSection()
     run_coupling_tests(Wagner(), TypicalSection())
     # test coupling with LiftingLineSection()
-    run_coupling_tests(Wagner(), LiftingLineSection())
+    run_coupling_tests(Wagner(), AD.LiftingLineSection())
 end
 
 @testset "Peters' Finite State" begin
@@ -113,7 +124,7 @@ end
     # test coupling with TypicalSection()
     run_coupling_tests(Peters{4}(), TypicalSection())
     # test coupling with LiftingLineSection()
-    run_coupling_tests(Peters{4}(), LiftingLineSection())
+    run_coupling_tests(Peters{4}(), AD.LiftingLineSection())
 end
 
 @testset "Rigid Body" begin
@@ -233,4 +244,10 @@ end
     run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), structural_model)
     run_coupling_tests(LiftingLine{4}(Wagner()), structural_model)
     run_coupling_tests(LiftingLine{4}(Peters{4}()), structural_model)
+
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{4}(Wagner()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{4}(Peters{4}()), structural_model, RigidBody())
 end

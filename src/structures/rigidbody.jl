@@ -9,13 +9,6 @@ M_z \\end{bmatrix}^T`` and zero parameters.
 """
 struct RigidBody <: AbstractModel end
 
-"""
-    Gravity <: NoStateModel
-
-Gravitational model with parameter ``g``
-"""
-struct Gravity <: NoStateModel end
-
 # --- Traits --- #
 number_of_states(::Type{RigidBody}) = 12
 number_of_inputs(::Type{RigidBody}) = 13
@@ -24,8 +17,6 @@ inplaceness(::Type{RigidBody}) = OutOfPlace()
 mass_matrix_type(::Type{RigidBody}) = Identity()
 state_jacobian_type(::Type{RigidBody}) = Nonlinear()
 input_jacobian_type(::Type{RigidBody}) = Nonlinear()
-
-number_of_parameters(::Type{Gravity}) = 1
 
 # --- Methods --- #
 
