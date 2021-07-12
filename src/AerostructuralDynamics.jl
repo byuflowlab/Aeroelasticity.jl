@@ -5,7 +5,7 @@ using LinearMaps
 using StaticArrays
 using ForwardDiff
 using GXBeam
-import DifferentialEquations.ODEFunction
+import DiffEqBase.ODEFunction
 
 export AbstractModel
 export TypicalSection, LiftingLineSection, RigidBody, GEBT

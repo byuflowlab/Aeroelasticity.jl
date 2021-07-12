@@ -3,7 +3,7 @@
 
 Lifting line model with `N` cross sections, using the aerodynamic models in `T`.
 State variables, inputs, and parameters correspond to the state variables, inputs,
-and parameters of each of the cross sections concatenated
+and parameters of each of the cross sections concatenated.
 """
 struct LiftingLine{N,T} <: AbstractModel
     models::T
@@ -14,11 +14,11 @@ end
 
 Lifting line section model with state variables ``q = \\begin{bmatrix} v_x & v_y &
 v_z & \\omega_x & \\omega_y & \\omega_z \\end{bmatrix}^T``, inputs
-``r = \\begin{bmatrix} L' & Y' & D' & Mx, My, Mz \\end{bmatrix}^T``, and no
+``r = \\begin{bmatrix} f_x & f_y & f_z & m_x, m_y, m_z \\end{bmatrix}^T``, and no
 parameters.  Two-dimensional aerodynamic models may be extended to
 three-dimensional models by coupling with this model.  Note that
-this model has no rate equations of its own. Its state variables are
-defined as functions of a 3D structural model's state variables.
+this model has no rate equations of its own since its state variables are defined
+as functions of a 3D structural model's state variables.
 """
 struct LiftingLineSection <: AbstractModel end
 
@@ -226,23 +226,21 @@ end
 
 # --- Unit Testing Methods --- #
 
-# TODO
+function get_lhs(model::LiftingLine, du, u, y, p, t)
 
-# function get_lhs(model::LiftingLine, du, u, y, p, t)
-#
-#     models = model.models
-#
-#     iu = state_indices(models)
-#     iy = input_indices(models)
-#     ip = parameter_indices(models)
-#
-#     dus = view.(Ref(du), iu)
-#     us = view.(Ref(u), iu)
-#     ys = view.(Ref(y), iy)
-#     ps = view.(Ref(p), ip)
-#
-#     return vcat(get_lhs.(models, dus, us, ys, ps, t)...)
-# end
+    models = model.models
+
+    iu = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    dus = view.(Ref(du), iu)
+    us = view.(Ref(u), iu)
+    ys = view.(Ref(y), iy)
+    ps = view.(Ref(p), ip)
+
+    return vcat(get_lhs.(models, dus, us, ys, ps, t)...)
+end
 
 # --- Rigid Body Coupling --- #
 
@@ -251,9 +249,12 @@ end
 
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a rigid body model.  This model introduces the additional parameters
-``\\begin{bmatrix} \\Delta L & p_b & b_x & b_y & b_z \\end{bmatrix}^T`` for each lifting line
-element, followed by the freestream velocity components ``\\begin{bmatrix} V_x &
-V_y & V_z \\end{bmatrix}^T`` and density ``\\rho``.
+``\\begin{bmatrix} \\Delta L & p_b & b_x & b_y & b_z \\end{bmatrix}^T`` for each
+lifting line element, followed by the freestream velocity components
+``\\begin{bmatrix} V_x & V_y & V_z \\end{bmatrix}^T`` and density ``\\rho``,
+followed by the rigid body properties ``\begin{bmatrix}^T m & I_{xx} & I_{yy} &
+I_{zz} & I_{xz} & I_{xy} & I_{yz} \\end{bmatrix}^T`` and the gravitational constant
+``g``.
 
 ** When using this model, the local frame for each lifting line element should be
 oriented with the x-axis in the chordwise direction, the y-axis in the spanwise
@@ -302,7 +303,7 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:RigidBody}) wher
 end
 
 function number_of_parameters(::Type{<:LiftingLine{N,T}}, ::Type{<:RigidBody}) where {N,T}
-    return 13*N+4
+    return 13*N+12
 end
 
 # --- methods --- #
@@ -350,6 +351,18 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::RigidBody, u, p, t) where 
     # extract freestream parameters
     Vinf = SVector(p[npa+nps+13*N+1], p[npa+nps+13*N+2], p[npa+nps+13*N+3])
     ρ = p[npa+nps+13*N+4]
+
+    # extract rigid body inertial properties
+    m = p[npa+nps+13*N+5]
+    Ixx = p[npa+nps+13*N+6]
+    Iyy = p[npa+nps+13*N+7]
+    Izz = p[npa+nps+13*N+8]
+    Ixz = p[npa+nps+13*N+9]
+    Ixy = p[npa+nps+13*N+10]
+    Iyz = p[npa+nps+13*N+11]
+
+    # extract gravitational constant
+    g =   p[npa+nps+13*N+12]
 
     # add freestream velocity due to translation
     Vinf -= V
@@ -403,9 +416,21 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::RigidBody, u, p, t) where 
 
     end
 
-    # save total forces and moments
-    ys[1:3] = Ftot
-    ys[4:6] = Mtot
+    # add gravitational force
+    sp, cp = sincos(ϕr)
+    st, ct = sincos(θr)
+    Ftot += m*g*SVector(-st, ct*sp, ct*cp)
+
+    # save rigid body model inputs
+    ys[1] = m
+    ys[2] = Ixx
+    ys[3] = Iyy
+    ys[4] = Izz
+    ys[5] = Ixz
+    ys[6] = Ixy
+    ys[7] = Iyz
+    ys[8:10] = Ftot
+    ys[11:13] = Mtot
 
     return y
 end
@@ -533,20 +558,20 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::RigidBody,
         Mi_dΩ = Cba'*ΔL*m_dΩ
 
         # add contribution to total forces and moments
-        My[nya+1 : nya+3, iλs[i]] = Fi_dλ
+        My[nya+8 : nya+10, iλs[i]] = Fi_dλ
         Ftot_dV += Fi_dV
         Ftot_dΩ += Fi_dΩ
 
-        My[nya+4 : nya+6, iλs[i]] = GXBeam.tilde(pb)*Fi_dλ + Mi_dλ
+        My[nya+11 : nya+13, iλs[i]] = GXBeam.tilde(pb)*Fi_dλ + Mi_dλ
         Mtot_dV += GXBeam.tilde(pb)*Fi_dV + Mi_dV
         Mtot_dΩ += GXBeam.tilde(pb)*Fi_dΩ + Mi_dΩ
 
     end
 
-    My[nya+1 : nya+3, nλ+7:nλ+9] = Ftot_dV
-    My[nya+1 : nya+3, nλ+10:nλ+12] = Ftot_dΩ
-    My[nya+4 : nya+6, nλ+7:nλ+9] = Mtot_dV
-    My[nya+4 : nya+6, nλ+10:nλ+12] = Mtot_dΩ
+    My[nya+8 : nya+10, nλ+7:nλ+9] = Ftot_dV
+    My[nya+8 : nya+10, nλ+10:nλ+12] = Ftot_dΩ
+    My[nya+11 : nya+13, nλ+7:nλ+9] = Mtot_dV
+    My[nya+11 : nya+13, nλ+10:nλ+12] = Mtot_dΩ
 
     return My
 end
@@ -675,9 +700,16 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::RigidBody,
 
     end
 
-    # save total forces and moments
-    ys[1:3] = Ftot
-    ys[4:6] = Mtot
+    # save contribution to rigid body model inputs from state rates
+    ys[1] = 0
+    ys[2] = 0
+    ys[3] = 0
+    ys[4] = 0
+    ys[5] = 0
+    ys[6] = 0
+    ys[7] = 0
+    ys[8:10] = Ftot
+    ys[11:13] = Mtot
 
     return y
 end
@@ -690,7 +722,8 @@ end
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a geometrically exact beam theory model.  This model introduces the
 freestream velocity components ``\\begin{bmatrix} V_x & V_y & V_z \\end{bmatrix}^T``
-and density ``\\rho`` as additional parameters.
+and density ``\\rho``, followed by the body frame linear and angular velocities
+as additional parameters.
 
 ** When using this model, the local frame for each beam element should be
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
@@ -738,7 +771,7 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,
     end
 end
 
-number_of_parameters(::Type{<:LiftingLine}, ::Type{<:GEBT}) = 4
+number_of_parameters(::Type{<:LiftingLine}, ::Type{<:GEBT}) = 10
 
 # --- methods --- #
 
@@ -780,6 +813,10 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     # extract freestream parameters
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
     ρ = p[npa+nps+4]
+
+    # extract body frame linear and angular velocities
+    vb = SVector(p[npa+nps+5], p[npa+nps+6], p[npa+nps+7])
+    ωb = SVector(p[npa+nps+8], p[npa+nps+9], p[npa+nps+10])
 
     # extract model constants
     system = stru.system
@@ -842,6 +879,10 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*R'*mi
 
     end
+
+    # save body frame linear and angular velocities
+    ys[6*N+1 : 6*N+3] = vb
+    ys[6*N+4 : 6*N+6] = ωb
 
     return y
 end
@@ -1104,6 +1145,522 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
         ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*R'*mi
 
     end
+
+    # save contribution to body frame linear and angular velocities from rates
+    ys[6*N+1 : 6*N+3] = 0
+    ys[6*N+4 : 6*N+6] = 0
+
+    return y
+end
+
+# --- Geometrically Exact Beam Theory + Rigid Body Coupling --- #
+
+"""
+    couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody)
+
+Create an aerostructural model by coupling a lifting line aerodynamic model
+with a geometrically exact beam theory model and a rigid body dynamics model.
+This model introduces the freestream velocity components ``\\begin{bmatrix}
+V_x & V_y & V_z \\end{bmatrix}^T``, freestream density ``\\rho``, and
+gravitational constant ``g`` as additional parameters.
+
+** When using this model, the local frame for each beam element should be
+oriented with the x-axis along the beam's axis, the y-axis forward, and the
+z-axis normal to the surface **
+"""
+couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody)
+
+# --- traits --- #
+
+function inplaceness(::Type{LiftingLine{N,T}}, ::Type{<:GEBT},
+    ::Type{<:RigidBody}) where {N,T}
+
+    return InPlace()
+end
+
+function mass_matrix_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT},
+    ::Type{<:RigidBody}) where {N,T}
+
+    model_types = T.parameters
+
+    if all(isempty.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+        return Empty()
+    elseif all(iszero.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+        return Zeros()
+    elseif all(isidentity.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+        return Identity()
+    elseif all(isconstant.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+        return Constant()
+    elseif all(islinear.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+        return Linear()
+    else
+        return Nonlinear()
+    end
+
+end
+
+function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT},
+    ::Type{<:RigidBody}) where {N,T}
+
+    model_types = T.parameters
+
+    if all(isempty.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+        return Empty()
+    elseif all(iszero.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+        return Zeros()
+    elseif all(isidentity.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+        return Identity()
+    elseif all(isconstant.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+        return Constant()
+    elseif all(islinear.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+        return Linear()
+    else
+        return Nonlinear()
+    end
+
+end
+
+number_of_parameters(::Type{<:LiftingLine}, ::Type{<:GEBT}, ::Type{<:RigidBody}) = 5
+
+# --- methods --- #
+
+function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, dyn::RigidBody, u,
+    p, t) where {N,T}
+
+    # extract number of state variables, inputs, and parameters
+    nλ = number_of_states(aero) # number of aerodynamic states
+    nq = number_of_states(stru) # number of structural states
+    nd = number_of_states(dyn) # number of rigid body states
+    nya = number_of_inputs(aero) # number of aerodynamic inputs
+    nys = number_of_inputs(stru) # number of structural inputs
+    nyd = number_of_inputs(dyn) # number of rigid body inputs
+    npa = number_of_parameters(aero) # number of aerodynamic parameters
+    nps = number_of_parameters(stru) # number of structural parameters
+    npd = number_of_parameters(dyn) # number of rigid body parameters
+    Nλi = number_of_states.(T.parameters) # number of aerodynamic states for each section
+    Nyai = number_of_inputs.(T.parameters) # number of aerodynamic inputs for each section
+    Npai = number_of_parameters.(T.parameters) # number of aerodynamic inputs for each section
+
+    # get indices for state variables, inputs, and parameters
+    iλ = 1:nλ # indices of aerodynamic states
+    iya = 1:nya # indices of aerodynamic inputs
+    ipa = 1:npa # indices of aerodynamic parameters
+    iq = nλ + 1 : nλ + nq # indices of structural states
+    iys = nya + 1 : nya + nys # indices of structural inputs
+    ips = npa + 1 : npa + nps # indices of structural parameters
+    id = nλ + nq + 1 : nλ + nq + nd # indices of rigid body states
+    iyd = nya + nys + 1 : nya + nys + nyd # indices of rigid body inputs
+    ipd = npa + nps + 1 : npa + nps + npd # indices of rigid body parameters
+    iλs = state_indices(aero.models) # indices of aerodynamic states for each section
+    iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
+    ipas = parameter_indices(aero.models) # indices of aerodynamic inputs for each section
+
+    # separate state variables, inputs, and parameters
+    λ = view(u, iλ) # aerodynamic state variables
+    ya = view(y, iya) # aerodynamic inputs
+    pa = view(p, ipa) # aerodynamic parameters
+    q = view(u, iq) # structural state variables
+    ys = view(y, iys) # structural inputs
+    ps = view(p, ips) # structural parameters
+    d = view(u, id) # rigid body state variables
+    yd = view(y, iyd) # rigid body inputs
+    pd = view(p, ipd) # rigid body parameters
+    λs = view.(Ref(λ), iλs) # aerodynamic state variables for each section
+    yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
+    pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
+
+    # extract rigid body states
+    xr, yr, zr, ϕr, θr, ψr, ur, vr, wr, pr, qr, rr = d
+    V = SVector(ur, vr, wr)
+    Ω = SVector(pr, qr, rr)
+
+    # extract freestream parameters
+    Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
+    ρ = p[npa+nps+4]
+
+    # add freestream velocity due to translation
+    Vinf -= V
+
+    # extract model constants
+    system = stru.system
+    assembly = stru.assembly
+
+    # initialize total forces and moments
+    Ftot = @SVector zeros(3)
+    Mtot = @SVector zeros(3)
+
+    # initialize rigid body properties
+    mass = 0.0
+    Ir = @SMatrix zeros(3,3)
+
+    # loop through each beam element / lifting line section
+    for i = 1:N
+
+        # get current structural element
+        element = assembly.elements[i]
+
+        # extract element aerodynamic states
+        λi = SVector{Nλi[i]}(λs[i])
+
+        # get structural state variables corresponding to this element
+        states = extract_element_state(system, i, q)
+
+        # element length
+        ΔL = element.L
+
+        # element mass and section inertia matrix (in body frame about element center)
+        # TODO: get these properties in a less roundabout way
+        mi = ΔL*element.minv11[1,1]
+        Ii = ΔL*(CtCab*R')*inv(element.minv22)*(R*CtCab')
+
+        # location of element (in body frame)
+        pelem = element.x + states.u
+
+        # transformation matrix from local beam frame to the body frame
+
+        # NOTE: We assume that the local beam frame y-axis is oriented towards
+        # the leading edge and the z-axis is oriented up
+
+        Ct = GXBeam.get_C(states.theta)'
+        Cab = element.Cab
+        CtCab = Ct*Cab
+
+        # transformation matrix from local beam frame to local aerodynamic frame
+
+        # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
+        # in the chordwise direction and the z-axis in the (airfoil) normal
+        # direction.
+
+        R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
+
+        # transform freestream velocity from body frame to local aerodynamic frame
+        vi = R*CtCab'*Vinf
+
+        # add local freestream linear velocities due to surface motion
+        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+
+        # calculate local section angular velocities due to surface motion
+        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+
+        # calculate lifting line section inputs
+        ui = vcat(λi, vi, ωi) # section state variables
+        pi = vcat(SVector{Npai[i]}(pas[i]), ρ) # section parameters
+        yi = get_inputs(aero.models[i], LiftingLineSection(), ui, pi, t)
+
+        # extract and save aerodynamic model inputs (in local aerodynamic frame)
+        for iy = 1:Nyai[i]
+            yas[i][iy] = yi[iy]
+        end
+
+        # extract forces and moments per unit length (in local aerodynamic frame)
+        fi = SVector(yi[Nyai[i]+1], yi[Nyai[i]+2], yi[Nyai[i]+3])
+        mi = SVector(yi[Nyai[i]+4], yi[Nyai[i]+5], yi[Nyai[i]+6])
+
+        # save force and moment per unit length (in body frame)
+        ys[6*(i-1)+1 : 6*(i-1)+3] = CtCab*R'*fi
+        ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*R'*mi
+
+        # add local forces and moments to total forces and moments (in body frame)
+        Ftot += Fi
+        Mtot += cross(pelem, Fi) + Mi
+
+        # add element mass and inertia to total mass and inertia
+        mass += mi
+        Ir += Ii + mi*(pelem'*pelem*I - pelem*pelem')
+
+    end
+
+    # save body frame linear and angular velocities
+    ys[6*N+1 : 6*N+3] = vb
+    ys[6*N+4 : 6*N+6] = ωb
+
+    # save rigid body model inputs
+    yd[1] = mass
+    yd[2] = Ixx = Ir[1,1]
+    yd[3] = Iyy = Ir[2,2]
+    yd[4] = Izz = Ir[3,3]
+    yd[5] = Ixz = Ir[1,3]
+    yd[6] = Ixy = Ir[1,2]
+    yd[7] = Iyz = Ir[2,3]
+    yd[8:10] = Ftot
+    yd[11:13] = Mtot
+
+    return y
+end
+
+function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
+    dyn::RigidBody, u, p, t) where {N,T}
+
+    #TODO: add inertial loads due to non-zero linear and angular acceleration terms
+
+    # start with zero valued mass matrix
+    My .= 0
+
+    # extract number of state variables, inputs, and parameters
+    nλ = number_of_states(aero) # number of aerodynamic states
+    nq = number_of_states(stru) # number of structural states
+    nya = number_of_inputs(aero) # number of aerodynamic inputs
+    nys = number_of_inputs(stru) # number of structural inputs
+    npa = number_of_parameters(aero) # number of aerodynamic parameters
+    nps = number_of_parameters(stru) # number of structural parameters
+    Nλi = number_of_states.(T.parameters) # number of aerodynamic states for each section
+    Nyai = number_of_inputs.(T.parameters) # number of aerodynamic inputs for each section
+    Npai = number_of_parameters.(T.parameters) # number of aerodynamic inputs for each section
+
+    # get indices for state variables, inputs, and parameters
+    iλ = 1:nλ # indices of aerodynamic states
+    iya = 1:nya # indices of aerodynamic inputs
+    ipa = 1:npa # indices of aerodynamic parameters
+    iq = nλ + 1 : nλ + nq # indices of structural states
+    iys = nya + 1 : nya + nys # indices of structural inputs
+    ips = npa + 1 : npa + nps # indices of structural parameters
+    iλs = state_indices(aero.models) # indices of aerodynamic states for each section
+    iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
+    ipas = parameter_indices(aero.models) # indices of aerodynamic inputs for each section
+
+    # separate state variables, inputs, and parameters
+    λ = view(u, iλ) # aerodynamic state variables
+    pa = view(p, ipa) # aerodynamic parameters
+    q = view(u, iq) # structural state variables
+    ps = view(p, ips) # structural parameters
+    λs = view.(Ref(λ), iλs) # aerodynamic state variables for each section
+    pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
+
+    # extract freestream parameters
+    Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
+    ρ = p[npa+nps+4]
+
+    # extract model constants
+    system = stru.system
+    assembly = stru.assembly
+
+    # loop through each lifting line / beam element
+    for i = 1:N
+
+        # get current structural element
+        element = assembly.elements[i]
+
+        # extract aerodynamic state variables corresponding to this element
+        λi = SVector{Nλi[i]}(λs[i])
+
+        # get structural state variables corresponding to this element
+        states = extract_element_state(system, i, q)
+
+        # transformation matrix from local beam frame to the body frame
+
+        # NOTE: We assume that the local beam frame y-axis is oriented towards
+        # the leading edge and the z-axis is oriented up
+
+        Ct = GXBeam.get_C(states.theta)'
+        Cab = element.Cab
+        CtCab = Ct*Cab
+
+        # transformation matrix from local beam frame to local aerodynamic frame
+
+        # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
+        # in the chordwise direction and the z-axis in the (airfoil) normal
+        # direction.
+
+        R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
+
+        # transform freestream velocity from body frame to local aerodynamic frame
+        vi = R*CtCab'*Vinf
+
+        # add local freestream linear velocities due to surface motion
+        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+
+        dv_dP = -R * element.minv11 * system.mass_scaling
+        dv_dH = -R * element.minv12 * system.mass_scaling
+
+        # calculate local section angular velocities due to surface motion
+        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+
+        dω_dP = R * element.minv12' * system.mass_scaling
+        dω_dH = R * element.minv22 * system.mass_scaling
+
+        # calculate lifting line section input mass matrix
+        ui = vcat(λi, vi, ωi) # section state variables
+        pi = vcat(SVector{Npai[i]}(pas[i]), ρ) # section parameters
+        Myi = get_input_mass_matrix(aero.models[i], LiftingLineSection(), ui, pi, t)
+
+        # separate into component mass matrices
+        d_dλ = SMatrix{Nyai[i], Nλi[i]}(view(Myi, 1:Nyai[i], 1:Nλi[i]))
+
+        d_dv = SMatrix{Nyai[i], 3}(view(Myi, 1:Nyai[i], Nλi[i]+1 : Nλi[i]+3))
+        d_dω = SMatrix{Nyai[i], 3}(view(Myi, 1:Nyai[i], Nλi[i]+4 : Nλi[i]+6))
+        d_dP = d_dv * dv_dP + d_dω * dω_dP
+        d_dH = d_dv * dv_dH + d_dω * dω_dH
+
+        f_dλ = SMatrix{3, Nλi[i]}(view(Myi, Nyai[i]+1 : Nyai[i]+3, 1:Nλi[i]))
+        m_dλ = SMatrix{3, Nλi[i]}(view(Myi, Nyai[i]+4 : Nyai[i]+6, 1:Nλi[i]))
+
+        f_dv = SMatrix{3, 3}(view(Myi, Nyai[i]+1 : Nyai[i]+3, Nλi[i]+1 : Nλi[i]+3))
+        f_dω = SMatrix{3, 3}(view(Myi, Nyai[i]+1 : Nyai[i]+3, Nλi[i]+4 : Nλi[i]+6))
+        f_dP = f_dv * dv_dP + f_dω * dω_dP
+        f_dH = f_dv * dv_dH + f_dω * dω_dH
+
+        m_dv = SMatrix{3, 3}(view(Myi, Nyai[i]+4 : Nyai[i]+6, Nλi[i]+1 : Nλi[i]+3))
+        m_dω = SMatrix{3, 3}(view(Myi, Nyai[i]+4 : Nyai[i]+6, Nλi[i]+4 : Nλi[i]+6))
+        m_dP = m_dv * dv_dP + m_dω * dω_dP
+        m_dH = m_dv * dv_dH + m_dω * dω_dH
+
+        # save aerodynamic input mass matrix entries (in local aerodynamic frame)
+        icol = system.icol_beam[i]
+        My[iyas[i], iλs[i]] = d_dλ
+        My[iyas[i], nλ+icol+12:nλ+icol+14] = d_dP
+        My[iyas[i], nλ+icol+15:nλ+icol+17] = d_dH
+
+        # save load mass matrix entries (in body frame)
+        offset = nya + 6*(i-1)
+        My[offset+1 : offset+3, iλs[i]] = CtCab*R'*f_dλ
+        My[offset+4 : offset+6, iλs[i]] = CtCab*R'*m_dλ
+        My[offset+1 : offset+3, nλ+icol+12:nλ+icol+14] = CtCab*R'*f_dP
+        My[offset+1 : offset+3, nλ+icol+15:nλ+icol+17] = CtCab*R'*f_dH
+        My[offset+4 : offset+6, nλ+icol+12:nλ+icol+14] = CtCab*R'*m_dP
+        My[offset+4 : offset+6, nλ+icol+15:nλ+icol+17] = CtCab*R'*m_dH
+
+    end
+
+    return My
+end
+
+# --- performance overloads --- #
+
+# TODO
+
+# --- unit testing methods --- #
+
+function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
+    dyn::RigidBody, du, u, p, t) where {N,T}
+
+    #TODO: add inertial loads due to non-zero linear and angular acceleration terms
+
+    # initialize input vector
+    models = (aero, stru)
+    TF = promote_type(eltype(du), eltype(u), eltype(p), typeof(t))
+    Nu = number_of_inputs(models)
+    y = zeros(TF, Nu)
+
+    # extract number of state variables, inputs, and parameters
+    nλ = number_of_states(aero) # number of aerodynamic states
+    nq = number_of_states(stru) # number of structural states
+    nya = number_of_inputs(aero) # number of aerodynamic inputs
+    nys = number_of_inputs(stru) # number of structural inputs
+    npa = number_of_parameters(aero) # number of aerodynamic parameters
+    nps = number_of_parameters(stru) # number of structural parameters
+    Nλi = number_of_states.(T.parameters) # number of aerodynamic states for each section
+    Nyai = number_of_inputs.(T.parameters) # number of aerodynamic inputs for each section
+    Npai = number_of_parameters.(T.parameters) # number of aerodynamic inputs for each section
+
+    # get indices for state variables, inputs, and parameters
+    iλ = 1:nλ # indices of aerodynamic states
+    iya = 1:nya # indices of aerodynamic inputs
+    ipa = 1:npa # indices of aerodynamic parameters
+    iq = nλ + 1 : nλ + nq # indices of structural states
+    iys = nya + 1 : nya + nys # indices of structural inputs
+    ips = npa + 1 : npa + nps # indices of structural parameters
+    iλs = state_indices(aero.models) # indices of aerodynamic states for each section
+    iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
+    ipas = parameter_indices(aero.models) # indices of aerodynamic inputs for each section
+
+    # separate state rates, states, inputs, and parameters
+    dλ = view(du, iλ) # aerodynamic states rates
+    λ = view(u, iλ) # aerodynamic state variables
+    ya = view(y, iya) # aerodynamic inputs
+    pa = view(p, ipa) # aerodynamic parameters
+    dq = view(du, iq) # structural state rates
+    q = view(u, iq) # structural state variables
+    ys = view(y, iys) # structural inputs
+    ps = view(p, ips) # structural parameters
+    dλs = view.(Ref(dλ), iλs) # aerodynamic state rates for each section
+    λs = view.(Ref(λ), iλs) # aerodynamic state variables for each section
+    yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
+    pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
+
+    # extract freestream parameters
+    Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
+    ρ = p[npa+nps+4]
+
+    # extract model constants
+    system = stru.system
+    assembly = stru.assembly
+
+    # loop through each lifting line / beam element
+    for i = 1:N
+
+        # get current structural element
+        element = assembly.elements[i]
+
+        # extract element aerodynamic state rates and states
+        dλi = SVector{Nλi[i]}(dλs[i])
+        λi = SVector{Nλi[i]}(λs[i])
+
+        # get element structural state rates and states
+        states = extract_element_state(system, i, q)
+        dstates = extract_element_state(system, i, dq)
+
+        # transformation matrix from local beam frame to the body frame
+
+        # NOTE: We assume that the local beam frame y-axis is oriented towards
+        # the leading edge and the z-axis is oriented up
+
+        Ct = GXBeam.get_C(states.theta)'
+        Cab = element.Cab
+        CtCab = Ct*Cab
+
+        # transformation matrix from local beam frame to local aerodynamic frame
+
+        # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
+        # in the chordwise direction and the z-axis in the (airfoil) normal
+        # direction.
+
+        R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
+
+        # transform freestream velocity from body frame to local aerodynamic frame
+        vi = R*CtCab'*Vinf
+
+        # add velocity due to surface motion
+        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+
+        # calculate freestream acceleration due to surface motion
+        dvi = -R*GXBeam.element_linear_velocity(element, dstates.P, dstates.H)
+
+        # calculate local section angular velocities due to surface motion
+        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+
+        # calculate local section angular accelerations due to surface motion
+        dωi = R*GXBeam.element_angular_velocity(element, dstates.P, dstates.H)
+
+        # calculate lifting line section inputs from state rate contributions
+        dui = vcat(dλi, dvi, dωi) # section state rates
+        ui = vcat(λi, vi, ωi) # section states
+        pi = vcat(SVector{Npai[i]}(pas[i]), ρ) # section parameters
+        yi = get_inputs_from_state_rates(aero.models[i], LiftingLineSection(),
+            dui, ui, pi, t)
+
+        # extract and save aerodynamic model inputs (in local aerodynamic frame)
+        for iy = 1:Nyai[i]
+            yas[i][iy] = yi[iy]
+        end
+
+        # extract forces and moments per unit length (in local aerodynamic frame)
+        fi = SVector(yi[Nyai[i]+1], yi[Nyai[i]+2], yi[Nyai[i]+3])
+        mi = SVector(yi[Nyai[i]+4], yi[Nyai[i]+5], yi[Nyai[i]+6])
+
+        # add apparent forces from rigid body acceleration
+        r = element.x + states.u
+        fi += element.mass*(dvi + cross(dωi, r))
+        mi += element.mass*dωi
+
+        # save force and moment per unit length (in body frame)
+        ys[6*(i-1)+1 : 6*(i-1)+3] = CtCab*R'*fi
+        ys[6*(i-1)+4 : 6*(i-1)+6] = CtCab*R'*mi
+
+    end
+
+    # save contribution to body frame linear and angular velocities from rates
+    ys[6*N+1 : 6*N+3] = 0
+    ys[6*N+4 : 6*N+6] = 0
 
     return y
 end

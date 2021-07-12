@@ -3,11 +3,12 @@
 
 Geometrically exact beam theory model, as implemented by the GXBeam package.
 State variables are as defined by GXBeam. Inputs correspond to the (non-follower)
-distributed aerodynamic loads on each beam element with distributed loads.
+prescribed forces/displacements on each node with prescribed conditions followed
+by the (non-follower) distributed loads on each beam element with distributed loads.
+At this point in time, this model doesn't accept any parameters.
+
 When coupled with an aerodynamic model, the local beam y and z-axes should be
 aligned with the negative chordwise and positive normal directions, respectively.
-
-At this point in time, this model doesn't accept any parameters.
 """
 struct GEBT{TF, TV, TM} <: AbstractModel
     system::GXBeam.System{TF, TV, TM}
@@ -57,7 +58,7 @@ function get_rates!(dq, model::GEBT, q, r, p, t)
     prescribed = model.prescribed
     distributed = model.distributed
 
-    # extract system constants and  pointers
+    # extract system constants and pointers
     force_scaling = system.force_scaling
     mass_scaling = system.mass_scaling
     irow_pt = system.irow_pt
