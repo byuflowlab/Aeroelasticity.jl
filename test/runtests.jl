@@ -65,7 +65,7 @@ function run_coupling_tests(models...;
     u = rand(number_of_states(models)),
     p = rand(number_of_parameters(models)),
     t = rand(),
-    atol = 1e-10,
+    atol = sqrt(eps()),
     norm = (x)->norm(x, Inf),
     test_mass_matrix = has_input_mass_matrix(models...))
 

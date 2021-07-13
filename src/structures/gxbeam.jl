@@ -98,7 +98,7 @@ end
 number_of_states(model::GEBT) = 18*length(model.icol_beam) + 6*length(model.icol_pt)
 
 function number_of_inputs(model::GEBT)
-    return 6*length(model.icol_pt) + 6*length(model.icol_beam)
+    return 6*length(model.icol_pt) + 6*length(model.icol_beam) + 6
 end
 
 number_of_parameters(model::GEBT) = 3*length(model.icol_pt) + 36*length(model.icol_beam)
