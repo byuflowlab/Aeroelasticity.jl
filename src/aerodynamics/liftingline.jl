@@ -1576,15 +1576,15 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         # add local freestream linear velocities due to surface motion
         vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
-        dv_dV = Cba*dVinf_dV
-        dv_dΩ = Cba*GXBeam.tilde(pb)
+        dv_dV = R*CtCab'*dVinf_dV
+        dv_dΩ = R*CtCab'*GXBeam.tilde(pb)
         dv_dP = -R * element.minv11 * stru.mass_scaling
         dv_dH = -R * element.minv12 * stru.mass_scaling
 
         # calculate local section angular velocities due to surface motion
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
-        dω_dΩ = Cba
+        dω_dΩ = R*CtCab'
         dω_dP = R * element.minv12' * stru.mass_scaling
         dω_dH = R * element.minv22 * stru.mass_scaling
 
