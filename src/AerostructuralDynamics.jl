@@ -30,6 +30,10 @@ export get_rates, get_rates!
 export get_state_jacobian, get_state_jacobian!
 export get_input_jacobian, get_input_jacobian!
 
+export default_parameters, default_inputs
+
+import Base.isempty
+
 include("traits.jl")
 include("interface.jl")
 include("structures/section.jl")

@@ -843,9 +843,13 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
     ρ = p[npa+nps+4]
 
-    # extract model constants
-    system = stru.system
-    assembly = stru.assembly
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
+    # construct assembly from structural parameters
+    assembly = gxbeam_assembly(ps, npoint, nelem, stru.element_start,
+        stru.element_stop)
 
     # loop through each beam element
     for i = 1:N
@@ -857,14 +861,24 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         λi = SVector{Nλi[i]}(λs[i])
 
         # get structural state variables corresponding to this element
-        states = extract_element_state(system, i, q)
+        icol = stru.icol_beam[i]
+        u_elem = SVector(q[icol], q[icol+1], q[icol+2])
+        θ_elem = SVector(q[icol+3], q[icol+4], q[icol+5])
+        F_elem = SVector(q[icol+6], q[icol+7], q[icol+8]) .* stru.force_scaling
+        M_elem = SVector(q[icol+9], q[icol+10], q[icol+11]) .* stru.force_scaling
+        P_elem = SVector(q[icol+12], q[icol+13], q[icol+14]) .* stru.mass_scaling
+        H_elem = SVector(q[icol+15], q[icol+16], q[icol+17]) .* stru.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(θ_elem)
+        θ_elem *= scaling
 
         # transformation matrix from local beam frame to the body frame
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
 
-        Ct = GXBeam.get_C(states.theta)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
@@ -880,10 +894,10 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         vi = R*CtCab'*Vinf
 
         # add local freestream linear velocities due to surface motion
-        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+        vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
         # calculate local section angular velocities due to surface motion
-        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
         # calculate lifting line section inputs
         ui = vcat(λi, vi, ωi) # section state variables
@@ -947,9 +961,12 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
     ρ = p[npa+nps+4]
 
-    # extract model constants
-    system = stru.system
-    assembly = stru.assembly
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(ps, npoint, nelem, stru.element_start, stru.element_stop)
 
     # loop through each lifting line / beam element
     for i = 1:N
@@ -961,14 +978,24 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         λi = SVector{Nλi[i]}(λs[i])
 
         # get structural state variables corresponding to this element
-        states = extract_element_state(system, i, q)
+        icol = stru.icol_beam[i]
+        u_elem = SVector(q[icol], q[icol+1], q[icol+2])
+        θ_elem = SVector(q[icol+3], q[icol+4], q[icol+5])
+        F_elem = SVector(q[icol+6], q[icol+7], q[icol+8]) .* stru.force_scaling
+        M_elem = SVector(q[icol+9], q[icol+10], q[icol+11]) .* stru.force_scaling
+        P_elem = SVector(q[icol+12], q[icol+13], q[icol+14]) .* stru.mass_scaling
+        H_elem = SVector(q[icol+15], q[icol+16], q[icol+17]) .* stru.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(θ_elem)
+        θ_elem *= scaling
 
         # transformation matrix from local beam frame to the body frame
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
 
-        Ct = GXBeam.get_C(states.theta)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
@@ -984,16 +1011,16 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         vi = R*CtCab'*Vinf
 
         # add local freestream linear velocities due to surface motion
-        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+        vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
-        dv_dP = -R * element.minv11 * system.mass_scaling
-        dv_dH = -R * element.minv12 * system.mass_scaling
+        dv_dP = -R * element.minv11 * stru.mass_scaling
+        dv_dH = -R * element.minv12 * stru.mass_scaling
 
         # calculate local section angular velocities due to surface motion
-        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
-        dω_dP = R * element.minv12' * system.mass_scaling
-        dω_dH = R * element.minv22 * system.mass_scaling
+        dω_dP = R * element.minv12' * stru.mass_scaling
+        dω_dH = R * element.minv22 * stru.mass_scaling
 
         # calculate lifting line section input mass matrix
         ui = vcat(λi, vi, ωi) # section state variables
@@ -1022,7 +1049,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         m_dH = m_dv * dv_dH + m_dω * dω_dH
 
         # save aerodynamic input mass matrix entries (in local aerodynamic frame)
-        icol = system.icol_beam[i]
+        icol = stru.icol_beam[i]
         My[iyas[i], iλs[i]] = d_dλ
         My[iyas[i], nλ+icol+12:nλ+icol+14] = d_dP
         My[iyas[i], nλ+icol+15:nλ+icol+17] = d_dH
@@ -1095,9 +1122,13 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
     Vinf = SVector(p[npa+nps+1], p[npa+nps+2], p[npa+nps+3])
     ρ = p[npa+nps+4]
 
-    # extract model constants
-    system = stru.system
-    assembly = stru.assembly
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(ps, npoint, nelem, stru.element_start, stru.element_stop)
+
 
     # loop through each lifting line / beam element
     for i = 1:N
@@ -1110,15 +1141,32 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
         λi = SVector{Nλi[i]}(λs[i])
 
         # get element structural state rates and states
-        states = extract_element_state(system, i, q)
-        dstates = extract_element_state(system, i, dq)
+        icol = stru.icol_beam[i]
+        u_elem = SVector(q[icol], q[icol+1], q[icol+2])
+        θ_elem = SVector(q[icol+3], q[icol+4], q[icol+5])
+        F_elem = SVector(q[icol+6], q[icol+7], q[icol+8]) .* stru.force_scaling
+        M_elem = SVector(q[icol+9], q[icol+10], q[icol+11]) .* stru.force_scaling
+        P_elem = SVector(q[icol+12], q[icol+13], q[icol+14]) .* stru.mass_scaling
+        H_elem = SVector(q[icol+15], q[icol+16], q[icol+17]) .* stru.mass_scaling
+
+        du_elem = SVector(dq[icol], dq[icol+1], dq[icol+2])
+        dθ_elem = SVector(dq[icol+3], dq[icol+4], dq[icol+5])
+        dF_elem = SVector(dq[icol+6], dq[icol+7], dq[icol+8]) .* stru.force_scaling
+        dM_elem = SVector(dq[icol+9], dq[icol+10], dq[icol+11]) .* stru.force_scaling
+        dP_elem = SVector(dq[icol+12], dq[icol+13], dq[icol+14]) .* stru.mass_scaling
+        dH_elem = SVector(dq[icol+15], dq[icol+16], dq[icol+17]) .* stru.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(θ_elem)
+        θ_elem *= scaling
+        dθ_elem *= scaling
 
         # transformation matrix from local beam frame to the body frame
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
 
-        Ct = GXBeam.get_C(states.theta)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
@@ -1134,16 +1182,16 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, du, u, 
         vi = R*CtCab'*Vinf
 
         # add velocity due to surface motion
-        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+        vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
         # calculate freestream acceleration due to surface motion
-        dvi = -R*GXBeam.element_linear_velocity(element, dstates.P, dstates.H)
+        dvi = -R*GXBeam.element_linear_velocity(element, dP_elem, dH_elem)
 
         # calculate local section angular velocities due to surface motion
-        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
         # calculate local section angular accelerations due to surface motion
-        dωi = R*GXBeam.element_angular_velocity(element, dstates.P, dstates.H)
+        dωi = R*GXBeam.element_angular_velocity(element, dP_elem, dH_elem)
 
         # calculate lifting line section inputs from state rate contributions
         dui = vcat(dλi, dvi, dωi) # section state rates
@@ -1285,9 +1333,12 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, dyn::RigidBody, u, p
     # add freestream velocity due to translation
     Vinf -= V
 
-    # extract model constants
-    system = stru.system
-    assembly = stru.assembly
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(ps, npoint, nelem, stru.element_start, stru.element_stop)
 
     # initialize total forces and moments
     Ftot = @SVector zeros(3)
@@ -1307,14 +1358,24 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, dyn::RigidBody, u, p
         λi = SVector{Nλi[i]}(λs[i])
 
         # get structural state variables corresponding to this element
-        states = extract_element_state(system, i, q)
+        icol = stru.icol_beam[i]
+        u_elem = SVector(q[icol], q[icol+1], q[icol+2])
+        θ_elem = SVector(q[icol+3], q[icol+4], q[icol+5])
+        F_elem = SVector(q[icol+6], q[icol+7], q[icol+8]) .* stru.force_scaling
+        M_elem = SVector(q[icol+9], q[icol+10], q[icol+11]) .* stru.force_scaling
+        P_elem = SVector(q[icol+12], q[icol+13], q[icol+14]) .* stru.mass_scaling
+        H_elem = SVector(q[icol+15], q[icol+16], q[icol+17]) .* stru.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(θ_elem)
+        θ_elem *= scaling
 
         # transformation matrix from local beam frame to the body frame
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
 
-        Ct = GXBeam.get_C(states.theta)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
@@ -1330,10 +1391,10 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, dyn::RigidBody, u, p
         vi = R*CtCab'*Vinf
 
         # add local freestream linear velocities due to surface motion
-        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+        vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
         # calculate local section angular velocities due to surface motion
-        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
         # calculate lifting line section inputs
         ui = vcat(λi, vi, ωi) # section state variables
@@ -1366,7 +1427,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, dyn::RigidBody, u, p
         Ielem = ΔL*(CtCab*R')*inv(element.minv22)*(R*CtCab')
 
         # location of element (in body frame)
-        pelem = element.x + states.u
+        pelem = element.x + u_elem
 
         # add contribution to total force and moment per unit length
         Ftot += ΔL*fbi
@@ -1453,9 +1514,13 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
     Vinf -= V
     dVinf_dV = -SMatrix{3,3}(I)
 
-    # extract model constants
-    system = stru.system
-    assembly = stru.assembly
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(ps, npoint, nelem, stru.element_start, stru.element_stop)
+
 
     # initialize total forces and moments
     Ftot_dV = @SMatrix zeros(3, 3)
@@ -1473,17 +1538,27 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         λi = SVector{Nλi[i]}(λs[i])
 
         # get structural state variables corresponding to this element
-        states = extract_element_state(system, i, q)
+        icol = stru.icol_beam[i]
+        u_elem = SVector(q[icol], q[icol+1], q[icol+2])
+        θ_elem = SVector(q[icol+3], q[icol+4], q[icol+5])
+        F_elem = SVector(q[icol+6], q[icol+7], q[icol+8]) .* stru.force_scaling
+        M_elem = SVector(q[icol+9], q[icol+10], q[icol+11]) .* stru.force_scaling
+        P_elem = SVector(q[icol+12], q[icol+13], q[icol+14]) .* stru.mass_scaling
+        H_elem = SVector(q[icol+15], q[icol+16], q[icol+17]) .* stru.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(θ_elem)
+        θ_elem *= scaling
 
         # location of element (in body frame)
-        pelem = element.x + states.u
+        pelem = element.x + u_elem
 
         # transformation matrix from local beam frame to the body frame
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
 
-        Ct = GXBeam.get_C(states.theta)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
@@ -1499,19 +1574,19 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         vi = R*CtCab'*Vinf
 
         # add local freestream linear velocities due to surface motion
-        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+        vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
         dv_dV = Cba*dVinf_dV
         dv_dΩ = Cba*GXBeam.tilde(pb)
-        dv_dP = -R * element.minv11 * system.mass_scaling
-        dv_dH = -R * element.minv12 * system.mass_scaling
+        dv_dP = -R * element.minv11 * stru.mass_scaling
+        dv_dH = -R * element.minv12 * stru.mass_scaling
 
         # calculate local section angular velocities due to surface motion
-        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
         dω_dΩ = Cba
-        dω_dP = R * element.minv12' * system.mass_scaling
-        dω_dH = R * element.minv22 * system.mass_scaling
+        dω_dP = R * element.minv12' * stru.mass_scaling
+        dω_dH = R * element.minv22 * stru.mass_scaling
 
         # calculate lifting line section input mass matrix
         ui = vcat(λi, vi, ωi) # section state variables
@@ -1546,7 +1621,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         m_dH = m_dv * dv_dH + m_dω * dω_dH
 
         # save aerodynamic input mass matrix entries (in local aerodynamic frame)
-        icol = system.icol_beam[i]
+        icol = stru.icol_beam[i]
         My[iyas[i], iλs[i]] = d_dλ
         My[iyas[i], nλ+icol+12:nλ+icol+14] = d_dP
         My[iyas[i], nλ+icol+15:nλ+icol+17] = d_dH
@@ -1674,9 +1749,12 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, dyn::Ri
     # add freestream velocity due to translation
     Vinf -= V
 
-    # extract model constants
-    system = stru.system
-    assembly = stru.assembly
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(ps, npoint, nelem, stru.element_start, stru.element_stop)
 
     # initialize total forces and moments
     Ftot = @SVector zeros(3)
@@ -1693,21 +1771,38 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, dyn::Ri
         λi = SVector{Nλi[i]}(λs[i])
 
         # get element structural state rates and states
-        states = extract_element_state(system, i, q)
-        dstates = extract_element_state(system, i, dq)
+        icol = stru.icol_beam[i]
+        u_elem = SVector(q[icol], q[icol+1], q[icol+2])
+        θ_elem = SVector(q[icol+3], q[icol+4], q[icol+5])
+        F_elem = SVector(q[icol+6], q[icol+7], q[icol+8]) .* stru.force_scaling
+        M_elem = SVector(q[icol+9], q[icol+10], q[icol+11]) .* stru.force_scaling
+        P_elem = SVector(q[icol+12], q[icol+13], q[icol+14]) .* stru.mass_scaling
+        H_elem = SVector(q[icol+15], q[icol+16], q[icol+17]) .* stru.mass_scaling
+
+        du_elem = SVector(dq[icol], dq[icol+1], dq[icol+2])
+        dθ_elem = SVector(dq[icol+3], dq[icol+4], dq[icol+5])
+        dF_elem = SVector(dq[icol+6], dq[icol+7], dq[icol+8]) .* stru.force_scaling
+        dM_elem = SVector(dq[icol+9], dq[icol+10], dq[icol+11]) .* stru.force_scaling
+        dP_elem = SVector(dq[icol+12], dq[icol+13], dq[icol+14]) .* stru.mass_scaling
+        dH_elem = SVector(dq[icol+15], dq[icol+16], dq[icol+17]) .* stru.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(θ_elem)
+        θ_elem *= scaling
+        dθ_elem *= scaling
 
         # element length
         ΔL = element.L
 
         # location of element (in body frame)
-        pelem = element.x + states.u
+        pelem = element.x + u_elem
 
         # transformation matrix from local beam frame to the body frame
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
 
-        Ct = GXBeam.get_C(states.theta)'
+        Ct = GXBeam.get_C(θ_elem)'
         Cab = element.Cab
         CtCab = Ct*Cab
 
@@ -1723,16 +1818,16 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT, dyn::Ri
         vi = R*CtCab'*Vinf
 
         # add velocity due to surface motion
-        vi -= R*GXBeam.element_linear_velocity(element, states.P, states.H)
+        vi -= R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
 
         # calculate freestream acceleration due to surface motion
-        dvi = -R*GXBeam.element_linear_velocity(element, dstates.P, dstates.H)
+        dvi = -R*GXBeam.element_linear_velocity(element, dP_elem, dH_elem)
 
         # calculate local section angular velocities due to surface motion
-        ωi = R*GXBeam.element_angular_velocity(element, states.P, states.H)
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
         # calculate local section angular accelerations due to surface motion
-        dωi = R*GXBeam.element_angular_velocity(element, dstates.P, dstates.H)
+        dωi = R*GXBeam.element_angular_velocity(element, dP_elem, dH_elem)
 
         # calculate lifting line section inputs from state rate contributions
         dui = vcat(dλi, dvi, dωi) # section state rates

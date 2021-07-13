@@ -19,15 +19,15 @@ function has_input_mass_matrix(models...)
     return !zero_matrix
 end
 
-function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf),
+function run_model_tests(model;
+    du = rand(number_of_states(model)),
+    u = rand(number_of_states(model)),
+    y = rand(number_of_inputs(model)),
+    p = rand(number_of_parameters(model)),
+    t = rand(),
+    atol = sqrt(eps()),
+    norm = (x)->norm(x, Inf),
     test_mass_matrix = has_mass_matrix(model))
-
-    # sample arguments
-    du = rand(number_of_states(model))
-    u = rand(number_of_states(model))
-    y = rand(number_of_inputs(model))
-    p = rand(number_of_parameters(model))
-    t = rand()
 
     # state jacobian test
     fu = (u) -> get_rates(model, u, y, p, t)
@@ -60,14 +60,14 @@ function run_model_tests(model; atol = 1e-10, norm = (x)->norm(x, Inf),
     return nothing
 end
 
-function run_coupling_tests(models...; atol = 1e-10, norm = (x)->norm(x, Inf),
+function run_coupling_tests(models...;
+    du = rand(number_of_states(models)),
+    u = rand(number_of_states(models)),
+    p = rand(number_of_parameters(models)),
+    t = rand(),
+    atol = 1e-10,
+    norm = (x)->norm(x, Inf),
     test_mass_matrix = has_input_mass_matrix(models...))
-
-    # sample arguments
-    du = rand(number_of_states(models))
-    u = rand(number_of_states(models))
-    p = rand(number_of_parameters(models))
-    t = rand()
 
     # jacobian test
     fu = (u) -> get_inputs(models, u, p, t)
@@ -133,48 +133,69 @@ end
 
 @testset "Geometrically Exact Beam Theory" begin
 
-    # test on its own
+    # number of elements
+    nelem = 4
 
-    N = 4
-
-    x = range(0, 60, length=N+1)
+    # point locations
+    x = range(0, 60, length=nelem+1)
     y = zero(x)
     z = zero(x)
     points = [[x[i],y[i],z[i]] for i = 1:length(x)]
 
-    start = 1:N
-    stop = 2:N+1
+    # element connectivity
+    start = 1:nelem
+    stop = 2:nelem+1
 
-    stiffness = fill(
-        [2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
+    # element orientation
+    e1 = [1, 0, 0]
+    e2 = [0, 1, 0]
+    e3 = [0, 0, 1]
+    frame = hcat(e1, e2, e3)
+
+    # element stiffness properties
+    stiffness = [
+         2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
          1.524e6  4.334e8 -3.741e6 -2.935e5  1.527e7  3.835e5
          6.734e6 -3.741e6  2.743e7 -4.592e5 -6.869e5 -4.742e6
         -3.382e7 -2.935e5 -4.592e5  2.167e7 -6.279e5  1.430e6
         -2.627e7  1.527e7 -6.869e5 -6.279e5  1.970e7  1.209e7
-        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8],
-        N)
+        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8
+        ]
+    compliance = inv(stiffness)
+    compliance_entries = [compliance[i,j] for i = 1:6 for j = i:6]
 
-    mass = fill(
-        [258.053      0.0        0.0      0.0      7.07839  -71.6871
+    # element inertial properties
+    mass = [
+         258.053      0.0        0.0      0.0      7.07839  -71.6871
            0.0      258.053      0.0     -7.07839  0.0        0.0
            0.0        0.0      258.053   71.6871   0.0        0.0
            0.0       -7.07839   71.6871  48.59     0.0        0.0
            7.07839    0.0        0.0      0.0      2.172      0.0
-         -71.6871     0.0        0.0      0.0      0.0       46.418],
-         N)
+         -71.6871     0.0        0.0      0.0      0.0       46.418
+         ]
 
-    assembly = Assembly(points, start, stop; stiffness=stiffness, mass=mass)
+    # construct assembly
+    assembly = Assembly(points, start, stop;
+        frames = fill(frame, nelem),
+        stiffness = fill(stiffness, nelem),
+        mass = fill(mass, nelem))
 
+    # define boundary conditions and applied loads
     prescribed = Dict(
             # fixed left side
             1 => PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
+            # force on right side
+            nelem+1 => PrescribedConditions(Fz=1e5)
             )
 
-    distributed = Dict(i => DistributedLoads(assembly, i) for i = 1:N)
+    # define model
+    model = GEBT(assembly, prescribed)
 
-    system = System(assembly, keys(prescribed), false)
+    # # use provided parameters (instead of random parameters)
+    # p = default_parameters(model, assembly)
 
-    model = GEBT(system, assembly, prescribed, distributed)
+    # # use provided inputs (instead of random inputs)
+    # y = default_inputs(model, assembly; prescribed)
 
     run_model_tests(model)
 end
@@ -200,44 +221,60 @@ end
 
     # test coupling with GXBeam
 
+    # point locations
     x = range(0, 60, length=N+1)
     y = zero(x)
     z = zero(x)
     points = [[x[i],y[i],z[i]] for i = 1:length(x)]
 
+    # element connectivity
     start = 1:N
     stop = 2:N+1
 
-    stiffness = fill(
-        [2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
+    # element orientation
+    e1 = [1, 0, 0]
+    e2 = [0, 1, 0]
+    e3 = [0, 0, 1]
+    frame = hcat(e1, e2, e3)
+
+    # element stiffness properties
+    stiffness = [
+         2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
          1.524e6  4.334e8 -3.741e6 -2.935e5  1.527e7  3.835e5
          6.734e6 -3.741e6  2.743e7 -4.592e5 -6.869e5 -4.742e6
         -3.382e7 -2.935e5 -4.592e5  2.167e7 -6.279e5  1.430e6
         -2.627e7  1.527e7 -6.869e5 -6.279e5  1.970e7  1.209e7
-        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8],
-        N)
+        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8
+        ]
+    compliance = inv(stiffness)
+    compliance_entries = [compliance[i,j] for i = 1:6 for j = i:6]
 
-    mass = fill(
-        [258.053      0.0        0.0      0.0      7.07839  -71.6871
+    # element inertial properties
+    mass = [
+         258.053      0.0        0.0      0.0      7.07839  -71.6871
            0.0      258.053      0.0     -7.07839  0.0        0.0
            0.0        0.0      258.053   71.6871   0.0        0.0
            0.0       -7.07839   71.6871  48.59     0.0        0.0
            7.07839    0.0        0.0      0.0      2.172      0.0
-         -71.6871     0.0        0.0      0.0      0.0       46.418],
-         N)
+         -71.6871     0.0        0.0      0.0      0.0       46.418
+         ]
 
-    assembly = Assembly(points, start, stop; stiffness=stiffness, mass=mass)
+    # construct assembly
+    assembly = Assembly(points, start, stop;
+        frames = fill(frame, N),
+        stiffness = fill(stiffness, N),
+        mass = fill(mass, N))
 
+    # define boundary conditions and applied loads
     prescribed = Dict(
             # fixed left side
             1 => PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
+            # force on right side
+            N+1 => PrescribedConditions(Fz=1e5)
             )
 
-    distributed = Dict(i => DistributedLoads(assembly, i) for i = 1:N)
-
-    system = System(assembly, keys(prescribed), false)
-
-    structural_model = GEBT(system, assembly, prescribed, distributed)
+    # define model
+    structural_model = GEBT(assembly, prescribed)
 
     run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), structural_model)
     run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), structural_model)
