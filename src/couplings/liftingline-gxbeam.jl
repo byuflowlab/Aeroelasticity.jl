@@ -4,13 +4,14 @@
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a geometrically exact beam theory model.  This model introduces additional
 parameters corresponding to the freestream velocity components ``V_x``, ``V_y``,
-``V_z``, air density ``\\rho``, body linear velocity components ``u``,
-``v``, ``w``, body angular velocity components ``p``, ``q``, ``r``, external
-loads ``F_{x,i}``, ``F_{y,i}``, ``F_{z,i}``, ``M_{x,i}``, ``M_{y,i}``,
-``M_{z,i}`` or displacements ``u_{x,i}``, ``u_{y,i}``, ``u_{z,i}``,
-``\\theta_{x,i}``, ``\\theta_{y,i}``, ``\\theta_{z,i}`` for each node, and
-constant distributed loads ``f_{x,i}``, ``f_{y,i}``, ``f_{z,i}``, ``m_{x,i}``,
-``m_{y,i}``, ``m_{z,i}`` for each beam element (excluding aerodynamic loads).
+``V_z``, followed by the air density ``\\rho``, followed by the external loads
+``F_{x,i}``, ``F_{y,i}``, ``F_{z,i}``, ``M_{x,i}``, ``M_{y,i}``, ``M_{z,i}`` or
+displacements ``u_{x,i}``, ``u_{y,i}``, ``u_{z,i}``, ``\\theta_{x,i}``,
+``\\theta_{y,i}``, ``\\theta_{z,i}`` for each node, followed by the constant
+distributed loads ``f_{x,i}``, ``f_{y,i}``, ``f_{z,i}``, ``m_{x,i}``,
+``m_{y,i}``, ``m_{z,i}`` for each beam element (excluding aerodynamic loads),
+followed by the body frame linear and angular velocity. ``u``, ``v``, ``w``,
+``p``, ``q``, ``r``.
 
 ** When using this model, the local frame for each beam element should be
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
@@ -99,8 +100,17 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
-    # global parameters (first 10 additional parameters)
-    Vx, Vy, Vz, ρ, ur, vr, wr, pr, qr, rr = pc
+    # global parameters
+    Vx = pc[1]
+    Vy = pc[2]
+    Vz = pc[3]
+    ρ = pc[4]
+    ur = pc[end-5]
+    vr = pc[end-4]
+    wr = pc[end-3]
+    pr = pc[end-2]
+    qr = pc[end-1]
+    rr = pc[end]
 
     # freestream velocity
     Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
@@ -116,7 +126,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     # save prescribed point loads/displacements
     for ip = 1:npoint
         yoff = nya + 6*(ip-1)
-        poff = npa + nps + 10 + 6*(ip-1)
+        poff = npa + nps + 4 + 6*(ip-1)
         y[yoff+1] = p[poff+1]
         y[yoff+2] = p[poff+2]
         y[yoff+3] = p[poff+3]
@@ -164,7 +174,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         fi = CtCab*R'*SVector(yi[Nyi+1], yi[Nyi+2], yi[Nyi+3])
         mi = CtCab*R'*SVector(yi[Nyi+4], yi[Nyi+5], yi[Nyi+6])
         # add constant distributed loads (in body frame)
-        poff = 10 + 6*npoint + 6*(i-1)
+        poff = 4 + 6*npoint + 6*(i-1)
         fi += SVector(pc[poff+1], pc[poff+2], pc[poff+3])
         mi += SVector(pc[poff+4], pc[poff+5], pc[poff+6])
         # save distributed loads for this element (in body frame)
@@ -220,8 +230,17 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     uas = view.(Ref(ua), iuas) # aerodynamic state variables for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
-    # global parameters (first 10 additional parameters)
-    Vx, Vy, Vz, ρ, ur, vr, wr, pr, qr, rr = pc
+    # global parameters
+    Vx = pc[1]
+    Vy = pc[2]
+    Vz = pc[3]
+    ρ = pc[4]
+    ur = pc[end-5]
+    vr = pc[end-4]
+    wr = pc[end-3]
+    pr = pc[end-2]
+    qr = pc[end-1]
+    rr = pc[end]
 
     # freestream velocity
     Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
@@ -359,8 +378,17 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
-    # global parameters (first 10 additional parameters)
-    Vx, Vy, Vz, ρ, ur, vr, wr, pr, qr, rr = pc
+    # global parameters
+    Vx = pc[1]
+    Vy = pc[2]
+    Vz = pc[3]
+    ρ = pc[4]
+    ur = pc[end-5]
+    vr = pc[end-4]
+    wr = pc[end-3]
+    pr = pc[end-2]
+    qr = pc[end-1]
+    rr = pc[end]
 
     # freestream velocity
     Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)

@@ -1,6 +1,6 @@
 # Examples
 
-## Two-Dimensional Aeroelastic Analysis
+## Aeroelastic Analysis of a Typical Section
 
 In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.
 
@@ -26,13 +26,13 @@ where ``a`` is the normalized distance from the semichord to the reference point
 
 We perform aeroelastic analyses using a variety of aerodynamic models in order to compare the various models.
 
-```@setup two-dimensional-stability
+```@setup typical-section-stability
 using Plots
 pyplot()
 nothing #hide
 ```
 
-```@example two-dimensional-stability
+```@example typical-section-stability
 using AerostructuralDynamics, LinearAlgebra
 
 # reduced velocity range
@@ -117,7 +117,7 @@ nothing #hide
 
 We now plot the results predicted using each aerodynamic model.
 
-```@example two-dimensional-stability
+```@example typical-section-stability
 using Plots
 pyplot()
 
@@ -192,56 +192,56 @@ end
 
 p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 
-savefig(p1, "two-dimensional-stability.svg") #hide
+savefig(p1, "typical-section-stability.svg") #hide
 
 nothing #hide
 ```
 
-![](two-dimensional-stability.svg)
+![](typical-section-stability.svg)
 
 The same analysis and results are presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity" for the steady state and Peters' Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.
 
-## Three Dimensional Aeroelastic Analysis
+## Aeroelastic Analysis of a Cantilever Wing
 
-In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.
+In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.  We perform this analysis using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been extensively used for validation.  
 
-```@setup three-dimensional-stability
+```@setup goland-stability
 using Plots
 pyplot()
 nothing #hide
 ```
 
-```@example three-dimensional-stability
+```@example goland-stability
 using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
 
 # discretization
 N = 8 # number of elements
 
 # geometric properties
-span = 16 # m
-chord = 1 # m (chord)
-xref = 0.5 # normalized reference location (from leading edge)
-xcg = 0.5 # center of gravity (from leading edge)
-
-# freestream properties
-Vinf = range(1, 30, length=50) # m/s (velocity)
-α = 2*pi/180 # angle of attack
-
-# aerodynamic section properties
-a = xref - 0.5 # normalized reference location (relative to semi-chord)
-b = chord / 2 # m (semi-chord)
-ρ = 0.088 # kg/m^3 (air density)
-a0 = 2*pi # lift slope (for each section)
-α0 = 0 # zero lift angle of attack (for each section)
+span = 6.096 # m (wing half span)
+chord = 1.8288 # m (chord)
 
 # structural section properties
-EIcc = 2e4 # N*m^2 (flat bending rigidity)
-EInn = 4e6 # N*m^2 (chord bending rigidity)
-GJ = 1e4 # N*m^2 (torsional rigidity)
-μ = 0.75 # kg/m (mass per unit span)
-i11 = 0.1 # kg*m (rotational inertia per unit span)
-i22 = 0.0375 # moment of inertia about beam y-axis
-i33 = 0.0625 # moment of inertia about beam z-axis
+xea = 0.33*chord # m (elastic axis, from leading edge)
+EIcc = 9.77e6 # N*m^2 (flat bending rigidity)
+GJ = 0.99e6 # N*m^2 (torsional rigidity)
+μ = 35.71 # kg/m (mass per unit length)
+xcm = 0.43*chord # m (center of mass, from leading edge)
+i11 = 8.64 # kg*m (moment of inertia about elastic axis)
+i22 = 0.1*i11 # moment of inertia about beam y-axis
+i33 = 0.9*i11 # moment of inertia about beam z-axis
+
+# freestream properties
+Vinf = 0:5:200 # m/s (velocity)
+α = 0 # angle of attack
+
+# aerodynamic section properties
+xref = xea/chord # normalized reference location (relative to leading edge)
+a = xref - 0.5 # normalized reference location (relative to semi-chord)
+b = chord / 2 # m (semi-chord)
+ρ = 1.02 # kg/m^3 (air density)
+a0 = 0.85*(2*pi) # lift slope (for each section)
+α0 = 0 # zero lift angle of attack (for each section)
 
 # define geometry
 xpt = range(0, 0, length=N+1) # point x-coordinates (in body frame)
@@ -251,8 +251,15 @@ points = [[xpt[i],ypt[i],zpt[i]] for i = 1:N+1]
 start = 1:N # starting point of each beam element
 stop = 2:N+1 # ending point of each beam element
 frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
-compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 1/EInn]), N) # compliance matrix
-mass = fill(Diagonal([μ, μ, μ, i11, i22, i33]), N) # mass matrix
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 0]), N) # compliance matrix
+xm2 = xea - xcm
+mass = fill([
+    μ 0 0 0 0 -μ*xm2;
+    0 μ 0 0 0 0;
+    0 0 μ μ*xm2 0 0;
+    0 0 μ*xm2 i11 0 0;
+    0 0 0 0 i22 0;
+    -μ*xm2 0 0 0 0 i33], N) # mass matrix
 assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
 
 # boundary condition initialization
@@ -262,21 +269,11 @@ prescribed = Dict(
         theta_z=0),
 )
 
-# distributed load initialization
-distributed = Dict()
-for i = 1:N
-    # distributed load on each beam element
-    distributed[i] = GXBeam.DistributedLoads(assembly, i)
-end
-
-# structural system initialization
-system = GXBeam.System(assembly, keys(prescribed), false)
-
 # construct aerodynamic model
 aerodynamic_model = LiftingLine{N}(Peters{6}())
 
 # construct structural model
-structural_model = GEBT(system, assembly, prescribed, distributed)
+structural_model = GEBT(assembly, prescribed)
 
 # define simulation models
 models = (aerodynamic_model, structural_model)
@@ -284,7 +281,6 @@ models = (aerodynamic_model, structural_model)
 # eigenvalue storage
 λ = zeros(ComplexF64, number_of_states(models), length(Vinf))
 
-# state variable initial guess
 u0 = zeros(number_of_states(models))
 
 # loop through each velocity
@@ -292,10 +288,11 @@ for i = 1:length(Vinf)
 
     println("Vinf: ", Vinf[i])
 
-    # set parameters and current time
+    # set state variables, parameters, and current time
     p_aero = vcat(fill([a, b, a0, α0], N)...)
-    p_stru = Float64[]
-    p_additional = [-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ]
+    p_stru = default_parameters(structural_model, assembly)
+    p_additional = vcat(-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ,
+        default_inputs(structural_model, assembly; prescribed=prescribed))
     p = vcat(p_aero, p_stru, p_additional)
     t = 0
 
@@ -338,30 +335,29 @@ default(
     framestyle = :zerolines)
 
 sp1 = plot(
-    xlim = (1, 30),
-    xtick = vcat(1, 5:5:30),
+    xlim = (0, 200),
+    xtick = 0:40:200,
     xlabel = "Velocity (m/s)",
-    ylim = (0, 90),
-    ytick = 0.0:10:90,
+    ylim = (0, 1000),
+    ytick = 0:100:1000,
     ylabel = "Frequency (rad/s)",
     legend = :topright
     )
 
 sp2 = plot(
-    xlim = (1, 30),
-    xtick = vcat(1, 5:5:30),
+    xlim = (0, 200),
+    xtick = 0:40:200,
     xlabel = "Velocity (m/s)",
-    ylim = (-12, 8),
-    ytick = -12:4:8,
-    ylabel = "Damping Ratio %",
+    ylim = (-80, 20),
+    ytick = -80:20:20,
+    ylabel = "Damping (1/s)",
     legend = :topleft
     )
 
 for i = 1:size(λ, 1)
 
-    idx = findall(x -> abs(x) < 500, λ[i,:])
-    Vi = Vinf[idx]
-    λi = λ[i,idx]
+    Vi = Vinf[:]
+    λi = λ[i,:]
 
     scatter!(sp1, Vi, imag.(λi),
         label = "",
@@ -373,13 +369,11 @@ end
 
 for i = 1:size(λ, 1)
 
-    idx = findall(x -> abs(x) < 500, λ[i,:])
-    Vi = Vinf[idx]
-    λi = λ[i,idx]
+    Vi = Vinf[:]
+    λi = λ[i,:]
 
     scatter!(sp2, Vi,
-        # real.(λi),
-        real.(λi)./abs.(λi)*100,
+        real.(λi),
         label = "",
         color = 1,
         markersize = 3,
@@ -388,4 +382,5 @@ for i = 1:size(λ, 1)
 end
 
 p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)
+
 ```

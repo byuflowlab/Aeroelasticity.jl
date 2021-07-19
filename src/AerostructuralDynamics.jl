@@ -33,6 +33,7 @@ export get_input_jacobian, get_input_jacobian!
 export default_parameters, default_inputs
 
 import Base.isempty
+import Base.iszero
 
 # Interface Functions
 include("traits.jl")

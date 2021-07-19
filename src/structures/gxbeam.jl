@@ -294,6 +294,7 @@ function default_parameters(model::GEBT, assembly)
 
     for ie = 1:ne
         element = assembly.elements[ie]
+        minv11, minv12, minv22 = element.minv11, element.minv12, element.minv22
         element_mass = inv([minv11 minv12; minv12' minv22])
         p[3*np + 36*(ie-1) + 1] = element.Cab[1,1]
         p[3*np + 36*(ie-1) + 2] = element.Cab[2,1]
