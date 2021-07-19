@@ -203,7 +203,7 @@ end
 @testset "Lifting Line" begin
 
     # number of lifting line sections
-    N = 4
+    N = 1
 
     # test on its own
     run_model_tests(LiftingLine{N}(QuasiSteady{0}()))
@@ -213,11 +213,11 @@ end
     run_model_tests(LiftingLine{N}(Peters{4}()))
 
     # test coupling with RigidBody
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), RigidBody())
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), RigidBody())
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), RigidBody())
-    run_coupling_tests(LiftingLine{4}(Wagner()), RigidBody())
-    run_coupling_tests(LiftingLine{4}(Peters{4}()), RigidBody())
+    run_coupling_tests(LiftingLine{N}(QuasiSteady{0}()), RigidBody())
+    run_coupling_tests(LiftingLine{N}(QuasiSteady{1}()), RigidBody())
+    run_coupling_tests(LiftingLine{N}(QuasiSteady{2}()), RigidBody())
+    run_coupling_tests(LiftingLine{N}(Wagner()), RigidBody())
+    run_coupling_tests(LiftingLine{N}(Peters{4}()), RigidBody())
 
     # test coupling with GXBeam
 
@@ -276,15 +276,15 @@ end
     # define model
     structural_model = GEBT(assembly, prescribed)
 
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), structural_model)
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), structural_model)
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), structural_model)
-    run_coupling_tests(LiftingLine{4}(Wagner()), structural_model)
-    run_coupling_tests(LiftingLine{4}(Peters{4}()), structural_model)
+    run_coupling_tests(LiftingLine{1}(QuasiSteady{0}()), structural_model)
+    run_coupling_tests(LiftingLine{1}(QuasiSteady{1}()), structural_model)
+    run_coupling_tests(LiftingLine{1}(QuasiSteady{2}()), structural_model)
+    run_coupling_tests(LiftingLine{1}(Wagner()), structural_model)
+    run_coupling_tests(LiftingLine{1}(Peters{4}()), structural_model)
 
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{0}()), structural_model, RigidBody())
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{1}()), structural_model, RigidBody())
-    run_coupling_tests(LiftingLine{4}(QuasiSteady{2}()), structural_model, RigidBody())
-    run_coupling_tests(LiftingLine{4}(Wagner()), structural_model, RigidBody())
-    run_coupling_tests(LiftingLine{4}(Peters{4}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{1}(QuasiSteady{0}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{1}(QuasiSteady{1}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{1}(QuasiSteady{2}()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{1}(Wagner()), structural_model, RigidBody())
+    run_coupling_tests(LiftingLine{1}(Peters{4}()), structural_model, RigidBody())
 end

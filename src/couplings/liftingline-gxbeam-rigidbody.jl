@@ -314,14 +314,14 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
     # global parameters (first 5 additional parameters)
     Vx, Vy, Vz, ρ, g = pc
 
+    # body angular velocity
+    Ω = SVector(pr, qr, rr)
+
     # freestream velocity
     Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
 
     # freestream acceleration
-    dVinf_dV = -SMatrix{3,3}(I)
-
-    # body angular velocity
-    Ω = SVector(pr, qr, rr)
+    dVinf_dV = -I
 
     # construct assembly from parameters
     npoint = length(stru.icol_pt)
@@ -371,7 +371,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
 
         # local freestream linear and angular accelerations
-        dvi_dV = R*CtCab'*dVinf_dV
+        dvi_dV = -R*CtCab'
         dvi_dΩ = R*CtCab'*GXBeam.tilde(pe)
         dvi_dPi = -R * element.minv11 * stru.mass_scaling
         dvi_dHi = -R * element.minv12 * stru.mass_scaling
@@ -447,6 +447,11 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         m_dV = CtCab*R'*m_dV
         m_dΩ = CtCab*R'*m_dΩ
 
+        # # add apparent forces due to body frame linear and angular acceleration
+        f_dV -= me*I
+        f_dΩ -= me*GXBeam.tilde(pe)
+        m_dΩ -= me*I
+
         # save load mass matrix entries
         offset = 6*npoint + 6*(i-1)
         My[iys[offset+1 : offset+3], iua[iuas[i]]] = f_dλi
@@ -467,8 +472,8 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT,
         Ftot_dV += ΔL*f_dV
         Ftot_dΩ += ΔL*f_dΩ
         My[iyd[11:13], iua[iuas[i]]] = GXBeam.tilde(pe)*ΔL*f_dλi + ΔL*m_dλi
-        My[iyd[11:13], ius[icol+12:icol+14]] = ΔL*m_dPi
-        My[iyd[11:13], ius[icol+15:icol+17]] = ΔL*m_dHi
+        My[iyd[11:13], ius[icol+12:icol+14]] = GXBeam.tilde(pe)*ΔL*f_dPi + ΔL*m_dPi
+        My[iyd[11:13], ius[icol+15:icol+17]] = GXBeam.tilde(pe)*ΔL*f_dHi + ΔL*m_dHi
         Mtot_dV += GXBeam.tilde(pe)*ΔL*f_dV + ΔL*m_dV
         Mtot_dΩ += GXBeam.tilde(pe)*ΔL*f_dΩ + ΔL*m_dΩ
     end
@@ -569,7 +574,6 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
 
     # freestream acceleration
     dVinf = -dV
-
 
     # construct assembly from parameters
     npoint = length(stru.icol_pt)
