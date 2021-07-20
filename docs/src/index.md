@@ -8,39 +8,22 @@
 
 Author: Taylor McDonnell
 
-**AerostructuralDynamics** is an aerostructural model coupling and analysis tool which simulates the behavior of coupled or decoupled aerodynamic, structural, and/or rigid-body dynamics models.
+**AerostructuralDynamics** is a multi-fidelity modeling and analysis framework which is designed to simulate the behavior of coupled and/or decoupled aerodynamic, structural, and/or rigid-body dynamics models.
 
 ## Package Features
- - Provides a framework for coupling aerodynamic and structural models for analysis and/or simulation.
- - Interfaces with DifferentialEquations to simulate the behavior of aerostructural models. #TODO
- - Defines a variety of aerodynamic and structural models
+ - Provides a framework for coupling multiple models together for analysis and/or simulation.
+ - Defines a variety of aerodynamic, structural, and dynamics models
    - Aerodynamic Models:
-     - Steady (2D)
-     - Quasi-Steady (2D)
+     - Steady and/or Quasi-Steady Thin Airfoil Theory (2D)
      - Wagner's Function (2D)
      - Peters' Finite State (2D)
-     - Steady Vortex Lattice (3D) #TODO
-     - Quasi-Steady Vortex Lattice (3D) #TODO
-     - Unsteady Vortex Lattice (3D) #TODO
+     - Lifting Line (3D)
    - Structural Dynamics Models:
-     - Typical Section (2D)
-     - Geometrically Exact Beam Assemblies (3D) #TODO
+     - Two Degree of Freedom Typical Section (2D)
+     - Geometrically Exact Beam Theory (3D)
    - Dynamics Models:
-     - Rigid Body (3D) #TODO
- - Defines the following coupled models
-   - Typical Section with:
-     - Steady (2D)
-     - Quasi-Steady (2D)
-     - Wagner's Function (2D)
-     - Peters' Finite State (2D)
-   - Geometrically Exact Beam Assemblies with:
-     - Quasi-Steady (2D) #TODO
-     - Wagner's Function (2D) #TODO
-     - Peters' Finite State (2D) #TODO
-     - Steady Vortex Lattice (3D) #TODO
-     - Quasi-Steady Vortex Lattice (3D) #TODO
-     - Unsteady Vortex Lattice (3D) #TODO
- - Verifications and/or validations of implemented models (see the [examples](@ref Examples))
+     - Rigid Body (3D)
+ - Verified and/or validated against theoretical, computational, and/or experimental results (see the [examples](https://flow.byu.edu/AerostructuralDynamics.jl/dev))
 
 ## Installation
 
