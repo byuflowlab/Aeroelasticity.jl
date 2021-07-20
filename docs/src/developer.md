@@ -1,6 +1,6 @@
 # Developer's Guide
 
-In this guide, we define a new aerodynamic and structural model and c then couple them together to form a new aeroelastic model.  The same process may be followed to define and/or couple any number of models together.
+In this guide, we define a new aerodynamic and structural model and then couple them together to form a new aeroelastic model.  The same process may be followed to define and/or couple any number of models together.
 
 ```@contents
 Pages = ["developer.md"]

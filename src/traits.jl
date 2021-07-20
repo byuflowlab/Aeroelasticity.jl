@@ -1,5 +1,3 @@
-# --- Model Abstractions --- #
-
 """
     AbstractModel
 

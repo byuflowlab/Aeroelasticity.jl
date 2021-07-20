@@ -152,7 +152,11 @@ When coupled with a structural model, aircraft linear and angular accelerations 
 
 ### Two-Dimensional Models
 
-#### [`TypicalSection`](@ref)
+#### Typical Section Model[`TypicalSection`](@ref)
+
+```@docs
+TypicalSection
+```
 
 ![](typical-section.svg)
 

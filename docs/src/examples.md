@@ -395,7 +395,6 @@ pyplot()
 nothing #hide
 ```
 
-
 ```@example blended-wing-body-stability
 using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
 
@@ -447,8 +446,8 @@ points2 = [[xpt2[i],ypt2[i],zpt2[i]] for i = 1:NW+1]
 frames2 = fill( , NW)
 compliance2 = fill(Diagonal([1/EA[2], 0, 0, 1/GJ[2], 1/EIcc[2], 1/EInn[2]]), NW)
 mass2 = fill(Diagonal([μ[2], μ[2], μ[2], i11[2], i22[2], i33[2]]), NW)
-a2 = linterp(xref[2]/chord[2] - 0.5, xref[3]/chord[3] - 0.5, length=NW)
-b2 = linterp(chord[2]/2, chord[3]/2, length=NW) # m (semi-chord)
+a2 = linterp(xref[2]/chord[2] - 0.5, xref[3]/chord[3] - 0.5; length = NW)
+b2 = linterp(chord[2]/2, chord[3]/2; length = NW) # m (semi-chord)
 a02 = fill(2*pi, NW) # lift slope (for each section)
 α02 = fill(0.0, NW) # zero lift angle of attack (for each section)
 
@@ -496,7 +495,7 @@ for i = 1:length(Vinf)
     println("Vinf: ", Vinf[i])
 
     # set state variables, parameters, and current time
-    p_aero = vcat(fill([a, b, a0, α0], N)...)
+    p_aero = vcat([(a[i], b[i], a0[i], α0[i]) for i = 1:N]...)
     p_stru = default_parameters(structural_model, assembly)
     p_additional = vcat(-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ,
         default_inputs(structural_model, assembly; prescribed=prescribed))
