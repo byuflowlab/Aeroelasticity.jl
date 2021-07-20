@@ -62,7 +62,7 @@ number_of_parameters(models...) = number_of_parameters(typeof.(models)...)
 
 # combined models have concatenated parameters
 function number_of_parameters(models::NTuple{N,AbstractModel}) where N
-    sum(number_of_parameters.(models)) + number_of_parameters(typeof.(models)...)
+    sum(number_of_parameters.(models)) + number_of_parameters(models...)
 end
 
 # combined models have concatenated parameters
