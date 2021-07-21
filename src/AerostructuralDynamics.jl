@@ -6,7 +6,7 @@ using GXBeam
 using LinearAlgebra
 using LinearMaps
 using StaticArrays
-import DiffEqBase.ODEFunction
+using DiffEqBase
 
 export AbstractModel
 export TypicalSection, LiftingLineSection, RigidBody, GEBT
@@ -14,6 +14,7 @@ export Steady, QuasiSteady, Wagner, Peters, LiftingLine
 
 export couple_models
 export stability_analysis
+export ode_function
 
 export number_of_states
 export number_of_inputs

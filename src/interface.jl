@@ -1260,253 +1260,372 @@ function _stability_analysis(::InPlace, model, x, y, p, t; nev=20)
 end
 
 """
-    ODEFunction(model)
+    ode_function(model)
 
 Construct an ODEFunction corresponding to the specified model or models which
 may be solved using DifferentialEquations.
 """
-ODEFunction(model::TM) where TM = _ODEFunction(inplaceness(TM), model)
+function ode_function(model::TM) where TM
+    return _ode_function(mass_matrix_type(TM), inplaceness(TM), model)
+end
 
-# function _ODEFunction(::OutOfPlace, model)
-#
-#     # problem dimensions
-#     Nu = number_of_states(model)
-#     Ny = number_of_inputs(model)
-#     Np = number_of_parameters(model)
-#
-#     # rate function
-#     f = (u, p, t) -> get_rates(models, u, get_inputs(models, u, p, t), p, t)
-#
-#     # mass matrix function
-#         if constant_mass_matrix(models)
-#             mass_matrix = get_mass_matrix(models)
-#         else
-#             # initialize mass matrix
-#             M = zeros(Nu, Nu)
-#             # initialize cached input mass matrix
-#             My_cache = zeros(Ny, Nu)
-#             # construct update function
-#             update_func = (M, u, p, t) -> begin
-#                 # check if we can use the cache variables (no custom types)
-#                 if eltype(M) <: Float64
-#                     # update the cache variables
-#                     if (u != ucache) && (p != pcache) && (t != tcache[])
-#                         # calculate and store new model inputs
-#                         get_inputs!(ycache, models, u, p, t;
-#                             uperm = ucache, pperm = pcache)
-#                         # store current input arguments
-#                         ucache .= u
-#                         pcache .= p
-#                         tcache .= t
-#                     end
-#                     # use the cached model inputs
-#                     y = ycache
-#                 else
-#                     # calculate model inputs (out-of-place to accomodate custom type)
-#                     y = get_inputs(models, u, p, t)
-#                 end
-#                 # update type of `My`
-#                 My = convert(typeof(M), My_cache)
-#                 # calculate inputs
-#                 get_mass_matrix!(M, models, u, y, p, t; My = convert(typeof(M), My))
-#             end
-#             # construct mass matrix operator
-#             mass_matrix = DiffEqArrayOperator(M; update_func)
-#         end
-#     else
-#         mass_matrix = I
-#     end
-#
-#     # construct jacobian function
-#     if defined_jacobian(models)
-#         if isinplace(models)
-#             jac = (J, u, p, t) -> begin
-#                 # check if we can use the cache variables (no custom types)
-#                 if eltype(du) <: Float64
-#                     # update the cache variables
-#                     if (u != ucache) && (p != pcache) && (t != tcache[])
-#                         # calculate and store new model inputs
-#                         get_inputs!(ycache, models, u, p, t;
-#                             uperm = ucache, pperm = pcache)
-#                         # store current input arguments
-#                         ucache .= u
-#                         pcache .= p
-#                         tcache .= t
-#                     end
-#                     # use the cached model inputs
-#                     y = ycache
-#                 else
-#                     # calculate model inputs (out-of-place to accomodate custom type)
-#                     y = get_inputs(models, u, p, t)
-#                 end
-#                 # calculate jacobian
-#                 get_state_jacobian!(J, models, u, y, p, t)
-#             end
-#         else
-#             jac = (u, p, t) -> begin
-#                 # check if we can use the cache variables (no custom types)
-#                 if eltype(du) <: Float64
-#                     # update the cache variables
-#                     if (u != ucache) && (p != pcache) && (t != tcache[])
-#                         # calculate and store new model inputs
-#                         y = get_inputs(models, u, p, t)
-#                         # store current input arguments
-#                         ucache .= u
-#                         pcache .= p
-#                         tcache .= t
-#                     end
-#                     # use statically sized version of the cached model inputs
-#                     y = SVector{Ny,Float64}(ycache)
-#                 else
-#                     # calculate model inputs (out-of-place to accomodate custom type)
-#                     y = get_inputs(models, u, p, t)
-#                 end
-#                 # calculate jacobian
-#                 J = get_state_jacobian(models, u, y, p, t)
-#             end
-#         end
-#     else
-#         jac = nothing # let DifferentialEquations construct the jacobian
-#     end
-#
-#     # construct and return an ODEFunction
-#     return ODEFunction{iip}(f; mass_matrix, jac)
-# end
-#
-# function _ODEFunction(::InPlace)
-#
-#     # problem dimensions
-#     Nu = number_of_states(models)
-#     Ny = number_of_inputs(models)
-#     Np = number_of_parameters(models)
-#
-#     # determine whether the problem is inplace
-#     iip = isinplace(models)
-#
-#     # create cache variables
-#     ucache = fill(NaN, Nu)
-#     ycache = fill(NaN, Ny)
-#     pcache = fill(NaN, Np)
-#     tcache = fill(NaN)
-#
-#     # construct in-place or out-of-place rate function
-#     if isinplace(models)
-#         f = (du, u, p, t) -> begin
-#             # check if we can use the cache variables (no custom types)
-#             if eltype(du) <: Float64
-#                 # update the cache variables
-#                 if (u != ucache) && (p != pcache) && (t != tcache[])
-#                     ucache .= u
-#                     get_inputs!(ycache, models, u, p, t)
-#                     pcache .= p
-#                     tcache .= t
-#                 end
-#                 # use the cached model inputs
-#                 y = ycache
-#             else
-#                 # calculate model inputs (out-of-place to accomodate custom type)
-#                 y = get_inputs(models, u, p, t)
-#             end
-#             # calculate mass matrix multiplied state rates
-#             get_rates!(du, models, u, y, p, t)
-#         end
-#     else
-#         f = (u, p, t) -> get_rates(models, u, get_inputs(models, u, p, t), p, t)
-#     end
-#
-#     # construct mass matrix (or mass matrix operator)
-#     if has_mass_matrix(models)
-#         if constant_mass_matrix(models)
-#             mass_matrix = get_mass_matrix(models)
-#         else
-#             # initialize mass matrix
-#             M = zeros(Nu, Nu)
-#             # initialize cached input mass matrix
-#             My_cache = zeros(Ny, Nu)
-#             # construct update function
-#             update_func = (M, u, p, t) -> begin
-#                 # check if we can use the cache variables (no custom types)
-#                 if eltype(M) <: Float64
-#                     # update the cache variables
-#                     if (u != ucache) && (p != pcache) && (t != tcache[])
-#                         # calculate and store new model inputs
-#                         get_inputs!(ycache, models, u, p, t;
-#                             uperm = ucache, pperm = pcache)
-#                         # store current input arguments
-#                         ucache .= u
-#                         pcache .= p
-#                         tcache .= t
-#                     end
-#                     # use the cached model inputs
-#                     y = ycache
-#                 else
-#                     # calculate model inputs (out-of-place to accomodate custom type)
-#                     y = get_inputs(models, u, p, t)
-#                 end
-#                 # update type of `My`
-#                 My = convert(typeof(M), My_cache)
-#                 # calculate inputs
-#                 get_mass_matrix!(M, models, u, y, p, t; My = convert(typeof(M), My))
-#             end
-#             # construct mass matrix operator
-#             mass_matrix = DiffEqArrayOperator(M; update_func)
-#         end
-#     else
-#         mass_matrix = I
-#     end
-#
-#     # construct jacobian function
-#     if defined_jacobian(models)
-#         if isinplace(models)
-#             jac = (J, u, p, t) -> begin
-#                 # check if we can use the cache variables (no custom types)
-#                 if eltype(du) <: Float64
-#                     # update the cache variables
-#                     if (u != ucache) && (p != pcache) && (t != tcache[])
-#                         # calculate and store new model inputs
-#                         get_inputs!(ycache, models, u, p, t;
-#                             uperm = ucache, pperm = pcache)
-#                         # store current input arguments
-#                         ucache .= u
-#                         pcache .= p
-#                         tcache .= t
-#                     end
-#                     # use the cached model inputs
-#                     y = ycache
-#                 else
-#                     # calculate model inputs (out-of-place to accomodate custom type)
-#                     y = get_inputs(models, u, p, t)
-#                 end
-#                 # calculate jacobian
-#                 get_state_jacobian!(J, models, u, y, p, t)
-#             end
-#         else
-#             jac = (u, p, t) -> begin
-#                 # check if we can use the cache variables (no custom types)
-#                 if eltype(du) <: Float64
-#                     # update the cache variables
-#                     if (u != ucache) && (p != pcache) && (t != tcache[])
-#                         # calculate and store new model inputs
-#                         y = get_inputs(models, u, p, t)
-#                         # store current input arguments
-#                         ucache .= u
-#                         pcache .= p
-#                         tcache .= t
-#                     end
-#                     # use statically sized version of the cached model inputs
-#                     y = SVector{Ny,Float64}(ycache)
-#                 else
-#                     # calculate model inputs (out-of-place to accomodate custom type)
-#                     y = get_inputs(models, u, p, t)
-#                 end
-#                 # calculate jacobian
-#                 J = get_state_jacobian(models, u, y, p, t)
-#             end
-#         end
-#     else
-#         jac = nothing # let DifferentialEquations construct the jacobian
-#     end
-#
-#     # construct and return an ODEFunction
-#     return ODEFunction{iip}(f; mass_matrix, jac)
-# end
+function _ode_function(::Identity, ::OutOfPlace, model::AbstractModel)
+
+    Np = number_of_parameters(model)
+    Ny = number_of_inputs(model)
+
+    ip = SVector{Np}(1:Np)
+    iy = SVector{Ny}(Np+1:Np+Ny)
+
+    f = (u, p, t) -> get_rates(models, u, p[iy], p[ip], t)
+
+    jac = (u, p, t) -> get_state_jacobian(models, u, p[iy], p[ip], t)
+
+    return ODEFunction{false}(f; jac)
+end
+
+function _ode_function(::Constant, ::OutOfPlace, model::AbstractModel)
+
+    Np = number_of_parameters(model)
+    Ny = number_of_inputs(model)
+
+    ip = SVector{Np}(1:Np)
+    iy = SVector{Ny}(Np+1:Np+Ny)
+
+    f = (u, p, t) -> get_rates(models, u, p[iy], p[ip], t)
+
+    mass_matrix = get_mass_matrix(models)
+
+    jac = (u, p, t) -> get_state_jacobian(models, u, p[iy], p[ip], t)
+
+    return ODEFunction{false}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Linear, ::OutOfPlace, model::AbstractModel)
+
+    Np = number_of_parameters(model)
+    Ny = number_of_inputs(model)
+
+    ip = SVector{Np}(1:Np)
+    iy = SVector{Ny}(Np+1:Np+Ny)
+
+    f = (du, u, p, t) -> get_rates!(du, models, u, p[iy], p[ip], t)
+
+    M = zeros(Nu, Nu)
+    update_func = (M, u, p, t) -> get_mass_matrix!(M, models, p[iy], p[ip], t)
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+
+    jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, p[iy], p[ip], t)
+
+    return ODEFunction{true}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Identity, ::InPlace, model::AbstractModel)
+
+    # problem dimensions
+    Nu = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    ip = 1:Np
+    iy = Np+1:Np+Ny
+
+    # construct state rate function
+    f = (du, u, p, t) ->  get_rates!(du, model, u, view(p, iy), view(p, ip), t)
+
+    # construct jacobian function
+    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
+
+    # construct and return an ODEFunction
+    return ODEFunction{true}(f; jac)
+end
+
+function _ode_function(::Constant, ::InPlace, model::AbstractModel)
+
+    # problem dimensions
+    Nu = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    ip = 1:Np
+    iy = Np+1:Np+Ny
+
+    # construct state rate function
+    f = (du, u, p, t) -> get_rates!(du, model, u, view(p, iy), view(p, ip), t)
+
+    # construct mass matrix
+    mass_matrix = get_mass_matrix(model)
+
+    # construct jacobian function
+    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
+
+    # construct and return an ODEFunction
+    return ODEFunction{true}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Linear, ::InPlace, model::AbstractModel)
+
+    # problem dimensions
+    Nu = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    ip = 1:Np
+    iy = Np+1:Np+Ny
+
+    # construct state rate function
+    f = (du, u, p, t) -> get_rates!(du, model, u, view(p, iy), view(p, ip), t)
+
+    # construct mass matrix
+    M = zeros(Nu, Nu)
+    update_func = (M, u, p, t) -> get_mass_matrix!(M, model, u, view(p, iy), view(p, ip), t)
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+
+    # construct jacobian function
+    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
+
+    # construct and return an ODEFunction
+    return ODEFunction{true}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Identity, ::OutOfPlace, model::Tuple)
+
+    fy = (u, p, t) -> get_inputs(models, u, p, t)
+
+    f = (u, p, t) -> get_rates(models, u, fy(u, p, t), p, t)
+
+    jac = (u, p, t) -> get_state_jacobian(models, u, fy(u, p, t), p, t)
+
+    return ODEFunction{false}(f; jac)
+end
+
+function _ode_function(::Constant, ::OutOfPlace, model::Tuple)
+
+    fy = (u, p, t) -> get_inputs(models, u, p, t)
+
+    f = (u, p, t) -> get_rates(models, u, fy(u, p, t), p, t)
+
+    mass_matrix = get_mass_matrix(models)
+
+    jac = (u, p, t) -> get_state_jacobian(models, u, fy(u, p, t), p, t)
+
+    return ODEFunction{false}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Linear, ::OutOfPlace, model::Tuple)
+
+    Nu = number_of_states(model)
+
+    fy = (u, p, t) -> get_inputs(model, u, p, t)
+
+    f = (du, u, p, t) -> get_rates!(du, model, u, fy(u, p, t), p, t)
+
+    M = zeros(Nu, Nu)
+    update_func = (M, u, p, t) -> get_mass_matrix!(M, model, u, fy(u, p, t), p, t)
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+
+    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, fy(u, p, t), p, t)
+
+    return ODEFunction{true}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Identity, ::InPlace, model::Tuple)
+
+    # problem dimensions
+    Nu = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # construct state rate function
+    ucache = fill(NaN, Nu)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+    f = (du, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(du) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # calculate state rates
+        get_rates!(du, model, u, y, p, t)
+    end
+
+    # construct jacobian function
+    jac = (J, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(du) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # calculate jacobian
+        get_state_jacobian!(J, model, u, y, p, t)
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true}(f; jac)
+end
+
+function _ode_function(::Constant, ::InPlace, model::Tuple)
+
+    # problem dimensions
+    Nu = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # construct state rate function
+    ucache = fill(NaN, Nu)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+    f = (du, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(du) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # calculate state rates
+        get_rates!(du, model, u, y, p, t)
+    end
+
+    # construct mass matrix
+    mass_matrix = get_mass_matrix(model)
+
+    # construct jacobian function
+    jac = (J, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(du) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # calculate jacobian
+        get_state_jacobian!(J, model, u, y, p, t)
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true}(f; mass_matrix, jac)
+end
+
+function _ode_function(::Linear, ::InPlace, model::Tuple)
+
+    # problem dimensions
+    Nu = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # construct state rate function
+    ucache = fill(NaN, Nu)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+    f = (du, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(du) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # calculate state rates
+        get_rates!(du, model, u, y, p, t)
+    end
+
+    # construct mass matrix
+    M = zeros(Nu, Nu)
+    My_cache = zeros(Ny, Nu)
+    update_func = (M, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(M) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                # store current input arguments
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # update type of `My`
+        My = convert(typeof(M), My_cache)
+        # calculate inputs
+        get_mass_matrix!(M, model, u, y, p, t; My)
+    end
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+
+    # construct jacobian function
+    jac = (J, u, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if eltype(du) <: Float64
+            # update the cache variables
+            if (u != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= u
+                get_inputs!(ycache, model, u, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_inputs(model, u, p, t)
+        end
+        # calculate jacobian
+        get_state_jacobian!(J, model, u, y, p, t)
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true}(f; mass_matrix, jac)
+end

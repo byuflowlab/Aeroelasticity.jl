@@ -14,10 +14,10 @@ If you haven't yet, now would be a good time to install AerostructuralDynamics. 
 pkg> add https://flow.byu.edu/AerostructuralDynamics.jl
 ```
 
-Now, that the package is installed we need to load it so that we can use it.  We will also be using the LinearAlgebra package from the standard library so let's load that as well.
+Now, that the package is installed we need to load it so that we can use it.
 
 ```@example guide
-using AerostructuralDynamics, LinearAlgebra
+using AerostructuralDynamics
 nothing #hide
 ```
 
@@ -113,10 +113,10 @@ For this model, the small number of states, inputs, and parameters make manually
 
 # Performing a Stability Analysis
 
-The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the [`stability_analysis`](@ref) function.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear, so no such need exists.
+The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the [`stability_analysis`](@ref) function, which determines .  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear, so no such need exists.
 
 ```@example guide
-λ, V = stability_analysis(coupled_model, u_coupled, y_coupled, p_coupled, t)
+λ, U, V = stability_analysis(coupled_model, x_coupled, y_coupled, p_coupled, t)
 nothing #hide
 ```
 
@@ -124,20 +124,22 @@ A positive real part corresponding to any eigenvalue returned from the [`stabili
 
 # Performing a Simulation
 
-We can simulate the behavior of our model by defining a [`DifferentialEquations.ODEProblem`](@ref) which may then be solved using the [`DifferentialEquations`](@ref) package.  To facilitate this process,
-convenience constructors are provided by this package for the [`DifferentialEquations.ODEProblem`](@ref) function.
+To simulate the behavior of our model we first need to create an object of type [`DifferentialEquations.ODEFunction`](@ref) using [`ode_function`](@ref).  Then DifferentialEquations may be used to solve the ordinary differential equation corresponding to the model.
 
 ```@example guide
 using DifferentialEquations
 
 # non-zero plunge degree of freedom
-u0 = [1, 0, 0, 0]
+u0 = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
 
-# simulate for 3 seconds
-tspan = (0, 3)
+# simulate for 10 seconds
+tspan = (0, 10)
+
+# construct ODE function
+f = ode_function(coupled_model)
 
 # construct ODE problem
-prob = DifferentialEquations.ODEProblem(model, u0, tspan, p_coupled; kwargs...)
+prob = DifferentialEquations.ODEProblem(f, u0, tspan, p_coupled)
 
 # solve ODE
 sol = DifferentialEquations.solve(prob)
