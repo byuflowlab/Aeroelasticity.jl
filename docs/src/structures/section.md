@@ -1,4 +1,4 @@
-# Typical Section Model
+# [Typical Section Model](@id typical-section-model)
 
 ![](typical-section.svg)
 

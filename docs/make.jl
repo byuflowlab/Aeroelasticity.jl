@@ -4,7 +4,7 @@ makedocs(;
     modules = [AerostructuralDynamics],
     pages = [
         "Home" => "index.md",
-        "Getting Started" => "guide.md"
+        "Getting Started" => "guide.md",
         "Examples" => "examples.md",
         "Models" => [
             "Aerodynamic Models" => [
@@ -25,9 +25,10 @@ makedocs(;
                 "Wagner's Function + Typical Section" => joinpath("couplings", "wagner-section.md"),
                 "Peters' Finite State + Typical Section" => joinpath("couplings", "peters-section.md"),
                 "Lifting Line + Rigid Body" => joinpath("couplings", "liftingline-rigidbody.md"),
-                "Lifting Line + Geometrically Exact Beam Theory" => joinpath("couplings", "liftingline-gebt.md"),
-                "Lifting Line + Geometrically Exact Beam Theory + Rigid Body" => joinpath("couplings", "liftingline-gebt-rigidbody.md"),
-            ]
+                "Lifting Line + Geometrically Exact Beam Theory" => joinpath("couplings", "liftingline-gxbeam.md"),
+                "Lifting Line + Geometrically Exact Beam Theory + Rigid Body" => joinpath("couplings", "liftingline-gxbeam-rigidbody.md"),
+            ],
+        ],
         "Library" => "library.md",
         "Developer Guide" => "developer.md",
     ],

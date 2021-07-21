@@ -20,10 +20,10 @@ Author: Taylor McDonnell
      - Lifting Line (3D)
    - Structural Dynamics Models:
      - Two Degree of Freedom Typical Section (2D)
-     - Geometrically Exact Beam Theory (3D)
+     - Geometrically Exact Beam Theory (As implemented by [GXBeam](https://github.com/byuflowlab/GXBeam.jl)) (3D)
    - Dynamics Models:
      - Rigid Body (3D)
- - Verified and/or validated against theoretical, computational, and/or experimental results (see the [examples](https://flow.byu.edu/AerostructuralDynamics.jl/dev))
+ - Verified and/or validated against theoretical, computational, and/or experimental results (see the [examples](@ref Examples))
 
 ## Installation
 

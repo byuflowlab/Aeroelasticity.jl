@@ -1,4 +1,4 @@
-# Peters' Finite State Model
+# [Peters' Finite State Model](@id peters-finite-state-model)
 
 ## Theory
 
