@@ -4,6 +4,7 @@ authors = ["Taylor McDonnell <taylor.golden.mcdonnell@gmail.com> and contributor
 version = "0.1.0"
 
 [deps]
+ArnoldiMethod = "ec485272-7323-5ecc-a04f-4719b315124d"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GXBeam = "974624c9-1acb-4ad6-a627-8ac40fc27a3e"

@@ -14,7 +14,7 @@ applied to each node.
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
 z-axis normal to the surface **
 """
-couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody)
+couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody) = (aero, stru, dyn)
 
 # --- traits --- #
 

@@ -1,0 +1,1 @@
+# [`Wagner`](@ref) + [`TypicalSection`](@ref)

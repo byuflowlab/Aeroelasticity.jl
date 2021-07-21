@@ -1,0 +1,1 @@
+# [`Peters`](@ref) + [`TypicalSection`](@ref)

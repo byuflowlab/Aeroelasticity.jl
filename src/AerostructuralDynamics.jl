@@ -1,15 +1,19 @@
 module AerostructuralDynamics
 
+using ArnoldiMethod
+using ForwardDiff
+using GXBeam
 using LinearAlgebra
 using LinearMaps
 using StaticArrays
-using ForwardDiff
-using GXBeam
 import DiffEqBase.ODEFunction
 
 export AbstractModel
 export TypicalSection, LiftingLineSection, RigidBody, GEBT
 export Steady, QuasiSteady, Wagner, Peters, LiftingLine
+
+export couple_models
+export stability_analysis
 
 export number_of_states
 export number_of_inputs
