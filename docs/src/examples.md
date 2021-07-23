@@ -280,8 +280,6 @@ u0 = zeros(number_of_states(model))
 # loop through each velocity
 for i = 1:length(Vinf)
 
-    println("Vinf: ", Vinf[i])
-
     # set state variables, parameters, and current time
     p_aero = vcat(fill([a, b, a0, α0], N)...)
     p_stru = set_parameters(structural_model, assembly)
