@@ -1,11 +1,9 @@
 """
     RigidBody <: AbstractModel
 
-Six-degree of freedom rigid body dynamic model with state variables ``q =
-\\begin{bmatrix} x & y & z & \\phi & \\theta & \\psi & u & v & w & p & q & r
-\\end{bmatrix}^T``, inputs ``r = \\begin{bmatrix} m & I_{xx} & I_{yy}
-& I_{zz} & I_{xz} & I_{xy} & I_{yz} & F_x & F_y & F_z & M_x & M_y &
-M_z \\end{bmatrix}^T`` and zero parameters.
+Six-degree of freedom rigid body dynamic model with state variables ``x, y, z,
+\\phi, \\theta, \\psi, u, v, w, p, q, r``, inputs ``m, I_{xx}, I_{yy}, I_{zz},
+I_{xz}, I_{xy}, I_{yz}, F_x, F_y, F_z, M_x, M_y, M_z`` and zero parameters.
 """
 struct RigidBody <: AbstractModel end
 
