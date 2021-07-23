@@ -6,7 +6,7 @@ lifting line section model.  The existence of this coupling allows
 [`QuasiSteady`](@ref) to be used with [`LiftingLine`](@ref). This model
 introduces the freestream air density ``\\rho`` as an additional parameter.
 """
-couple_models(aero::QuasiSteady, stru::LiftingLineSection)
+couple_models(aero::QuasiSteady, stru::LiftingLineSection) = (aero, stru)
 
 # --- traits --- #
 

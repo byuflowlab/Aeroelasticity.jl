@@ -1203,7 +1203,7 @@ function _get_input_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
 end
 
 """
-    stability_analysis(model::TM, x, y, p, t; kwargs...)
+    get_eigen(model::TM, x, y, p, t; kwargs...)
 
 Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
 corresponding to the model for state variables `x`, inputs `y`, parameters `p`,
@@ -1212,11 +1212,11 @@ and time `t`.
 For in-place models, the number of eigenvalues to compute may be specified using
 the `nev` keyword argument.
 """
-function stability_analysis(model::TM, x, y, p, t; kwargs...) where TM
-    return _stability_analysis(inplaceness(TM), model, x, y, p, t; kwargs...)
+function get_eigen(model::TM, x, y, p, t; kwargs...) where TM
+    return _get_eigen(inplaceness(TM), model, x, y, p, t; kwargs...)
 end
 
-function _stability_analysis(::OutOfPlace, model, x, y, p, t)
+function _get_eigen(::OutOfPlace, model, x, y, p, t)
     M = Array(get_mass_matrix(model, x, y, p, t)) # mass matrix
     K = Array(get_state_jacobian(model, x, y, p, t)) # jacobian
     E = eigen(K, M) # eigenvalue decomposition
@@ -1226,7 +1226,7 @@ function _stability_analysis(::OutOfPlace, model, x, y, p, t)
     return λ, U, V
 end
 
-function _stability_analysis(::InPlace, model, x, y, p, t; nev=20)
+function _get_eigen(::InPlace, model, x, y, p, t; nev=20)
 
     # calculate the mass matrix corresponding to steady state operating conditions
     M = get_mass_matrix(model, x, y, p, t)
@@ -1260,16 +1260,16 @@ function _stability_analysis(::InPlace, model, x, y, p, t; nev=20)
 end
 
 """
-    ode_function(model)
+    get_ode(model)
 
 Construct an ODEFunction corresponding to the specified model or models which
 may be solved using DifferentialEquations.
 """
-function ode_function(model::TM) where TM
-    return _ode_function(mass_matrix_type(TM), inplaceness(TM), model)
+function get_ode(model::TM) where TM
+    return _get_ode(mass_matrix_type(TM), inplaceness(TM), model)
 end
 
-function _ode_function(::Identity, ::OutOfPlace, model::AbstractModel)
+function _get_ode(::Identity, ::OutOfPlace, model::AbstractModel)
 
     Np = number_of_parameters(model)
     Ny = number_of_inputs(model)
@@ -1284,7 +1284,7 @@ function _ode_function(::Identity, ::OutOfPlace, model::AbstractModel)
     return ODEFunction{false}(f; jac)
 end
 
-function _ode_function(::Constant, ::OutOfPlace, model::AbstractModel)
+function _get_ode(::Constant, ::OutOfPlace, model::AbstractModel)
 
     Np = number_of_parameters(model)
     Ny = number_of_inputs(model)
@@ -1301,7 +1301,7 @@ function _ode_function(::Constant, ::OutOfPlace, model::AbstractModel)
     return ODEFunction{false}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Linear, ::OutOfPlace, model::AbstractModel)
+function _get_ode(::Linear, ::OutOfPlace, model::AbstractModel)
 
     Np = number_of_parameters(model)
     Ny = number_of_inputs(model)
@@ -1320,7 +1320,7 @@ function _ode_function(::Linear, ::OutOfPlace, model::AbstractModel)
     return ODEFunction{true}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Identity, ::InPlace, model::AbstractModel)
+function _get_ode(::Identity, ::InPlace, model::AbstractModel)
 
     # problem dimensions
     Nu = number_of_states(model)
@@ -1340,7 +1340,7 @@ function _ode_function(::Identity, ::InPlace, model::AbstractModel)
     return ODEFunction{true}(f; jac)
 end
 
-function _ode_function(::Constant, ::InPlace, model::AbstractModel)
+function _get_ode(::Constant, ::InPlace, model::AbstractModel)
 
     # problem dimensions
     Nu = number_of_states(model)
@@ -1363,7 +1363,7 @@ function _ode_function(::Constant, ::InPlace, model::AbstractModel)
     return ODEFunction{true}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Linear, ::InPlace, model::AbstractModel)
+function _get_ode(::Linear, ::InPlace, model::AbstractModel)
 
     # problem dimensions
     Nu = number_of_states(model)
@@ -1388,7 +1388,7 @@ function _ode_function(::Linear, ::InPlace, model::AbstractModel)
     return ODEFunction{true}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Identity, ::OutOfPlace, model::Tuple)
+function _get_ode(::Identity, ::OutOfPlace, model::Tuple)
 
     fy = (u, p, t) -> get_inputs(models, u, p, t)
 
@@ -1399,7 +1399,7 @@ function _ode_function(::Identity, ::OutOfPlace, model::Tuple)
     return ODEFunction{false}(f; jac)
 end
 
-function _ode_function(::Constant, ::OutOfPlace, model::Tuple)
+function _get_ode(::Constant, ::OutOfPlace, model::Tuple)
 
     fy = (u, p, t) -> get_inputs(models, u, p, t)
 
@@ -1412,7 +1412,7 @@ function _ode_function(::Constant, ::OutOfPlace, model::Tuple)
     return ODEFunction{false}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Linear, ::OutOfPlace, model::Tuple)
+function _get_ode(::Linear, ::OutOfPlace, model::Tuple)
 
     Nu = number_of_states(model)
 
@@ -1429,7 +1429,7 @@ function _ode_function(::Linear, ::OutOfPlace, model::Tuple)
     return ODEFunction{true}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Identity, ::InPlace, model::Tuple)
+function _get_ode(::Identity, ::InPlace, model::Tuple)
 
     # problem dimensions
     Nu = number_of_states(model)
@@ -1486,7 +1486,7 @@ function _ode_function(::Identity, ::InPlace, model::Tuple)
     return ODEFunction{true}(f; jac)
 end
 
-function _ode_function(::Constant, ::InPlace, model::Tuple)
+function _get_ode(::Constant, ::InPlace, model::Tuple)
 
     # problem dimensions
     Nu = number_of_states(model)
@@ -1546,7 +1546,7 @@ function _ode_function(::Constant, ::InPlace, model::Tuple)
     return ODEFunction{true}(f; mass_matrix, jac)
 end
 
-function _ode_function(::Linear, ::InPlace, model::Tuple)
+function _get_ode(::Linear, ::InPlace, model::Tuple)
 
     # problem dimensions
     Nu = number_of_states(model)

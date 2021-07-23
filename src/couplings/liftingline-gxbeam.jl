@@ -3,21 +3,19 @@
 
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a geometrically exact beam theory model.  This model introduces additional
-parameters corresponding to the freestream velocity components ``V_x``, ``V_y``,
-``V_z``, followed by the air density ``\\rho``, followed by the external loads
-``F_{x,i}``, ``F_{y,i}``, ``F_{z,i}``, ``M_{x,i}``, ``M_{y,i}``, ``M_{z,i}`` or
-displacements ``u_{x,i}``, ``u_{y,i}``, ``u_{z,i}``, ``\\theta_{x,i}``,
-``\\theta_{y,i}``, ``\\theta_{z,i}`` for each node, followed by the constant
-distributed loads ``f_{x,i}``, ``f_{y,i}``, ``f_{z,i}``, ``m_{x,i}``,
-``m_{y,i}``, ``m_{z,i}`` for each beam element (excluding aerodynamic loads),
-followed by the body frame linear and angular velocity. ``u``, ``v``, ``w``,
-``p``, ``q``, ``r``.
+parameters corresponding to the freestream velocity components ``V_x, V_y, V_z``,
+followed by the air density ``\\rho``, followed by the external loads ``F_{x,i},
+F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or displacements ``u_{x,i},
+u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i}, \\theta_{z,i}`` for each node,
+followed by the constant distributed loads ``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i},
+m_{y,i}, m_{z,i}`` for each beam element (excluding aerodynamic loads), followed
+by the body frame linear and angular velocity ``u, v, w, p, q, r``.
 
-** When using this model, the local frame for each beam element should be
+**NOTE: When using this model, the local frame for each beam element should be
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
-z-axis normal to the surface **
+z-axis normal to the surface**
 """
-couple_models(aero::LiftingLine, stru::GEBT)
+couple_models(aero::LiftingLine, stru::GEBT) = (aero, stru)
 
 # --- traits --- #
 

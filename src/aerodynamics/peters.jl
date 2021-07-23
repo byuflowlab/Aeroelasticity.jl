@@ -1,9 +1,8 @@
 """
     Peters{N,TF,SV,SA} <: AbstractModel
 
-Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
-u  & \\omega & \\dot{v} & \\dot{\\omega}\\end{bmatrix}^T`` and parameters
-``p_a = \\begin{bmatrix} a & b & a_0 & \\alpha_0 \\end{bmatrix}^T``
+Peter's finite state model with `N` state variables, inputs ``u, \\omega,
+\\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, \\alpha_0``
 """
 struct Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: AbstractModel
     A::TA

@@ -29,7 +29,7 @@ makedocs(;
                 "Lifting Line + Geometrically Exact Beam Theory + Rigid Body" => joinpath("couplings", "liftingline-gxbeam-rigidbody.md"),
             ],
         ],
-        "Library" => "library.md",
+        "Interface" => "interface.md",
         "Developer Guide" => "developer.md",
     ],
     sitename = "AerostructuralDynamics.jl",

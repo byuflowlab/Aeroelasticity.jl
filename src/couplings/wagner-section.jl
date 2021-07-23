@@ -6,7 +6,7 @@ Wagner's function and a two-degree of freedom typical section model.  This model
 introduces the freestream velocity ``U`` and air density ``\\rho`` as additional
 parameters.
 """
-couple_models(aero::Wagner, stru::TypicalSection)
+couple_models(aero::Wagner, stru::TypicalSection) = (aero, stru)
 
 # --- traits --- #
 

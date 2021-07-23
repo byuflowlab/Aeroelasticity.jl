@@ -6,7 +6,7 @@ Peters et al. and a two-degree of freedom typical section model.  This model
 introduces the freestream velocity ``U`` and air density ``\\rho`` as additional
 parameters.
 """
-couple_models(aero::Peters, stru::TypicalSection)
+couple_models(aero::Peters, stru::TypicalSection) = (aero, stru)
 
 # --- traits --- #
 

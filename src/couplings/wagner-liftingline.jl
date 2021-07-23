@@ -6,7 +6,7 @@ on Wagner's function and a lifting line section model.  The existence of this
 coupling allows [`Wagner`](@ref) to be used with [`LiftingLine`](@ref).  This
 model introduces the freestream air density ``\\rho`` as an additional parameter.
 """
-couple_models(aero::Wagner, stru::LiftingLineSection)
+couple_models(aero::Wagner, stru::LiftingLineSection) = (aero, stru)
 
 # --- traits --- #
 

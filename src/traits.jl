@@ -31,8 +31,8 @@ struct Nonlinear <: MatrixType end
 """
     inplaceness(::Type{T})
 
-Return [`InPlace()`](@ref) if functions associated with model `T` are in-place
-or [`OutOfPlace()`](@ref) if functions associated with model `T` are out-of-place.
+Return `InPlace()` if functions associated with model `T` are in-place
+or `OutOfPlace()` if functions associated with model `T` are out-of-place.
 """
 inplaceness(::Type{T}) where T
 
@@ -52,8 +52,8 @@ end
 """
     inplaceness(::Type{T1}, ::Type{T2}, ..., ::Type{TN})
 
-Return [`InPlace()`](@ref) if the functions associated with the input function
-for coupled models `T1`, `T2`, ... `TN` are in-place or [`OutOfPlace()`](@ref)
+Return `InPlace()` if the functions associated with the input function
+for coupled models `T1`, `T2`, ... `TN` are in-place or `OutOfPlace()`
 if the functions associated with the input function for coupled models `T1`,
 `T2`, ... `TN` are out-of-place.
 """
@@ -63,17 +63,17 @@ inplaceness(::Vararg{Type,N}) where N
    mass_matrix_type(::Type{T})
 
 Return
- - [`Empty()`](@ref), if the mass matrix associated with model `T` is empty
- - [`Zeros()`](@ref), if the mass matrix associated with model `T` is filled
+ - `Empty()`, if the mass matrix associated with model `T` is empty
+ - `Zeros()`, if the mass matrix associated with model `T` is filled
     with zeros
- - [`Identity()`](@ref), if the mass matrix associated with model `T` is the
+ - `Identity()`, if the mass matrix associated with model `T` is the
     identity matrix
- - [`Constant()`](@ref), if the mass matrix associated with model `T` is
+ - `Constant()`, if the mass matrix associated with model `T` is
     constant with respect to time
- - [`Linear()`](@ref), if the mass matrix associated with model `T` may vary
+ - `Linear()`, if the mass matrix associated with model `T` may vary
     with respect to time
 
-If no method is defined for the specified type, return [`Linear()`](@ref).
+If no method is defined for the specified type, return `Linear()`.
 """
 mass_matrix_type(::Type{T}) where T = Linear()
 
@@ -105,25 +105,25 @@ end
    state_jacobian_type(::Type{T})
 
 Return
- - [`Empty()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Empty()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` is empty
- - [`Zeros()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Zeros()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` is filled
     with zeros
- - [`Identity()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Identity()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` is the
     identity matrix
- - [`Constant()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Constant()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` is
     constant with respect to time
- - [`Linear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Linear()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` may vary
     with respect to time, but is linear with respect to the states
- - [`Nonlinear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Nonlinear()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the state variables associated with model `T` may vary
     with respect to time, and is nonlinear with respect to the states
 
-If no method is defined for the specified type, return [`Nonlinear()`](@ref).
+If no method is defined for the specified type, return `Nonlinear()`.
 """
 state_jacobian_type(::Type{T}) where T =  Nonlinear()
 
@@ -157,22 +157,22 @@ end
    input_jacobian_type(::Type{T})
 
 Return
- - [`Empty()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Empty()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs is empty for model `T`
- - [`Zeros()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Zeros()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs is filled with zeros for model `T`
- - [`Identity()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Identity()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs is the identity matrix for model `T`
- - [`Constant()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Constant()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs is constant with respect to time for model `T`
- - [`Linear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Linear()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs may vary with respect to time for model `T`, and
     is linear with respect to the inputs
- - [`Nonlinear()`](@ref), if the jacobian of the mass matrix multiplied state rates
+ - `Nonlinear()`, if the jacobian of the mass matrix multiplied state rates
     with respect to the inputs may vary with respect to time for model `T`, and
     is nonlinear with respect to the inputs
 
-If no method is defined for the specified type, return [`Nonlinear()`](@ref).
+If no method is defined for the specified type, return `Nonlinear()`.
 """
 input_jacobian_type(::Type{T}) where T = Nonlinear()
 

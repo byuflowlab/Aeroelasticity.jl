@@ -1,11 +1,20 @@
 """
+    couple_models(aero::Steady, stru::TypicalSection)
+
+Create an aerostructural model using a steady aerodynamics model and a
+two-degree of freedom typical section model.  This model introduces the
+freestream velocity ``U`` and air density ``\\rho`` as additional parameters.
+"""
+couple_models(aero::Steady, stru::TypicalSection) = (aero, stru)
+
+"""
     couple_models(aero::QuasiSteady, stru::TypicalSection)
 
 Create an aerostructural model using a quasi-steady aerodynamics model and a
 two-degree of freedom typical section model.  This model introduces the
 freestream velocity ``U`` and air density ``\\rho`` as additional parameters.
 """
-couple_models(aero::QuasiSteady, stru::TypicalSection)
+couple_models(aero::QuasiSteady, stru::TypicalSection) = (aero, stru)
 
 # --- traits --- #
 inplaceness(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = OutOfPlace()

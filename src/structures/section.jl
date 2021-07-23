@@ -1,12 +1,18 @@
 """
     TypicalSection <: AbstractModel
 
-Typical section structural model with state variables ``q = \\begin{bmatrix} h &
-θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, inputs ``r = \\begin{bmatrix}
-\\mathcal{L} & \\mathcal{M} \\end{bmatrix}^T``, and parameters ``p_s =
-\\begin{bmatrix} k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``
+Typical section structural model with state variables ``h, \\theta, \\dot{h},
+\\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
+k_\\theta, m, S_\\theta, I_\\theta``
 """
 struct TypicalSection <: AbstractModel end
+
+"""
+    TypicalSection()
+
+Initialize an object of type [`TypicalSection`](@ref)
+"""
+TypicalSection()
 
 # --- Traits --- #
 

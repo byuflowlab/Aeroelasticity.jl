@@ -8,8 +8,22 @@ The lifting line model implemented in this package assumes that the aerodynamics
 
 When coupled with a structural model, aircraft linear and angular accelerations are obtained from the structural model and transformed into the (deformed) local beam frame using an appropriate transformation matrix.  The local freestream velocities/accelerations and pitch rates/accelerations are then defined by a subset of the transformed linear and angular accelerations and cross-flow effects are neglected.   An inverse transformation may then be performed to transform the local aerodynamic forces/moments into the reference frame used by the structural model.
 
-## Documentation
+## Type Definition
 
 ```@docs
-LiftingLine()
+LiftingLine
+```
+
+## Constructors
+
+```@docs
+LiftingLine(models)
+```
+
+## Example Initialization
+
+```@example wagner
+using AerostructuralDynamics #hide
+model = LiftingLine{4}(Wagner())
+nothing #hide
 ```

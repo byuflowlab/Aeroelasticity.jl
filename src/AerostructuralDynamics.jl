@@ -8,35 +8,53 @@ using LinearMaps
 using StaticArrays
 using DiffEqBase
 
+# Models
 export AbstractModel
-export TypicalSection, LiftingLineSection, RigidBody, GEBT
-export Steady, QuasiSteady, Wagner, Peters, LiftingLine
+export NoStateModel
 
+export Steady
+export QuasiSteady
+export Wagner
+export Peters
+export LiftingLine
+export TypicalSection
+export RigidBody
+export GEBT
 export couple_models
-export stability_analysis
-export ode_function
 
+# Interface
 export number_of_states
 export number_of_inputs
-
 export number_of_parameters
-export isinplace
-export has_mass_matrix
-export constant_mass_matrix
-export defined_state_jacobian
-
 export state_indices
 export input_indices
 export parameter_indices
-
 export get_inputs, get_inputs!
-export get_mass_matrix, get_mass_matrix!
 export get_rates, get_rates!
+export get_mass_matrix, get_mass_matrix!
 export get_state_jacobian, get_state_jacobian!
-export get_input_jacobian, get_input_jacobian!
+export get_eigen
+export get_ode
 
-export default_parameters, default_inputs
+# Helper Functions
+export set_states
+export set_inputs
+export set_parameters
 
+# Developer Interface
+export AbstractModel
+export NoStateModel
+export inplaceness
+export mass_matrix_type
+export state_jacobian_type
+export input_jacobian_type
+export get_input_jacobian
+export get_input_mass_matrix
+export get_input_mass_matrix!
+export get_input_state_jacobian
+export get_input_state_jacobian!
+
+# needed for traits
 import Base.isempty
 import Base.iszero
 

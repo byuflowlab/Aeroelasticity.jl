@@ -22,12 +22,10 @@ The first model we will be constructing is the typical section structural model,
 ![](typical-section.svg)
 
 The equations of motion for this model are:
-
 ```math
 m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -\mathcal{L} \\
 I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = \mathcal{M}
 ```
-
 where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.
 
 ### Theory
@@ -120,14 +118,14 @@ number_of_parameters(::Type{MyTypicalSection}) = 5
 nothing #hide
 ```
 
-To indicate whether our mode uses in-place or out-of-place functions, we define a new method for the [`inplaceness`](@ref) function.  In general, for performance reasons, in-place functions are preferred.  The one exception is for models with small amounts of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.  For this model, we use the latter approach.
+To indicate whether our mode uses in-place or out-of-place functions, we define a new method for the [`AerostructuralDynamics.inplaceness`](@ref) function.  In general, for performance reasons, in-place functions are preferred.  The one exception is for models with small amounts of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.  For this model, we use the latter approach.
 
 ```@example developer
 inplaceness(::Type{MyTypicalSection}) = OutOfPlace()
 nothing #hide
 ```
 
-To indicate mass matrix properties, we define a new method for the [`mass_matrix_type`](@ref) function.
+To indicate mass matrix properties, we define a new method for the [`AerostructuralDynamics.mass_matrix_type`](@ref) function.
 
 ```@example developer
 mass_matrix_type(::Type{MyTypicalSection}) = Linear()
@@ -184,7 +182,7 @@ nothing #hide
 ## Performance Overloads
 
 The code we have presented so far fully defines the governing equations for the structural state variables of the typical section model.  At this point, if the jacobian of the governing differential equations of the typical section model with respect to the state variables, inputs, and/or parameters is needed by a differential equations solver and/or for a stability analysis, it will be
-calculated automatically using the [ForwardDiff](@ref) package.  Alternatively, jacobians may be specified manually, in order to avoid the computational expenses associated with automatic differentiation.
+calculated automatically using the [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) package.  Alternatively, jacobians may be specified manually, in order to avoid the computational expenses associated with automatic differentiation.
 
 The jacobian of the right hand side of the governing equations with respect to the state variables may be manually defined using the [`get_state_jacobian`](@ref) function for out-of-place models and [`get_state_jacobian!`](@ref) function for in-place models.
 
@@ -440,17 +438,6 @@ input_jacobian_type(::Type{<:MyPeters}) = Varying()
 nothing #hide
 ```
 
-To indicate whether the state rates are linearly dependent on the inputs, or in other words whether the governing aerodynamic equations can be expressed as  
-```math
-M_a(\lambda,p_a,t)\dot{\lambda} = f_a(\lambda,p_s,t) + D_a(\lambda,p_s,t)d
-```
-we define a new method for the [`input_dependence_type`](@ref) function.
-
-```@example developer
-input_dependence_type(::Type{<:MyPeters}) = Linear()
-nothing #hide
-```
-
 ### Mass Matrix Equation
 
 For out-of-place models, the mass matrix is calculated using the [`get_mass_matrix`](@ref) function.  For in-place models the mass matrix is calculated using the [`get_mass_matrix!`](@ref) function.  For constant mass matrices, these functions are called without the `λ`, `d`, `p`, and `t` arguments.  
@@ -584,7 +571,6 @@ inplaceness(::Type{<:MyPeters}) = OutOfPlace()
 mass_matrix_type(::Type{<:MyPeters}) = Constant()
 state_jacobian_type(::Type{<:MyPeters}) = Varying()
 input_jacobian_type(::Type{<:MyPeters}) = Varying()
-input_dependence_type(::Type{<:MyPeters}) = Linear()
 
 # --- Methods --- #
 
@@ -805,7 +791,7 @@ nothing #hide
 
 ### Input Mass Matrix Equation
 
-For out-of-place input functions, the mass matrix is calculated using the [`get_input_mass_matrix`](@ref) function.  For in-place combined input functions, the mass matrix is calculated using the [`get_input_mass_matrix!`](@ref) function.  For constant mass matrices, these functions are called without the `u`, `p`, and `t` arguments.
+For out-of-place input functions, the mass matrix is calculated using the [`AerostructuralDynamics.get_input_mass_matrix`](@ref) function.  For in-place combined input functions, the mass matrix is calculated using the [`AerostructuralDynamics.get_input_mass_matrix!`](@ref) function.  For constant mass matrices, these functions are called without the `u`, `p`, and `t` arguments.
 
 ```@example developer
 
@@ -864,7 +850,7 @@ nothing #hide
 
 ### Input Jacobian
 
-The jacobian of ``f_y`` with respect to the state variables is calculated using the [`get_input_state_jacobian`](@ref) function for out-of-place combined input functions and [`get_input_state_jacobian!`](@ref) function for in-place combined inputs functions.
+The jacobian of ``f_y`` with respect to the state variables is calculated using the [`AerostructuralDynamics.get_input_state_jacobian`](@ref) function for out-of-place combined input functions and [`AerostructuralDynamics.get_input_state_jacobian!`](@ref) function for in-place combined inputs functions.
 
 ```@example developer
 function get_input_state_jacobian(aero::MyPeters{N,TF,SV,SA},

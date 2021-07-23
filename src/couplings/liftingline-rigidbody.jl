@@ -3,18 +3,17 @@
 
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a rigid body model.  This model introduces additional parameters
-corresponding to the freestream velocity components ``V_x``, ``V_y``, ``V_z``,
-air density ``\\rho``, gravitational constant ``g``, inertial properties ``m``,
-``Ixx``, ``Iyy``, ``Izz``, ``Ixz``, ``Ixy``, ``Iyz``, and constant applied
-forces/moments (in the body frame) ``Fx``, ``Fy``, ``Fz``, ``Mx``, ``My``, Mz``,
-followed by the length, position, and orientation of each lifting line element
-``L``, ``p_e``, ``e_1``, ``e_2``, ``e_3``.
+corresponding to the freestream velocity components ``V_x, V_y, V_z``,
+air density ``\\rho``, gravitational constant ``g``, inertial properties ``m,
+Ixx, Iyy, Izz, Ixz, Ixy, Iyz``, and constant applied forces/moments (in the body
+frame) ``Fx, Fy, Fz, Mx, My, Mz``, followed by the length, position, and
+orientation of each lifting line element ``L, p_e, e_1, e_2, e_3``.
 
-** When using this model, the local frame for each lifting line element should be
+**NOTE: When using this model, the local frame for each lifting line element should be
 oriented with the x-axis in the chordwise direction, the y-axis in the spanwise
-direction (out the right wing), and the z-axis in the airfoil normal direction **
+direction (out the right wing), and the z-axis in the airfoil normal direction**
 """
-couple_models(aero::LiftingLine, stru::RigidBody)
+couple_models(aero::LiftingLine, stru::RigidBody) = (aero, stru)
 
 # --- traits --- #
 

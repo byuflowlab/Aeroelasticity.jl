@@ -6,7 +6,7 @@ defined by Peters et al. and a lifting line section model.  The existence of thi
 coupling allows [`Peters`](@ref) to be used with [`LiftingLine`](@ref).  This
 model introduces the freestream air density ``\\rho`` as an additional parameter.
 """
-couple_models(aero::Peters, stru::LiftingLineSection)
+couple_models(aero::Peters, stru::LiftingLineSection) = (aero, stru)
 
 # --- traits --- #
 

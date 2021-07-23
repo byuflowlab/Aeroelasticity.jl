@@ -76,11 +76,11 @@ structural_model = TypicalSection()
 # loop through each aerodynamic model
 for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
 
-    # combined models
-    models = (aerodynamic_model, structural_model)
+    # coupled model
+    model = couple_models(aerodynamic_model, structural_model)
 
     # eigenvalue storage
-    λ[ia] = zeros(ComplexF64, number_of_states(models), length(V))
+    λ[ia] = zeros(ComplexF64, number_of_states(model), length(V))
 
     # loop through each reduced frequency
     for i = 1:length(V)
@@ -99,16 +99,10 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
         t = 0.0
 
         # calculate inputs
-        y = get_inputs(models, u, p, t)
+        y = get_inputs(model, u, p, t)
 
-        # mass matrix
-        M = get_mass_matrix(models, u, y, p, t)
-
-        # jacobian
-        J = get_state_jacobian(models, u, y, p, t)
-
-        # solve generalized eigenvalue problem
-        λ[ia][:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+        # perform linear stability analysis
+        λ[ia][:,i], Uλ, Vλ = get_eigen(model, u, y, p, t)
     end
 end
 
@@ -275,13 +269,13 @@ aerodynamic_model = LiftingLine{N}(Peters{6}())
 # construct structural model
 structural_model = GEBT(assembly, prescribed)
 
-# define simulation models
-models = (aerodynamic_model, structural_model)
+# define coupled model
+model = couple_models(aerodynamic_model, structural_model)
 
 # eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(models), length(Vinf))
+λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
 
-u0 = zeros(number_of_states(models))
+u0 = zeros(number_of_states(model))
 
 # loop through each velocity
 for i = 1:length(Vinf)
@@ -290,25 +284,25 @@ for i = 1:length(Vinf)
 
     # set state variables, parameters, and current time
     p_aero = vcat(fill([a, b, a0, α0], N)...)
-    p_stru = default_parameters(structural_model, assembly)
+    p_stru = set_parameters(structural_model, assembly)
     p_additional = vcat(-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ,
-        default_inputs(structural_model, assembly; prescribed=prescribed))
+        set_inputs(structural_model, assembly; prescribed=prescribed))
     p = vcat(p_aero, p_stru, p_additional)
     t = 0
 
     # find state variables corresponding to steady state operating conditions
-    fresid = u -> get_rates(models, u, get_inputs(models, u, p, t), p, t)
+    fresid = u -> get_rates(model, u, get_inputs(model, u, p, t), p, t)
     sol = nlsolve(fresid, u0)
     u = sol.zero
 
     # calculate the inputs corresponding to steady state operating conditions
-    y = get_inputs(models, u, p, t)
+    y = get_inputs(model, u, p, t)
 
     # calculate the mass matrix corresponding to steady state operating conditions
-    M = get_mass_matrix(models, u, y, p, t)
+    M = get_mass_matrix(model, u, y, p, t)
 
     # calculate the jacobian corresponding to steady state operating conditions
-    J = get_state_jacobian(models, u, y, p, t)
+    J = get_state_jacobian(model, u, y, p, t)
 
     # solve the generalized eigenvalue problem
     λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
@@ -395,7 +389,7 @@ pyplot()
 nothing #hide
 ```
 
-```@example blended-wing-body-stability
+```julia
 using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
 
 # discretization
@@ -482,12 +476,12 @@ structural_model = GEBT(assembly, prescribed)
 dynamics_model = RigidBody()
 
 # define simulation models
-models = (aerodynamic_model, structural_model, dynamics_model)
+model = couple_models(aerodynamic_model, structural_model, dynamics_model)
 
 # eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(models), length(Vinf))
+λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
 
-u0 = zeros(number_of_states(models))
+u0 = zeros(number_of_states(model))
 
 # loop through each velocity
 for i = 1:length(Vinf)
@@ -496,25 +490,25 @@ for i = 1:length(Vinf)
 
     # set state variables, parameters, and current time
     p_aero = vcat([(a[i], b[i], a0[i], α0[i]) for i = 1:N]...)
-    p_stru = default_parameters(structural_model, assembly)
+    p_stru = set_parameters(structural_model, assembly)
     p_additional = vcat(-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ,
-        default_inputs(structural_model, assembly; prescribed=prescribed))
+        set_inputs(structural_model, assembly; prescribed=prescribed))
     p = vcat(p_aero, p_stru, p_additional)
     t = 0
 
     # find state variables corresponding to steady state operating conditions
-    fresid = u -> get_rates(models, u, get_inputs(models, u, p, t), p, t)
+    fresid = u -> get_rates(model, u, get_inputs(model, u, p, t), p, t)
     sol = nlsolve(fresid, u0)
     u = sol.zero
 
     # calculate the inputs corresponding to steady state operating conditions
-    y = get_inputs(models, u, p, t)
+    y = get_inputs(model, u, p, t)
 
     # calculate the mass matrix corresponding to steady state operating conditions
-    M = get_mass_matrix(models, u, y, p, t)
+    M = get_mass_matrix(model, u, y, p, t)
 
     # calculate the jacobian corresponding to steady state operating conditions
-    J = get_state_jacobian(models, u, y, p, t)
+    J = get_state_jacobian(model, u, y, p, t)
 
     # solve the generalized eigenvalue problem
     λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
@@ -526,7 +520,7 @@ end
 
 We now plot the results predicted using each aerodynamic model.
 
-```@example blended-wing-body-stability
+```julia
 using Plots
 pyplot()
 

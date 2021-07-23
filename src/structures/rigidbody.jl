@@ -9,6 +9,15 @@ M_z \\end{bmatrix}^T`` and zero parameters.
 """
 struct RigidBody <: AbstractModel end
 
+# --- Constructors --- #
+
+"""
+    RigidBody()
+
+Initialize an object of type [`RigidBody`](@ref)
+"""
+RigidBody()
+
 # --- Traits --- #
 number_of_states(::Type{RigidBody}) = 12
 number_of_inputs(::Type{RigidBody}) = 13

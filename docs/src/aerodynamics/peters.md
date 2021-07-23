@@ -2,7 +2,7 @@
 
 ## Theory
 
-For Peter's finite state model, an additional term is added to the expression for the effective angle of attack from the quasi-steady model to account for induced velocity.
+For Peter's finite state model, an additional term is added to the expression for the effective angle of attack from the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory) to account for induced velocity.
 ```math
 \alpha = - \frac{v}{u} + \frac{b}{u}\left( \frac{1}{2} - a \right) \dot{\theta} + \frac{\lambda_0}{u}
 ```
@@ -11,7 +11,7 @@ The induced velocity ``\lambda_0`` is approximated from a set of N induced-flow 
 ```math
 \lambda \approx \frac{1}{2} \sum_{n=1}^N b_n \lambda_n
 ```
-The set of N first-order ordinary differential equations which govern the N finite aerodynamic states are derived by Peters as
+The set of N first-order ordinary differential equations which govern the N finite aerodynamic states are derived by Peters et al. as
 ```math
 \bar{A} \lambda + \frac{u}{b} \lambda = \bar{c} \left[ -\dot{v} + u\dot{\theta} + b \left(\frac{1}{2} - a \right) \ddot{\theta} \right]
 ```
@@ -37,10 +37,26 @@ where
 \end{cases}
 ```
 
-The same lift and moment expressions are used as in the quasisteady model, but with the new effective angle of attack.
+The same force and moment expressions are used as in the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory), but with the new effective angle of attack provided above.
 
-## Documentation
+Note that while Peter's finite state model can accommodate any number of aerodynamic state variables, generally 4-10 state variables are used.
+
+## Type Definition
+
+```@docs
+Peters
+```
+
+## Constructors
 
 ```@docs
 Peters()
+```
+
+## Example Initialization
+
+```@example peters
+using AerostructuralDynamics #hide
+model = Peters{6}()
+nothing #hide
 ```

@@ -4,15 +4,14 @@
 Create an aerostructural model using a lifting line aerodynamic model coupled
 with a geometrically exact beam theory and rigid body model.  This model introduces
 additional parameters corresponding to the freestream velocity components
-``\\begin{bmatrix} V_x & V_y & V_z \\end{bmatrix}^T``, air density ``\\rho``,
-gravitational constant ``g``, and external forces ``F_{x,i}``, ``F_{y,i}``,
-``F_{z,i}``, ``M_{x,i}``, ``M_{y,i}``, ``M_{z,i}`` or displacements ``u_{x,i}``,
-``u_{y,i}``, ``u_{z,i}``, ``\\theta_{x,i}``, ``\\theta_{y,i}``, ``\\theta_{z,i}``
-applied to each node.
+``V_x, V_y, V_z``, air density ``\\rho``,
+gravitational constant ``g``, and external forces ``F_{x,i}, F_{y,i}, F_{z,i},
+M_{x,i}, M_{y,i}, M_{z,i}`` or displacements ``u_{x,i}, u_{y,i}, u_{z,i},
+\\theta_{x,i}, \\theta_{y,i}, \\theta_{z,i}`` applied to each node.
 
-** When using this model, the local frame for each beam element should be
+**NOTE: When using this model, the local frame for each beam element should be
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
-z-axis normal to the surface **
+z-axis normal to the surface**
 """
 couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody) = (aero, stru, dyn)
 

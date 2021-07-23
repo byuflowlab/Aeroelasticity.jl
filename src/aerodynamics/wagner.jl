@@ -1,10 +1,8 @@
 """
     Wagner{TF} <: AbstractModel
 
-Aerodynamic model based on Wagner's function with state variables ``\\lambda =
-\\begin{bmatrix} \\lambda_1 & \\lambda_2 \\end{bmatrix}^T``, inputs ``d =
-\\begin{bmatrix} u & v & \\omega \\end{bmatrix}^T``
-and parameters ``p_a = \\begin{bmatrix} a & b & a_0 & \alpha_0 \\end{bmatrix}^T``
+Aerodynamic model based on Wagner's function with state variables ``\\lambda_1,
+\\lambda_2``, inputs ``u, v, \\omega``, and parameters ``a, b, a_0, \\alpha_0``
 """
 struct Wagner{TF} <: AbstractModel
     C1::TF

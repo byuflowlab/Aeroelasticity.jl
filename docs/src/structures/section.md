@@ -1,18 +1,35 @@
 # [Typical Section Model](@id typical-section-model)
 
-![](typical-section.svg)
+![](../typical-section.svg)
 
 ## Theory
 
 The equations of motion for this model are:
 ```math
-m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -\mathcal{L} \\
-I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = \mathcal{M}
+\begin{bmatrix} m & S_\theta \\ S_\theta & I_\theta \end{bmatrix}
+\begin{Bmatrix} \ddot{h} \\ \ddot{\theta} \end{Bmatrix} +
+\begin{bmatrix} k_h & 0 \\ 0 & k_h \end{bmatrix}
+\begin{Bmatrix} h \\ \theta \end{Bmatrix} =
+\begin{Bmatrix} -\mathcal{L} \\ \mathcal{M} \end{Bmatrix}
 ```
-where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.
+where ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``S_\theta`` is the structural imbalance, ``I_\theta`` is the mass moment of inertia, ``\mathcal{L}`` is the lift per unit span, and ``\mathcal{M}`` is the moment per unit span.
 
-## Documentation
+## Type Definition
+
+```@docs
+TypicalSection
+```
+
+## Constructors
 
 ```@docs
 TypicalSection()
+```
+
+## Example Initialization
+
+```@example section
+using AerostructuralDynamics #hide
+model = TypicalSection()
+nothing #hide
 ```

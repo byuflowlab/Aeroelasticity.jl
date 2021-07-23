@@ -1,20 +1,26 @@
 """
     QuasiSteady{Order} <: NoStateModel
 
-2D quasi-steady aerodynamic model with parameters ``p_a = \\begin{bmatrix} a & b
-& a_0 & \alpha_0 \\end{bmatrix}^T``.
+2D quasi-steady aerodynamic model with parameters ``a, b, a_0, \\alpha_0``.
 """
 struct QuasiSteady{Order} <: NoStateModel end
+
+"""
+    Steady <: NoStateModel
+
+2D steady aerodynamic model with parameters ``a, b, a_0, \\alpha_0``.
+"""
+const Steady = QuasiSteady{0}
 
 # --- Constructors --- #
 
 """
     Steady()
 
-Initialize an object of type [`QuasiSteady`](@ref) which represents a 2D
+Initialize an object of type [`Steady`](@ref) which represents a 2D
 steady aerodynamic model.
 """
-Steady() = QuasiSteady{0}()
+Steady()
 
 """
     QuasiSteady()
