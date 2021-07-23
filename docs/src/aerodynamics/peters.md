@@ -39,7 +39,7 @@ where
 
 The same force and moment expressions are used as in the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory), but with the new effective angle of attack provided above.
 
-Note that while Peter's finite state model can accommodate any number of aerodynamic state variables, generally 4-10 state variables are used.
+Note that while Peter's finite state model can accommodate any number of aerodynamic state variables, generally 3-10 state variables are used.
 
 ## Type Definition
 

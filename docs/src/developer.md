@@ -23,10 +23,13 @@ The first model we will be constructing is the typical section structural model,
 
 The equations of motion for this model are:
 ```math
-m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -\mathcal{L} \\
-I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = \mathcal{M}
+\begin{bmatrix} m & S_\theta \\ S_\theta & I_\theta \end{bmatrix}
+\begin{Bmatrix} \ddot{h} \\ \ddot{\theta} \end{Bmatrix} +
+\begin{bmatrix} k_h & 0 \\ 0 & k_h \end{bmatrix}
+\begin{Bmatrix} h \\ \theta \end{Bmatrix} =
+\begin{Bmatrix} -\mathcal{L} \\ \mathcal{M} \end{Bmatrix}
 ```
-where ``a`` is the normalized distance from the semichord to the reference point, ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_P`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.
+where ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``S_\theta`` is the structural imbalance, ``I_\theta`` is the mass moment of inertia, ``\mathcal{L}`` is the lift per unit span, and ``\mathcal{M}`` is the moment per unit span.
 
 ### Theory
 
@@ -79,10 +82,9 @@ We start creating our model by defining a new type.
 """
     MyTypicalSection <: AbstractModel
 
-Typical section structural model with state variables ``\\begin{bmatrix} h &
-θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, inputs ``\\begin{bmatrix}
-\\mathcal{L} & \\mathcal{M} \\end{bmatrix}^T``, and parameters ``\\begin{bmatrix}
-k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``
+Typical section structural model with state variables ``h, \\theta, \\dot{h},
+\\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
+k_\\theta, m, S_\\theta, I_\\theta``
 """
 struct MyTypicalSection <: AbstractModel end
 
@@ -91,41 +93,42 @@ nothing #hide
 
 Model parameters may be stored either as fields of the newly defined type or passed directly to the solver.  In this case, we choose to define all of the structural parameters as elements of the parameter vector.  In general, constants should be stored as fields of the newly defined type, while any variable that could be a design variables should be passed to the solver through the parameter vector.
 
-Note that the state, parameter, and aerodynamic load variable identities should be documented in the docstring associated with the newly defined type since the type definition provides the primary (and sometimes only) source of documentation for a given model.
+Note that the state, parameter, and aerodynamic load variable identities should be documented in the docstring associated with the newly defined type since the type definition provides the primary source of documentation for a given model.
 
 ### Defining Model Properties
 
 We now need to define a few model properties.
 
-To indicate the number of state variables in our model, we define a new method for the [`number_of_states`](@ref) function.  In our case, we have four state variables ``q = \begin{bmatrix} h & \theta & \dot{h} & \dot{\theta} \end{bmatrix}^T ``.
+To indicate the number of state variables in our model, we define a new method for the [`number_of_states`](@ref) function.  In our case, we have four state variables ``h, \\theta, \\dot{h},
+\\dot{\\theta}``.
 
 ```@example developer
 number_of_states(::Type{MyTypicalSection}) = 4
 nothing #hide
 ```
 
-To indicate the number of inputs/coupling variables, we define a new method for the [`number_of_inputs`](@ref) function.  In our case, we have two inputs/coupling variables ``r = \begin{bmatrix} \mathcal{L} & \mathcal{M} \end{bmatrix}^T``.  We define these two variables as inputs/coupling variables since they either need to be manually specified, or must be provided by other models.  For aeroelastic systems, the inputs/coupling variables for the structural model typically correspond to the aerodynamic loads while the inputs/coupling variables for the aerodynamic model typically correspond to the structural deflections.
+To indicate the number of inputs/coupling variables, we define a new method for the [`number_of_inputs`](@ref) function.  In our case, we have two inputs/coupling variables ``\\mathcal{L}, \\mathcal{M}``.  We define these two variables as inputs/coupling variables since they either need to be manually specified, or must be provided by other models.  For aeroelastic systems, the inputs/coupling variables for the structural model typically correspond to the aerodynamic loads while the inputs/coupling variables for the aerodynamic model typically correspond to the structural deflections.
 
 ```@example developer
 number_of_inputs(::Type{MyTypicalSection}) = 2
 nothing #hide
 ```
 
-To indicate the number of parameters, we define a new method for the [`number_of_parameters`](@ref) function.  In our case, we have five parameters ``p_s = \\begin{bmatrix} k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``.
+To indicate the number of parameters, we define a new method for the [`number_of_parameters`](@ref) function.  In our case, we have five parameters ``k_h, k_\\theta, m, S_\\theta, I_\\theta``.
 
 ```@example developer
 number_of_parameters(::Type{MyTypicalSection}) = 5
 nothing #hide
 ```
 
-To indicate whether our mode uses in-place or out-of-place functions, we define a new method for the [`AerostructuralDynamics.inplaceness`](@ref) function.  In general, for performance reasons, in-place functions are preferred.  The one exception is for models with small amounts of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.  For this model, we use the latter approach.
+To indicate whether our model uses in-place or out-of-place functions, we define a new method for the [`AerostructuralDynamics.inplaceness`](@ref) function.  In general, for performance reasons, in-place functions are preferred.  The one exception is for models with small amounts of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.  For this model, we use the latter approach.
 
 ```@example developer
 inplaceness(::Type{MyTypicalSection}) = OutOfPlace()
 nothing #hide
 ```
 
-To indicate mass matrix properties, we define a new method for the [`AerostructuralDynamics.mass_matrix_type`](@ref) function.
+To indicate mass matrix properties, we define a new method for the [`mass_matrix_type`](@ref) function.
 
 ```@example developer
 mass_matrix_type(::Type{MyTypicalSection}) = Linear()
@@ -167,7 +170,7 @@ end
 nothing #hide
 ```
 
-Since our model uses a mass matrix, we also need to define a new method for the [`get_mass_matrix`](@ref) function (or [`get_mass_matrix!`](@ref) if the model's functions are in-place functions).
+Since our model uses a mass matrix, we also need to define a new method for the [`get_mass_matrix`](@ref) function (or [`get_mass_matrix!`](@ref) if the model's functions are in-place functions).  For constant mass matrices, these functions are called without the `λ`, `d`, `p`, and `t` arguments.  
 
 ```@example developer
 function get_mass_matrix(::MyTypicalSection, q, r, p, t)
@@ -181,8 +184,7 @@ nothing #hide
 
 ## Performance Overloads
 
-The code we have presented so far fully defines the governing equations for the structural state variables of the typical section model.  At this point, if the jacobian of the governing differential equations of the typical section model with respect to the state variables, inputs, and/or parameters is needed by a differential equations solver and/or for a stability analysis, it will be
-calculated automatically using the [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) package.  Alternatively, jacobians may be specified manually, in order to avoid the computational expenses associated with automatic differentiation.
+The code we have presented so far fully defines the governing equations for the structural state variables of the typical section model.  At this point, if the jacobian of the governing differential equations of the typical section model with respect to the state variables, inputs, and/or parameters is needed by a differential equations solver and/or for a stability analysis, it will be calculated automatically using the [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) package.  Alternatively, jacobians may be specified manually, in order to avoid the computational expenses associated with automatic differentiation.
 
 The jacobian of the right hand side of the governing equations with respect to the state variables may be manually defined using the [`get_state_jacobian`](@ref) function for out-of-place models and [`get_state_jacobian!`](@ref) function for in-place models.
 
@@ -211,10 +213,9 @@ Putting it all together, a complete representation of our typical section model 
 """
     MyTypicalSection <: AbstractModel
 
-Typical section structural model with state variables ``\\begin{bmatrix} h &
-θ & \\dot{h} & \\dot{\\theta} \\end{bmatrix}^T``, inputs ``\\begin{bmatrix}
-\\mathcal{L} & \\mathcal{M} \\end{bmatrix}^T``, and parameters ``\\begin{bmatrix}
-k_h & k_\\theta & m & S_\\theta & I_\\theta \\end{bmatrix}^T``
+Typical section structural model with state variables ``h, \\theta, \\dot{h},
+\\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
+k_\\theta, m, S_\\theta, I_\\theta``
 """
 struct MyTypicalSection <: AbstractModel end
 
@@ -297,22 +298,7 @@ where ``u`` is the local freestream velocity in the chordwise direction, ``v`` i
 
 The equations of motion for Peters' finite state model, when expressed in the form expected by this package are:
 ```math
-\bar{A}\dot{\lambda} = -\frac{U}{b}\lambda +
-E d
-```
-where
-```math
-E = \bar{c} \begin{bmatrix}
-U \\
-1 \\
-b \left(\frac{1}{2} - a\right)
-\end{bmatrix}
-\quad
-d = \begin{bmatrix}
-\dot{\theta} \\
-\ddot{h} \\
-\ddot{\theta}
-\end{bmatrix}
+\bar{A}\dot{\lambda} = \bar{c}\left[ \dot{v} + u\omega + b \left(\frac{1}{2} - a\right) \dot{\omega} \right] - \frac{u}{b}\lambda
 ```
 
 ### Defining a New Type
@@ -323,9 +309,8 @@ We start creating our aerodynamic model by defining a new type.
 """
     MyPeters{N,TF,SV,SA} <: AbstractModel
 
-Peters' finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
-\\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
-``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
+Peter's finite state model with `N` state variables, inputs ``u, \\omega,
+\\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, \\alpha_0``
 """
 struct MyPeters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: AbstractModel
     A::TA
@@ -395,20 +380,19 @@ number_of_states(::Type{MyPeters{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
 nothing #hide
 ```
 
-To indicate the number of inputs, we define a new method for the [`number_of_inputs`](@ref) function.  In our case, we have three inputs ``d = \begin{bmatrix} \dot{\theta} & \ddot{h} & \ddot{\theta} \end{bmatrix}^T``.  This method must be defined for all models.
+To indicate the number of inputs, we define a new method for the [`number_of_inputs`](@ref) function.  In our case, we have four inputs ``u, \dot{\theta}, \ddot{h}, \ddot{\theta}``.  This method must be defined for all models.
 
 ```@example developer
-number_of_inputs(::Type{<:MyPeters}) = 3
+number_of_inputs(::Type{<:MyPeters}) = 4
 nothing #hide
 ```
 
-To indicate the number of parameters, we define a new method for the [`number_of_parameters`](@ref) function.  In our case, we have four parameters ``p_a = \begin{bmatrix} a & b & U & \rho \end{bmatrix}^T``.  This method must be defined for all models.
+To indicate the number of parameters, we define a new method for the [`number_of_parameters`](@ref) function.  In our case, we have four parameters ``a, b, a_0, u_0``.  This method must be defined for all models.
 
 ```@example developer
 number_of_parameters(::Type{<:MyPeters}) = 4
 nothing #hide
 ```
-
 
 To indicate whether we plan to use in-place or out-of-place functions, we define a new method for the [`inplaceness`](@ref) function.  This method must be defined for all models.
 
@@ -427,27 +411,20 @@ nothing #hide
 To indicate the properties of the jacobian of the state rates with respect to the state variables, we define a new method for the [`state_jacobian_type`](@ref) function.
 
 ```@example developer
-state_jacobian_type(::Type{<:MyPeters}) = Varying()
+state_jacobian_type(::Type{<:MyPeters}) = Linear()
 nothing #hide
 ```
 
 To indicate the properties of the jacobian of the state rates with respect to the inputs, we define a new method for the [`input_jacobian_type`](@ref) function.
 
 ```@example developer
-input_jacobian_type(::Type{<:MyPeters}) = Varying()
+input_jacobian_type(::Type{<:MyPeters}) = Nonlinear()
 nothing #hide
 ```
 
-### Mass Matrix Equation
+### Defining Model Methods
 
-For out-of-place models, the mass matrix is calculated using the [`get_mass_matrix`](@ref) function.  For in-place models the mass matrix is calculated using the [`get_mass_matrix!`](@ref) function.  For constant mass matrices, these functions are called without the `λ`, `d`, `p`, and `t` arguments.  
-
-```@example developer
-get_mass_matrix(model::MyPeters) = model.A
-nothing #hide
-```
-
-### State Rate Equation
+Now that we have defined the properties of our model, we need to define the governing equations for its state variables, if it has any.
 
 The right hand side of the governing aerodynamic differential equations is calculated using the [`get_rates`](@ref) function for out-of-place models and [`get_rates!`](@ref) function for in-place models.  
 
@@ -455,48 +432,61 @@ The right hand side of the governing aerodynamic differential equations is calcu
 function get_rates(model::MyPeters{N,TF,SV,SA}, λ, d, p, t) where {N,TF,SV,SA}
     # extract aerodynamic states as statically sized vector
     λ = SVector{N}(λ)
-    # extract structural deflections
-    θdot, hddot, θddot = d
+    # extract inputs
+    u, ω, vdot, ωdot = d
     # extract parameters
-    a, b, U, ρ = p
+    a, b, a0, α0 = p
     # extract model constants
     cbar = model.c
     # calculate rates
-    return cbar*(hddot + U*θdot + (b/2-a*b)*θddot) - U/b*λ
+    return cbar*(vdot + u*ω + (b/2-a*b)*ωdot) - u/b*λ
 end
 
 nothing #hide
 ```
 
-### State Rate Jacobian
+Since our model uses a mass matrix, we also need to define a new method for the [`get_mass_matrix`](@ref) function (or [`get_mass_matrix!`](@ref) if the model's functions are in-place functions).  For constant mass matrices, these functions are called without the `λ`, `d`, `p`, and `t` arguments.  
 
-The jacobian of the right hand side of the governing aerodynamic equations with respect to the state variables is calculated using the [`get_state_jacobian`](@ref) function for out-of-place models and [`get_state_jacobian!`](@ref) function for in-place models.
+```@example developer
+get_mass_matrix(model::MyPeters) = model.A
+nothing #hide
+```
+
+### Performance Overloads
+
+The code we have presented so far fully defines the governing equations for the aerodynamic state variables of the Peters' finite state model.  At this point, if the jacobian of the governing differential equations of the typical section model with respect to the state variables, inputs, and/or parameters is needed by a differential equations solver and/or for a stability analysis, it will be calculated automatically using the [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) package.  Alternatively, jacobians may be specified manually, in order to avoid the computational expenses associated with automatic differentiation.
+
+The jacobian of the right hand side of the governing equations with respect to the state variables may be manually defined using the [`get_state_jacobian`](@ref) function for out-of-place models and [`get_state_jacobian!`](@ref) function for in-place models.
 
 ```@example developer
 function get_state_jacobian(model::MyPeters, λ, d, p, t)
+    # extract inputs
+    u, ω, vdot, ωdot = d
     # extract parameters
-    a, b, U, ρ = p
+    a, b, a0, α0 = p
     # extract model constants
     cbar = model.c
     # jacobian with respect to aerodynamic states
-    return -U/b*Diagonal(one.(cbar))
+    return -u/b*Diagonal(one.(cbar))
 end
 
 nothing #hide
 ```
 
-### Structural Deflection Jacobian
-
-The jacobian of the right hand side of the governing aerodynamic equations with respect to the structural deflections is defined using the [`get_input_jacobian`](@ref) function.
+The jacobian of the right hand side of the governing equations with respect to the inputs is defined using the [`get_input_jacobian`](@ref) function.  
 
 ```@example developer
 function get_input_jacobian(model::MyPeters, λ, d, p, t)
+    # extract aerodynamic states as statically sized vector
+    λ = SVector{N}(λ)
+    # extract inputs
+    u, ω, vdot, ωdot = d
     # extract parameters
-    a, b, U, ρ = p
+    a, b, a0, α0 = p
     # extract model constants
     cbar = model.c
     # return jacobian
-    return hcat(U*cbar, cbar, (b/2-a*b)*cbar)
+    return hcat(cbar*ω - λ/b, u*cbar, cbar, (b/2-a*b)*cbar)
 end
 
 nothing #hide
@@ -510,9 +500,8 @@ Putting it all together, a complete representation Peters' finite state aerodyna
 """
     MyPeters{N,TF,SV,SA} <: AbstractModel
 
-Peter's finite state model with `N` state variables, inputs ``d = \\begin{bmatrix}
-\\dot{\\theta} & \\ddot{h} & \\ddot{\\theta}\\end{bmatrix}^T`` and parameters
-``p_a = \\begin{bmatrix} a & b & U & \\rho \\end{bmatrix}^T``
+Peter's finite state model with `N` state variables, inputs ``u, \\omega,
+\\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, \\alpha_0``
 """
 struct MyPeters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}} <: AbstractModel
     A::TA
@@ -565,46 +554,54 @@ end
 # --- Traits --- #
 
 number_of_states(::Type{MyPeters{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
-number_of_inputs(::Type{<:MyPeters}) = 3
+number_of_inputs(::Type{<:MyPeters}) = 4
 number_of_parameters(::Type{<:MyPeters}) = 4
 inplaceness(::Type{<:MyPeters}) = OutOfPlace()
 mass_matrix_type(::Type{<:MyPeters}) = Constant()
-state_jacobian_type(::Type{<:MyPeters}) = Varying()
-input_jacobian_type(::Type{<:MyPeters}) = Varying()
+state_jacobian_type(::Type{<:MyPeters}) = Linear()
+input_jacobian_type(::Type{<:MyPeters}) = Nonlinear()
 
 # --- Methods --- #
-
-get_mass_matrix(model::MyPeters) = model.A
 
 function get_rates(model::MyPeters{N,TF,SV,SA}, λ, d, p, t) where {N,TF,SV,SA}
     # extract aerodynamic states as statically sized vector
     λ = SVector{N}(λ)
-    # extract structural deflections
-    θdot, hddot, θddot = d
+    # extract inputs
+    u, ω, vdot, ωdot = d
     # extract parameters
-    a, b, U, ρ = p
+    a, b, a0, α0 = p
     # extract model constants
     cbar = model.c
     # calculate rates
-    return cbar*(hddot + U*θdot + (b/2-a*b)*θddot) - U/b*λ
+    return cbar*(vdot + u*ω + (b/2-a*b)*ωdot) - u/b*λ
 end
 
+get_mass_matrix(model::MyPeters) = model.A
+
+# --- Performance Overloads --- #
+
 function get_state_jacobian(model::MyPeters, λ, d, p, t)
+    # extract inputs
+    u, ω, vdot, ωdot = d
     # extract parameters
-    a, b, U, ρ = p
+    a, b, a0, α0 = p
     # extract model constants
     cbar = model.c
     # jacobian with respect to aerodynamic states
-    return -U/b*Diagonal(one.(cbar))
+    return -u/b*Diagonal(one.(cbar))
 end
 
 function get_input_jacobian(model::MyPeters, λ, d, p, t)
+    # extract aerodynamic states as statically sized vector
+    λ = SVector{N}(λ)
+    # extract inputs
+    u, ω, vdot, ωdot = d
     # extract parameters
-    a, b, U, ρ = p
+    a, b, a0, α0 = p
     # extract model constants
     cbar = model.c
     # return jacobian
-    return hcat(U*cbar, cbar, (b/2-a*b)*cbar)
+    return hcat(cbar*ω - λ/b, u*cbar, cbar, (b/2-a*b)*cbar)
 end
 
 nothing #hide
@@ -616,7 +613,7 @@ For demonstrating how to couple aerodynamic and structural models together, we u
 
 ### Theory
 
-We assume the aerodynamic loads and structural deflections may be expressed as a function of the aerodynamic and structural state variables and parameters, as well as the current time.
+We first assume the inputs to the aerodynamic and structural rate equations may be expressed as a function of the aerodynamic and structural state variables and parameters, as well as the current time.
 
 ```math
 d = f_d(u,p,t) \quad r = f_r(u,p,t) \\
