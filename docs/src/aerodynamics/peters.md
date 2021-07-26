@@ -4,7 +4,7 @@
 
 For Peter's finite state model, an additional term is added to the expression for the effective angle of attack from the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory) to account for induced velocity.
 ```math
-\alpha = - \frac{v}{u} + \frac{b}{u}\left( \frac{1}{2} - a \right) \dot{\theta} + \frac{\lambda_0}{u}
+\alpha = - \frac{v}{u} + \frac{b}{u}\left( \frac{1}{2} - a \right) \dot{\theta} + \frac{\lambda_0}{u} - \alpha_0
 ```
 
 The induced velocity ``\lambda_0`` is approximated from a set of N induced-flow states ``\lambda_1, \lambda_2, \dots, \lambda_N`` as
