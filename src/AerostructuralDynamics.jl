@@ -41,19 +41,6 @@ export set_states
 export set_inputs
 export set_parameters
 
-# Developer Interface
-export AbstractModel
-export NoStateModel
-export inplaceness
-export mass_matrix_type
-export state_jacobian_type
-export input_jacobian_type
-export get_input_jacobian
-export get_input_mass_matrix
-export get_input_mass_matrix!
-export get_input_state_jacobian
-export get_input_state_jacobian!
-
 # needed for traits
 import Base.isempty
 import Base.iszero

@@ -3,8 +3,8 @@
 
 Create an aerostructural model using the unsteady aerodynamic model defined by
 Peters et al. and a two-degree of freedom typical section model.  This model
-introduces the freestream velocity ``U`` and air density ``\\rho`` as additional
-parameters.
+introduces the freestream velocity ``U_\\infty`` and air density ``\\rho_\\infty``
+as additional parameters.
 """
 couple_models(aero::Peters, stru::TypicalSection) = (aero, stru)
 
@@ -28,10 +28,10 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     bbar = aero.b
     # local freestream velocity components
     u = U
-    v = U*θ + hdot
+    vbar = U*θ + hdot
     ω = θdot
     # calculate aerodynamic loads
-    L, M = peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    L, M = peters_state_loads(a, b, ρ, a0, α0, bbar, u, vbar, ω, λ)
     # return portion of inputs that is not dependent on the state rates
     return SVector(u, ω, 0, 0, L, M)
 end
