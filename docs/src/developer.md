@@ -2,6 +2,11 @@
 
 In this guide, we describe how to create new independent and/or coupled models.
 
+```@contents
+Pages = ["library.md"]
+Depth = 3
+```
+
 ## Creating a New Model
 
 In this section, we describe in detail how to construct a new independent model.  To demonstrate this process, we also show how one might implement the [`TypicalSection`](@ref) model.
@@ -57,7 +62,7 @@ D =
 \end{bmatrix}
 ```
 
-A special type of model which trivially satisfies the form of the governing differential equations expected by this package is a model with no state variables and/or inputs.  These models are designated as being subtypes of abstract type [`NoStateModel`](@ref) and are used solely to define the inputs of other models.  For example, the [`Steady`](@ref) and [`QuasiSteady`](@ref) models may be used to calculate the inputs corresponding to the [`TypicalSection`](@ref) model, but have no state variables of their own.
+A special type of model which trivially satisfies the form of the governing differential equations expected by this package is a model with no state variables and/or inputs.  These models are designated as being subtypes of abstract type [`NoStateModel`](@ref AerostructuralDynamics.NoStateModel) and are used solely to define the inputs of other models.  For example, the [`Steady`](@ref) and [`QuasiSteady`](@ref) models may be used to calculate the inputs corresponding to the [`TypicalSection`](@ref) model, but have no state variables of their own.
 
 ### Defining a Model's Type
 
@@ -77,13 +82,13 @@ struct TypicalSection <: AbstractModel end
 
 ### Defining Model Traits
 
-The next step in defining a new model is to define the model's properties.  At a minimum, this requires defining new methods for the [`number_of_states`](@ref), [`number_of_inputs`](@ref), [`number_of_parameters`](@ref), and [`inplaceness`](@ref) functions, though additional method definitions may be necessary.  
+The next step in defining a new model is to define the model's properties.  At a minimum, this requires defining new methods for the [`number_of_states`](@ref), [`number_of_inputs`](@ref), [`number_of_parameters`](@ref), and [`inplaceness`](@ref AerostructuralDynamics.inplaceness) functions, though additional method definitions may be necessary.  
 
 The length of the model's state, input and parameter vectors is specified by defining new methods for the [`number_of_states`](@ref), [`number_of_inputs`](@ref), and [`number_of_parameters`](@ref) functions.  For out-of-place models, these methods must operate the model type so that the vector sizes are completely inferrable.  For in-place models, this restriction is loosened and these methods may operate on model instances instead.
 
-Whether a model uses in-place or out-of-place function definitions is specified by defining a new method for the [`inplaceness`](@ref) function, which operates on the model type. For performance reasons, in-place functions are generally preferred.  The one exception is for models with small numbers of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.
+Whether a model uses in-place or out-of-place function definitions is specified by defining a new method for the [`inplaceness`](@ref AerostructuralDynamics.inplaceness) function, which operates on the model type. For performance reasons, in-place functions are generally preferred.  The one exception is for models with small numbers of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.
 
-The properties of the model's mass matrix, state jacobian, and/or input jacobian are defined by defining new methods for the [`mass_matrix_type`](@ref), [`state_jacobian_type`](@ref), and/or [`input_jacobian_type`](@ref) functions, respectively.  By default, these properties assume their loosest possible definitions.
+The properties of the model's mass matrix, state jacobian, and/or input jacobian are defined by defining new methods for the [`mass_matrix_type`](@ref AerostructuralDynamics.mass_matrix_type), [`state_jacobian_type`](@ref AerostructuralDynamics.state_jacobian_type), and/or [`input_jacobian_type`](@ref AerostructuralDynamics.input_jacobian_type) functions, respectively.  By default, these properties assume their loosest possible definitions.
 
 As an example, the [`TypicalSection`](@ref) model's properties are defined using the following block of code.
 
@@ -125,7 +130,7 @@ end
 
 ### Defining Methods for Jacobians
 
-Unless otherwise specified, the jacobian of the governing differential equations for a given model with respect to the state variables and/or inputs is calculated when necessary using forward automatic differentiation (enabled by the [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) package).  While this approach for computing the jacobians is convenient and exact, alternative methods for computing jacobians may be more computationally efficient.  To manually define the jacobian of the right hand side of the governing equations with respect to the state variables, a new method for [`get_state_jacobian`](@ref) (or [`get_state_jacobian!`](@ref) for in-place models) may be defined.  To manually define the jacobian of the right hand side of the governing equations with respect to the inputs, a new method for [`get_input_jacobian`](@ref) may be defined.  
+Unless otherwise specified, the jacobian of the governing differential equations for a given model with respect to the state variables and/or inputs is calculated when necessary using forward automatic differentiation (enabled by the [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) package).  While this approach for computing the jacobians is convenient and exact, alternative methods for computing jacobians may be more computationally efficient.  To manually define the jacobian of the right hand side of the governing equations with respect to the state variables, a new method for [`get_state_jacobian`](@ref) (or [`get_state_jacobian!`](@ref) for in-place models) may be defined.  To manually define the jacobian of the right hand side of the governing equations with respect to the inputs, a new method for [`get_input_jacobian`](@ref AerostructuralDynamics.get_input_jacobian) may be defined.  
 
 For the [`TypicalSection`](@ref) model, these jacobians may be defined analytically using the following block of code
 
@@ -140,11 +145,11 @@ end
 get_input_jacobian(::MyTypicalSection) = @SMatrix [0 0; 0 0; -1 0; 0 1]
 ```
 
-Note that while there is no in-place version of the [`get_input_jacobian`](@ref) function it may be constructed as either a linear map (for large matrices) or static array (for small matrices) in order to avoid allocations.
+Note that while there is no in-place version of the [`get_input_jacobian`](@ref AerostructuralDynamics.get_input_jacobian) function it may be constructed as either a linear map (for large matrices) or static array (for small matrices) in order to avoid allocations.
 
 ### Defining Methods for Unit Testing
 
-In order to test whether provided mass matrices are correct for a given model, a new method for [`get_lhs()`](@ref) (which defines the left hand side of the governing differential equations) must be provided.  Since this function is only used for testing, there is no in-place version of this function.  
+In order to test whether provided mass matrices are correct for a given model, a new method for [`get_lhs()`](@ref AerostructuralDynamics.get_lhs) (which defines the left hand side of the governing differential equations) must be provided.  Since this function is only used for testing, there is no in-place version of this function.  
 
 For the [`TypicalSection`](@ref) model, the new method could be defined as follows
 
@@ -250,13 +255,13 @@ couple_models(aero::Wagner, stru::TypicalSection) = (aero, stru)
 
 ### Defining the Coupled Model's Traits
 
-The next step in defining a coupled model is to define a model's properties.  At a minimum, this requires defining new methods for the [`number_of_parameters`](@ref) and [`inplaceness`](@ref) functions, though additional method definitions may be necessary.
+The next step in defining a coupled model is to define a model's properties.  At a minimum, this requires defining new methods for the [`number_of_parameters`](@ref) and [`inplaceness`](@ref AerostructuralDynamics.inplaceness) functions, though additional method definitions may be necessary.
 
 The number of additional parameters introduced by the coupled model is specified by defining a new method for the [`number_of_parameters`](@ref) function.  For out-of-place models, these methods must operate on the model types so that the length of the parameter vector is completely inferrable. For in-place models, this restriction is loosened and this methods may operate on model instances instead.
 
-Whether the coupled model uses an in-place or out-of-place coupling function is defined by the [`inplaceness`](@ref) function, which operates on the model type. For performance reasons, in-place functions are generally preferred. The one exception is for coupled models with small numbers of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.
+Whether the coupled model uses an in-place or out-of-place coupling function is defined by the [`inplaceness`](@ref AerostructuralDynamics.inplaceness) function, which operates on the model type. For performance reasons, in-place functions are generally preferred. The one exception is for coupled models with small numbers of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.
 
-The properties of the coupling function's mass matrix and/or state jacobian are defined by defining new methods for the [`mass_matrix_type`](@ref) and/or [`state_jacobian_type`](@ref) functions, respectively. By default, these properties assume their loosest possible definitions.
+The properties of the coupling function's mass matrix and/or state jacobian are defined by defining new methods for the [`mass_matrix_type`](@ref AerostructuralDynamics.mass_matrix_type) and/or [`state_jacobian_type`](@ref AerostructuralDynamics.state_jacobian_type) functions, respectively. By default, these properties assume their loosest possible definitions.
 
 The properties of the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model may be defined using the following block of code.
 
@@ -269,7 +274,7 @@ state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
 
 ### Defining Methods for Defining the Inputs
 
-Once the properties of a coupled model have been defined, methods must be provided for the model which define the values of its inputs. The portion of the inputs which is independent of the state rates is calculated using the [`get_inputs`](@ref) function for out-of-place coupling functions or the [`get_inputs!`](@ref) function for in-place coupling functions. For models with inputs that are also linearly dependent on the state rates, a new method must also be defined for the [`get_input_mass_matrix`](@ref) function (or [`get_input_mass_matrix!`](@ref) function if the inputs are defined in-place). For constant mass matrices (mass_matrix_type(typeof.(models)...) == Constant()), this function should be defined without the x, p, and t arguments.
+Once the properties of a coupled model have been defined, methods must be provided for the model which define the values of its inputs. The portion of the inputs which is independent of the state rates is calculated using the [`get_inputs`](@ref) function for out-of-place coupling functions or the [`get_inputs!`](@ref) function for in-place coupling functions. For models with inputs that are also linearly dependent on the state rates, a new method must also be defined for the [`get_input_mass_matrix`](@ref AerostructuralDynamics.get_input_mass_matrix) function (or [`get_input_mass_matrix!`](@ref AerostructuralDynamics.get_input_mass_matrix!) function if the inputs are defined in-place). For constant mass matrices (mass_matrix_type(typeof.(models)...) == Constant()), this function should be defined without the x, p, and t arguments.
 
 As an example, the expressions defining the inputs for the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model may be defined using the following block of code.
 
@@ -325,7 +330,7 @@ end
 
 ### Defining Methods for the Coupling Function's Jacobians
 
-Unless otherwise specified, the jacobian of the expression for the inputs of a given coupled model with respect to the state variables is calculated when necessary using forward automatic differentiation (enabled by the ForwardDiff package). While this approach for computing the jacobians is convenient and exact, alternative methods for computing jacobians may be more computationally efficient. To manually define the jacobian of the coupling function with respect to the state variables, a new method for the [`get_input_state_jacobian`](@ref) (or [`get_input_state_jacobian!`](@ref) for inputs which are defined in-place) may be defined.
+Unless otherwise specified, the jacobian of the expression for the inputs of a given coupled model with respect to the state variables is calculated when necessary using forward automatic differentiation (enabled by the ForwardDiff package). While this approach for computing the jacobians is convenient and exact, alternative methods for computing jacobians may be more computationally efficient. To manually define the jacobian of the coupling function with respect to the state variables, a new method for the [`get_input_state_jacobian`](@ref AerostructuralDynamics.get_input_state_jacobian) (or [`get_input_state_jacobian!`](@ref AerostructuralDynamics.get_input_state_jacobian) for inputs which are defined in-place) may be defined.
 
 For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, this jacobian may be defined analytically using the following block of code.
 
@@ -401,7 +406,7 @@ end
 
 ### Defining Methods for Unit Testing
 
-In order to test whether the provided mass matrices are correct for a given coupled model, a new method for [`get_inputs_from_state_rates`](@ref) (which defines the portion of the inputs that are dependent on the state rates) must be provided.  Since this function is used for testing, there is no in-place version of this function.
+In order to test whether the provided mass matrices are correct for a given coupled model, a new method for [`get_inputs_from_state_rates`](@ref AerostructuralDynamics.get_inputs_from_state_rates) (which defines the portion of the inputs that are dependent on the state rates) must be provided.  Since this function is used for testing, there is no in-place version of this function.
 
 For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, this function could be defined as follows
 

@@ -9,9 +9,6 @@ using StaticArrays
 using DiffEqBase
 
 # Models
-export AbstractModel
-export NoStateModel
-
 export Steady
 export QuasiSteady
 export Wagner
@@ -20,26 +17,24 @@ export LiftingLine
 export TypicalSection
 export RigidBody
 export GEBT
-export couple_models
 
 # Interface
+export couple_models
 export number_of_states
 export number_of_inputs
 export number_of_parameters
 export state_indices
 export input_indices
 export parameter_indices
+export set_states
+export set_inputs
+export set_parameters
 export get_inputs, get_inputs!
 export get_rates, get_rates!
 export get_mass_matrix, get_mass_matrix!
 export get_state_jacobian, get_state_jacobian!
 export get_eigen
 export get_ode
-
-# Helper Functions
-export set_states
-export set_inputs
-export set_parameters
 
 # needed for traits
 import Base.isempty

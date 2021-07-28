@@ -365,6 +365,14 @@ function _get_mass_matrix!(M, ::Linear, ::InPlace,
 end
 
 """
+    get_lhs(model, u, y, p, t)
+
+Return the left hand side of the governing differential equations for the model.
+This method is used for testing the mass matrix associated with each model.
+"""
+get_lhs(models, u, y, p, t)
+
+"""
     get_rates(models, u, y, p, t)
 
 Calculate the (mass matrix multiplied) state rates for the specified model or
@@ -1007,6 +1015,14 @@ function _get_input_mass_matrix!(My, ::Linear, ::InPlace,
 
     return My
 end
+
+"""
+    get_inputs_from_state_rates(models, u, p, t)
+
+Calculate the portion of the inputs which are dependent on the state rates.  This
+function is used to test the mass matrices associated with each input mass matrix.
+"""
+get_inputs_from_state_rates(models, u, p, t)
 
 """
     get_inputs(models, u, p, t)

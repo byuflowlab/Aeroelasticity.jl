@@ -37,7 +37,7 @@ function run_model_tests(model;
 
     # input jacobian test
     fy = (y) -> get_rates(model, u, y, p, t)
-    Jy = get_input_jacobian(model, u, y, p, t)
+    Jy = AD.get_input_jacobian(model, u, y, p, t)
     Jy_fd = ForwardDiff.jacobian(fy, y)
     @test isapprox(Array(Jy), Jy_fd; atol, norm)
 

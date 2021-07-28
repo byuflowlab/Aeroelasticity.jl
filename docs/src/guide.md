@@ -9,6 +9,11 @@ nothing #hide
 
 In this guide we introduce you to the basic functionality of this package in a step by step manner.  This is a good starting point for learning about how to use this package.  For more details about how to use a particular model, the model documentation is likely a better resource.  For more examples of how to use this package see the [examples](@ref Examples).
 
+```@contents
+Pages = ["library.md"]
+Depth = 3
+```
+
 If you haven't yet, now would be a good time to install AerostructuralDynamics.  AerostructuralDynamics can be installed from the Julia REPL by typing `]` (to enter the package manager) and then running the following command.
 ```julia
 pkg> add https://flow.byu.edu/AerostructuralDynamics.jl

@@ -60,7 +60,7 @@ if the functions associated with the input function for coupled models `T1`,
 inplaceness(::Vararg{Type,N}) where N
 
 """
-   mass_matrix_type(::Type{T})
+    mass_matrix_type(::Type{T})
 
 Return
  - `Empty()`, if the mass matrix associated with model `T` is empty
@@ -102,7 +102,7 @@ function mass_matrix_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
 end
 
 """
-   state_jacobian_type(::Type{T})
+    state_jacobian_type(::Type{T})
 
 Return
  - `Empty()`, if the jacobian of the mass matrix multiplied state rates
@@ -154,7 +154,7 @@ function state_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
 end
 
 """
-   input_jacobian_type(::Type{T})
+    input_jacobian_type(::Type{T})
 
 Return
  - `Empty()`, if the jacobian of the mass matrix multiplied state rates
