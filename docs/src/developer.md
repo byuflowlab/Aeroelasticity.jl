@@ -22,10 +22,10 @@ where ``M(x, y, p, t)`` is a function which defines the mass matrix correspondin
 For example, the governing differential equation for the [`TypicalSection`](@ref) model is often expressed as the second order ordinary differential equation
 ```math
 \begin{bmatrix} m & S_\theta \\ S_\theta & I_\theta \end{bmatrix}
-\begin{Bmatrix} \ddot{h} \\ \ddot{\theta} \end{Bmatrix} +
+\begin{bmatrix} \ddot{h} \\ \ddot{\theta} \end{bmatrix} +
 \begin{bmatrix} k_h & 0 \\ 0 & k_h \end{bmatrix}
-\begin{Bmatrix} h \\ \theta \end{Bmatrix} =
-\begin{Bmatrix} -\mathcal{L} \\ \mathcal{M} \end{Bmatrix}
+\begin{bmatrix} h \\ \theta \end{bmatrix} =
+\begin{bmatrix} -\mathcal{L} \\ \mathcal{M} \end{bmatrix}
 ```
 where ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``S_\theta`` is the structural imbalance, ``I_\theta`` is the mass moment of inertia, ``\mathcal{L}`` is the lift per unit span, and ``\mathcal{M}`` is the moment per unit span.  Expressed in the form expected by this package, the governing differential equation for this model is
 ```math
@@ -33,8 +33,8 @@ M \dot{x} = K x + D y
 ```
 where
 ```math
-x = \begin{Bmatrix} h & \theta & \dot{h} & \dot{\theta} \end{Bmatrix}^T \quad
-y = \begin{Bmatrix} \mathcal{L} & \mathcal{M} \end{Bmatrix}^T
+x = \begin{bmatrix} h & \theta & \dot{h} & \dot{\theta} \end{bmatrix}^T \quad
+y = \begin{bmatrix} \mathcal{L} & \mathcal{M} \end{bmatrix}^T
 ```
 ```math
 M =
@@ -177,21 +177,21 @@ M(x,y,p,t)\dot{x} = f(x,y,p,t)
 ```
 where
 ```math
-x = \begin{Bmatrix} x_1^T & x_2^T & \dots & x_N^T \end{Bmatrix}^T \quad
-y = \begin{Bmatrix} y_1^T & y_2^T & \dots & y_N^T \end{Bmatrix}^T \quad
-p = \begin{Bmatrix} p_1^T & p_2^T & \dots & p_N^T \end{Bmatrix}^T \\
+x = \begin{bmatrix} x_1^T & x_2^T & \dots & x_N^T \end{bmatrix}^T \quad
+y = \begin{bmatrix} y_1^T & y_2^T & \dots & y_N^T \end{bmatrix}^T \quad
+p = \begin{bmatrix} p_1^T & p_2^T & \dots & p_N^T \end{bmatrix}^T \\
 M(x, y, p, t) = \begin{bmatrix}
     M_1(x_1, y_1, p_1, t) & 0 & & 0 \\
     0 & M_2(x_2, y_2, p_2, t) & & 0 \\
     & & \ddots & \\
     0 & 0 & & M_N(x_N, y_N, p_N, t)
 \end{bmatrix} \\
-f(x, y, p, t) = \begin{Bmatrix}
+f(x, y, p, t) = \begin{bmatrix}
     f_1(x_1, y_1, p_1, t) \\
     f_2(x_2, y_2, p_2, t) \\
     \vdots \\
     f_N(x_N, y_N, p_N, t) \\
-\end{Bmatrix}
+\end{bmatrix}
 ```
 
 We then couple the models in this system of equations by allowing the inputs corresponding to each model to be defined as a function of the variables associated with the other models.  Specifically, we assume that the inputs corresponding to each model may be defined as
@@ -213,9 +213,9 @@ and
 
 For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, the coupled model's state variables, inputs, and parameters are
 ```math
-x = \begin{Bmatrix} \lambda_1 & \lambda_2 & h & \theta & \dot{h} & \dot{\theta} \end{Bmatrix}^T \quad
-y = \begin{Bmatrix} u & v & \omega & L & M \end{Bmatrix}^T \\
-p = \begin{Bmatrix} a & b & a_0 & \alpha_0 & k_h & k_\theta & m & S_\theta & I_\theta \end{Bmatrix}^T \\
+x = \begin{bmatrix} \lambda_1 & \lambda_2 & h & \theta & \dot{h} & \dot{\theta} \end{bmatrix}^T \quad
+y = \begin{bmatrix} u & v & \omega & L & M \end{bmatrix}^T \\
+p = \begin{bmatrix} a & b & a_0 & \alpha_0 & k_h & k_\theta & m & S_\theta & I_\theta \end{bmatrix}^T \\
 ```
 The [`Wagner`](@ref) model inputs may be defined as a function of the state variables of the typical section model.
 ```math
