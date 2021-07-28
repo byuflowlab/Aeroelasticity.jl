@@ -3,8 +3,8 @@
 
 Create an aerostructural model using an unsteady aerodynamic model based on
 Wagner's function and a two-degree of freedom typical section model.  This model
-introduces the freestream velocity ``U`` and air density ``\\rho`` as additional
-parameters.
+introduces the freestream velocity ``U_\\infty`` and air density ``\\rho_\\infty``
+as additional parameters.
 """
 couple_models(aero::Wagner, stru::TypicalSection) = (aero, stru)
 
