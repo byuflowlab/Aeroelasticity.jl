@@ -37,7 +37,7 @@ p_stru = [kh, kθ, m, Sθ, Iθ]
 p_additional = [U, ρ]
 p_coupled = vcat(p_aero, p_stru, p_additional)</code></pre><p>For coupled models, inputs are calculated as a function of the model states, model parameters, and current time using the <a href="../library/public/#AerostructuralDynamics.get_inputs"><code>get_inputs</code></a> function.  For uncoupled models, inputs are provided by the user.</p><pre><code class="language-julia hljs">t = 0 # time
 
-y_coupled = get_inputs(coupled_model, x_coupled, p_coupled, t) # inputs</code></pre><h2 id="Performing-a-Stability-Analysis"><a class="docs-heading-anchor" href="#Performing-a-Stability-Analysis">Performing a Stability Analysis</a><a id="Performing-a-Stability-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Performing-a-Stability-Analysis" title="Permalink"></a></h2><p>The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the <a href="../library/public/#AerostructuralDynamics.get_eigen"><code>get_eigen</code></a> function, which returns eigenvalues, left eigenvectors, and right eigenvectors.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear, so all sets of state variables yield the same result.</p><pre><code class="language-julia hljs">λ, U, V = get_eigen(coupled_model, x_coupled, y_coupled, p_coupled, t)</code></pre><p>A positive real part corresponding to any eigenvalue returned from the <a href="../library/public/#AerostructuralDynamics.get_eigen"><code>get_eigen</code></a> function indicates that the system is unstable for the provided set of state variables, inputs, and parameters.</p><h2 id="Performing-a-Simulation"><a class="docs-heading-anchor" href="#Performing-a-Simulation">Performing a Simulation</a><a id="Performing-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Performing-a-Simulation" title="Permalink"></a></h2><p>To simulate the behavior of our model we first need to create an object of type <code>DifferentialEquations.ODEFunction</code> using <a href="../library/public/#AerostructuralDynamics.get_ode"><code>get_ode</code></a>.  Then the <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations</a> package may be used to solve the ordinary differential equation corresponding to the model.</p><pre><code class="language-julia hljs">using DifferentialEquations
+y_coupled = get_inputs(coupled_model, x_coupled, p_coupled, t) # inputs</code></pre><h2 id="Performing-a-Stability-Analysis"><a class="docs-heading-anchor" href="#Performing-a-Stability-Analysis">Performing a Stability Analysis</a><a id="Performing-a-Stability-Analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Performing-a-Stability-Analysis" title="Permalink"></a></h2><p>The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the <a href="../library/public/#AerostructuralDynamics.get_eigen"><code>get_eigen</code></a> function, which returns eigenvalues, left eigenvectors, and right eigenvectors.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear, so all sets of state variables yield the same result.</p><pre><code class="language-julia hljs">λ, U, V = get_eigen(coupled_model, x_coupled, y_coupled, p_coupled, t)</code></pre><p>A positive real part corresponding to any eigenvalue returned from the <a href="../library/public/#AerostructuralDynamics.get_eigen"><code>get_eigen</code></a> function indicates that the system is unstable for the provided set of state variables, inputs, and parameters.</p><h2 id="Performing-a-Simulation"><a class="docs-heading-anchor" href="#Performing-a-Simulation">Performing a Simulation</a><a id="Performing-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Performing-a-Simulation" title="Permalink"></a></h2><p>To simulate the behavior of our model we first need to create an object of type <code>DifferentialEquations.ODEFunction</code> using <a href="../library/public/#AerostructuralDynamics.get_ode"><code>get_ode</code></a>.  Then the <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations</a> package may be used to solve the ordinary differential equation corresponding to the model.</p><pre><code class="language- hljs">using DifferentialEquations
 
 # non-zero plunge degree of freedom
 u0 = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
@@ -52,47 +52,5 @@ f = get_ode(coupled_model)
 prob = DifferentialEquations.ODEProblem(f, u0, tspan, p_coupled)
 
 # solve ODE
-sol = DifferentialEquations.solve(prob)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
-Interpolation: specialized 3rd order &quot;free&quot; stiffness-aware interpolation
-t: 35-element Vector{Float64}:
-  0.0
-  1.0e-6
-  1.1e-5
-  0.00011099999999999999
-  0.0011109999999999998
-  0.011011972631008473
-  0.03208352179931346
-  0.06083912523919266
-  0.10056555626095366
-  0.1517242531892151
-  ⋮
-  5.205954295121433
-  5.775839195826205
-  6.388165723253661
-  7.007230251626449
-  7.626294779999237
-  8.263481870493154
-  8.912904598085685
-  9.562327325678217
- 10.0
-u: 35-element Vector{Vector{Float64}}:
- [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
- [-9.044822871380169e-8, -6.218317349311651e-8, -4.522414262191437e-8, -1.695909870729431e-8, 0.9999999999999202, 3.5403567435916175e-14, -1.5979884137062566e-7, 7.080713177719468e-8]
- [-9.949245714033e-7, -6.840126093194207e-7, -4.974657056777112e-7, -1.8655511166450709e-7, 0.9999999999903324, 4.283827915195206e-12, -1.7577870374209561e-6, 7.788774283037961e-7]
- [-1.003909353103351e-5, -6.902076983100932e-6, -5.019894917306624e-6, -1.8830177125425952e-6, 0.9999999990155602, 4.3620315970351274e-10, -1.773764722592358e-5, 7.85947825327791e-6]
- [-0.00010042131406607219, -6.905964839163567e-5, -5.024544267440964e-5, -1.8897773806573887e-5, 0.9999999013793727, 4.369512190308462e-8, -0.0001775340655027782, 7.86552567180552e-5]
- [-0.0009894372252042224, -0.0006821454936542493, -0.00049804714313309, -0.0001921660033367079, 0.9999903120132005, 4.288982509755885e-6, -0.0017594535457055673, 0.0007785832858738225]
- [-0.0028457263651582715, -0.0019716285266793286, -0.001449554962866215, -0.0005880297601685218, 0.9999177785126844, 3.633713784072465e-5, -0.005124699635165989, 0.0022617611272753024]
- [-0.0052993939578688054, -0.003693286967725643, -0.0027383497303757804, -0.001180068209613708, 0.9997044268472052, 0.0001303018662159304, -0.009713516183509286, 0.004270591662249182]
- [-0.008536298915326103, -0.005988723229272782, -0.004484452797894766, -0.0020758656399546146, 0.9991927477159361, 0.00035457666999105314, -0.016044910271934793, 0.007013868645289046]
- [-0.012442730824393382, -0.008783652674815184, -0.006644239901162873, -0.003320374485493297, 0.9981636944374042, 0.0008025006739095601, -0.02418147763876031, 0.010485038182065084]
- ⋮
- [-0.09248487785621787, -0.04688301933239061, -0.029528911380585048, -0.023558089940106445, -0.3230268621213677, -0.11531054230535, -0.27496190438442136, -0.08947532996926635]
- [-0.05060038357162489, -0.019033962062358908, -0.009351997374536283, -0.008706299437172998, -0.4660282230354371, -0.15628139200264024, -0.2253429105265707, -0.05165712830656878]
- [0.006677160795649896, 0.017073989777514648, 0.01602971981698161, 0.010367921067074548, -0.585426757377924, -0.1722743994281744, -0.16346310559550786, 0.00017285893676160228]
- [0.06721227944491634, 0.05331376618154885, 0.040712801045488065, 0.029274344664438148, -0.6657814768898821, -0.15639523997377147, -0.095528320484616, 0.04931576961550388]
- [0.11888423832653802, 0.08221795661220592, 0.059555864883341976, 0.04405096844842535, -0.7032904769160245, -0.1147778519373052, -0.025584548238087375, 0.08143224466903795]
- [0.1531800371316459, 0.09890589009378076, 0.06938533499186259, 0.052159334004552416, -0.69689824196389, -0.0591298062052872, 0.04515886161995207, 0.08866774973732365]
- [0.1637917678449901, 0.10037231922338374, 0.06854348967723019, 0.0521436571286307, -0.6453635466686123, -0.006376697707995122, 0.11243256251911218, 0.07000855208174876]
- [0.15186623198615912, 0.0884580450007346, 0.05880053250455814, 0.04516064727819799, -0.5527285414165567, 0.028188095645181238, 0.17109901733940877, 0.034857904261571225]
- [0.13481024571726494, 0.07558771925342479, 0.0492585901233418, 0.03803024146600942, -0.47044462068813986, 0.03778289557587591, 0.20387581981503478, 0.00925696505013477]</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../examples/">Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.5 on <span class="colophon-date" title="Wednesday 28 July 2021 21:13">Wednesday 28 July 2021</span>. Using Julia version 1.6.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+sol = DifferentialEquations.solve(prob)
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../examples/">Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.5 on <span class="colophon-date" title="Thursday 29 July 2021 16:34">Thursday 29 July 2021</span>. Using Julia version 1.6.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
