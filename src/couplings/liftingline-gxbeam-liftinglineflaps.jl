@@ -33,19 +33,19 @@ function mass_matrix_type(::Type{LiftingLine{NS,TS}}, ::Type{<:GEBT},
     aero_model_types = TS.parameters
     flap_model_types = TF.parameters
     if all(isempty.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isempty.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(isempty.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
         return Empty()
     elseif all(iszero.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(iszero.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(iszero.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
         return Zeros()
     elseif all(isidentity.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isidentity.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(isidentity.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
         return Identity()
     elseif all(isconstant.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isconstant.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(isconstant.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
         return Constant()
     elseif all(islinear.(mass_matrix_type.(model_types, Ref(LiftingLineSection)))) &&
-        all(islinear.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(islinear.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
         return Linear()
     else
         return Nonlinear()
@@ -58,19 +58,19 @@ function state_jacobian_type(::Type{LiftingLine{NS,TS}}, ::Type{<:GEBT},
     aero_model_types = TS.parameters
     flap_model_types = TF.parameters
     if all(isempty.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isempty.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(isempty.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
         return Empty()
     elseif all(iszero.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(iszero.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(iszero.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
         return Zeros()
     elseif all(isidentity.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isidentity.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(isidentity.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
         return Identity()
     elseif all(isconstant.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isconstant.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(isconstant.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
         return Constant()
     elseif all(islinear.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(islinear.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
+        all(islinear.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
         return Linear()
     else
         return Nonlinear()
@@ -182,7 +182,7 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
         section_flap = flap.models[i]
-        section_ctrl = LiftingLineSectionControl()
+        section_ctrl = LiftingLineControl()
         section_models = (section_aero, section_stru, section_flap, section_ctrl)
 
         # model dimensions for this section
@@ -360,7 +360,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NS,TS}, stru::GEBT,
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
         section_flap = flap.models[i]
-        section_ctrl = LiftingLineSectionControl()
+        section_ctrl = LiftingLineControl()
         section_models = (section_aero, section_stru, section_flap, section_ctrl)
 
         # model dimensions for this section
@@ -498,9 +498,9 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
 
     # initialize input vector
     models = (aero, stru, flap)
-    TF = promote_type(eltype(du), eltype(u), eltype(p), typeof(t))
+    T = promote_type(eltype(du), eltype(u), eltype(p), typeof(t))
     Ny = number_of_inputs(models)
-    y = zeros(TF, Ny)
+    y = zeros(T, Ny)
 
     # extract number of state variables, inputs, and parameters
     nua = number_of_states(aero) # number of aerodynamic states
@@ -591,7 +591,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
         section_flap = flap.models[i]
-        section_ctrl = LiftingLineSectionControl()
+        section_ctrl = LiftingLineControl()
         section_models = (section_aero, section_stru, section_flap, section_ctrl)
 
         # model dimensions for this section

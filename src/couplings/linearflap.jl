@@ -1,42 +1,42 @@
 """
-    couple_models(aero::Steady, stru::TypicalSection, flap::Flap2D)
+    couple_models(aero::Steady, stru::TypicalSection, flap::LinearFlap)
 
 Create an aerostructural model using a steady aerodynamics model, a two-degree
 of freedom typical section model, and a linear steady-state control surface
 model.  This model introduces the freestream velocity ``U_\\infty``, air density
 ``\\rho_\\infty``, and flap deflection ``\\delta`` as additional parameters.
 """
-couple_models(aero::Steady, stru::TypicalSection, flap::Flap2D) = (aero, stru, flap)
+couple_models(aero::Steady, stru::TypicalSection, flap::LinearFlap) = (aero, stru, flap)
 
 """
-    couple_models(aero::QuasiSteady, stru::TypicalSection, flap::Flap2D)
+    couple_models(aero::QuasiSteady, stru::TypicalSection, flap::LinearFlap)
 
 Create an aerostructural model using a quasi-steady aerodynamics model, a
 two-degree of freedom typical section model, and a linear steady-state control
 surface model.  This model introduces the freestream velocity ``U_\\infty``, air
 density ``\\rho_\\infty``, and flap deflection ``\\delta`` as additional parameters.
 """
-couple_models(aero::QuasiSteady, stru::TypicalSection, flap::Flap2D) = (aero, stru, flap)
+couple_models(aero::QuasiSteady, stru::TypicalSection, flap::LinearFlap) = (aero, stru, flap)
 
 # --- traits --- #
-inplaceness(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{Flap2D}) = OutOfPlace()
-mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{Flap2D}) = Zeros()
-state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{Flap2D}) = Nonlinear()
-number_of_parameters(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{Flap2D}) = 3
+inplaceness(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = OutOfPlace()
+mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Zeros()
+state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Nonlinear()
+number_of_parameters(::Type{QuasiSteady{0}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = 3
 
-inplaceness(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{Flap2D}) = OutOfPlace()
-mass_matrix_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{Flap2D}) = Zeros()
-state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{Flap2D}) = Nonlinear()
-number_of_parameters(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{Flap2D}) = 3
+inplaceness(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = OutOfPlace()
+mass_matrix_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Zeros()
+state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Nonlinear()
+number_of_parameters(::Type{QuasiSteady{1}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = 3
 
-inplaceness(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{Flap2D}) = OutOfPlace()
-mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{Flap2D}) = Linear()
-state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{Flap2D}) = Nonlinear()
-number_of_parameters(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{Flap2D}) = 3
+inplaceness(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = OutOfPlace()
+mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Linear()
+state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Nonlinear()
+number_of_parameters(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::Type{LinearFlap}) = 3
 
 # --- methods --- #
 
-function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::Flap2D,
+function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::LinearFlap,
     q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
@@ -54,7 +54,7 @@ function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::Flap2D,
     return SVector(L, M)
 end
 
-function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, flap::Flap2D,
+function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, flap::LinearFlap,
     q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q

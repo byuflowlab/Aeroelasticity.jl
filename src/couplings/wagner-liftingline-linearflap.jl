@@ -1,16 +1,16 @@
 """
-    couple_models(aero::Wagner, stru::LiftingLineSection, flap::Flap2D,
-        ctrl::LiftingLineSectionControl)
+    couple_models(aero::Wagner, stru::LiftingLineSection, flap::LinearFlap,
+        ctrl::LiftingLineControl)
 
 Create an aerostructural model using an unsteady aerodynamic model based
 on Wagner's function, a lifting line aerodynamic model, and a linear steady-state
 control surface model.  The existence of this coupling allows [`Wagner`](@ref)
-and [`Flap2D`](@ref) to be used with [`LiftingLine`](@ref) and
+and [`LinearFlap`](@ref) to be used with [`LiftingLine`](@ref) and
 [`LiftingLineFlaps`](@ref).  This model introduces the freestream air density
 ``\\rho`` as an additional parameter.
 """
-function couple_models(aero::Wagner, stru::LiftingLineSection, flap::Flap2D,
-    ctrl::LiftingLineSectionControl)
+function couple_models(aero::Wagner, stru::LiftingLineSection, flap::LinearFlap,
+    ctrl::LiftingLineControl)
 
     return (aero, stru, flap, ctrl)
 end
@@ -18,25 +18,25 @@ end
 # --- traits --- #
 
 function inplaceness(::Type{Wagner}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return OutOfPlace()
 end
 
 function mass_matrix_type(::Type{Wagner}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Linear()
 end
 
 function state_jacobian_type(::Type{Wagner}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Nonlinear()
 end
 
 function number_of_parameters(::Type{Wagner}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return 1
 end
@@ -44,7 +44,7 @@ end
 # --- methods --- #
 
 function get_inputs(aero::Wagner, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -70,7 +70,7 @@ function get_inputs(aero::Wagner, stru::LiftingLineSection,
 end
 
 function get_input_mass_matrix(aero::Wagner, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -96,7 +96,7 @@ end
 # --- performance overloads --- #
 
 function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -139,7 +139,7 @@ end
 # --- unit testing methods --- #
 
 function get_inputs_from_state_rates(aero::Wagner, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, dx, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineControl, dx, x, p, t)
     # extract state rates
     dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx
     # extract parameters

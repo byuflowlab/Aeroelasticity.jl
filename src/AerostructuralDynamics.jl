@@ -17,6 +17,7 @@ export LiftingLine
 export TypicalSection
 export RigidBody
 export GEBT
+export LinearFlap
 
 # Interface
 export couple_models
@@ -45,31 +46,48 @@ include("traits.jl")
 include("interface.jl")
 
 # 2D Aerodynamic Models
-include("aerodynamics/quasisteady.jl")
-include("aerodynamics/wagner.jl")
-include("aerodynamics/peters.jl")
+include(joinpath("aerodynamics", "quasisteady.jl"))
+include(joinpath("aerodynamics", "wagner.jl"))
+include(joinpath("aerodynamics", "peters.jl"))
 
 # 3D Aerodynamic Models
-include("aerodynamics/liftingline.jl")
+include(joinpath("aerodynamics", "liftingline.jl"))
 
 # 2D Structural Models
-include("structures/section.jl")
+include(joinpath("structures", "section.jl"))
 
 # 3D Structural Models
-include("structures/rigidbody.jl")
-include("structures/gxbeam.jl")
+include(joinpath("structures", "rigidbody.jl"))
+include(joinpath("structures", "gxbeam.jl"))
+
+# 2D Control Surface Models
+include(joinpath("control-surfaces", "linearflap.jl"))
+
+# 3D Control Surface Models
+include(joinpath("control-surfaces", "liftinglineflaps.jl"))
 
 # 2D Coupled Models
-include("couplings/quasisteady-section.jl")
-include("couplings/quasisteady-liftingline.jl")
-include("couplings/wagner-section.jl")
-include("couplings/wagner-liftingline.jl")
-include("couplings/peters-section.jl")
-include("couplings/peters-liftingline.jl")
+include(joinpath("couplings", "quasisteady-section.jl"))
+include(joinpath("couplings", "quasisteady-section-linearflap.jl"))
+include(joinpath("couplings", "wagner-section.jl"))
+include(joinpath("couplings", "wagner-section-linearflap.jl"))
+include(joinpath("couplings", "peters-section.jl"))
+include(joinpath("couplings", "peters-section-linearflap.jl"))
+
+# 2D to 3D Coupled Models (internal)
+include(joinpath("couplings", "quasisteady-liftingline.jl"))
+include(joinpath("couplings", "quasisteady-liftingline-linearflap.jl"))
+include(joinpath("couplings", "wagner-liftingline.jl"))
+include(joinpath("couplings", "wagner-liftingline-linearflap.jl"))
+include(joinpath("couplings", "peters-liftingline.jl"))
+include(joinpath("couplings", "peters-liftingline-linearflap.jl"))
 
 # 3D Coupled Models
-include("couplings/liftingline-rigidbody.jl")
-include("couplings/liftingline-gxbeam.jl")
-include("couplings/liftingline-gxbeam-rigidbody.jl")
+include(joinpath("couplings", "liftingline-rigidbody.jl"))
+include(joinpath("couplings", "liftingline-rigidbody-liftinglineflaps.jl"))
+include(joinpath("couplings", "liftingline-gxbeam.jl"))
+include(joinpath("couplings", "liftingline-gxbeam-liftinglineflaps.jl"))
+include(joinpath("couplings", "liftingline-gxbeam-rigidbody.jl"))
+include(joinpath("couplings", "liftingline-gxbeam-rigidbody-liftinglineflaps.jl"))
 
 end

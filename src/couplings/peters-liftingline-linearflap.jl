@@ -1,16 +1,16 @@
 """
-    couple_models(aero::Peters, stru::LiftingLineSection, flap::Flap2D,
-        ctrl::LiftingLineSectionControl)
+    couple_models(aero::Peters, stru::LiftingLineSection, flap::LinearFlap,
+        ctrl::LiftingLineControl)
 
 Create an aerostructural model using a using the unsteady aerodynamic model
 defined by Peters et al, a lifting line aerodynamic model, and a linear steady-state
 control surface model.  The existence of this coupling allows [`Peters`](@ref)
-and [`Flap2D`](@ref) to be used with [`LiftingLine`](@ref) and
+and [`LinearFlap`](@ref) to be used with [`LiftingLine`](@ref) and
 [`LiftingLineFlaps`](@ref).  This model introduces the freestream air density
 ``\\rho`` as an additional parameter.
 """
-function couple_models(aero::Peters, stru::LiftingLineSection, flap::Flap2D,
-    ctrl::LiftingLineSectionControl)
+function couple_models(aero::Peters, stru::LiftingLineSection, flap::LinearFlap,
+    ctrl::LiftingLineControl)
 
     return (aero, stru, flap, ctrl)
 end
@@ -18,25 +18,25 @@ end
 # --- traits --- #
 
 function inplaceness(::Type{Peters}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return OutOfPlace()
 end
 
 function mass_matrix_type(::Type{Peters}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Linear()
 end
 
 function state_jacobian_type(::Type{Peters}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Nonlinear()
 end
 
 function number_of_parameters(::Type{Peters}, ::Type{LiftingLineSection},
-    ::Type{Flap2D}, ::Type{LiftingLineSectionControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return 1
 end
@@ -44,7 +44,7 @@ end
 # --- methods --- #
 
 function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
+    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t) where {N,TF,SV,SA}
     # extract model constants
     bbar = aero.b
     # extract state variables
@@ -71,7 +71,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
 end
 
 function get_input_mass_matrix(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
+    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t) where {N,TF,SV,SA}
 
     # extract parameters
     a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
@@ -111,7 +111,7 @@ end
 # --- performance overloads --- #
 
 function get_input_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
+    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t) where {N,TF,SV,SA}
 
     # extract model constants
     bbar = aero.b
@@ -151,7 +151,7 @@ function get_input_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSec
     Jsa = vcat(zero(L_λ'), zero(L_λ'), L_λ', zero(M_λ'), M_λ', zero(M_λ'))
     Jss = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_vx 0 L_vz 0 L_ωy 0;
         0 0 0 0 0 0; M_vx 0 M_vz 0 M_ωy 0; 0 0 0 0 0 0]
-    Jsc = @SVector [D_δ 0 L_δ 0 M_δ 0]
+    Jsc = @SVector [D_δ, 0, L_δ, 0, M_δ, 0]
 
     # assemble jacobian
     return [Jaa Jas Jac; Jsa Jss Jsc]
@@ -160,7 +160,7 @@ end
 # --- unit testing methods --- #
 
 function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::Flap2D, ctrl::LiftingLineSectionControl, dx, x, p, t) where {N,TF,SV,SA}
+    flap::LinearFlap, ctrl::LiftingLineControl, dx, x, p, t) where {N,TF,SV,SA}
     # extract state variables
     dλ = dx[SVector{N}(1:N)]
     dvx, dvy, dvz, dωx, dωy, dωz = dx[SVector{6}(N+1:N+6)]

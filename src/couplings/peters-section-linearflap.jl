@@ -6,19 +6,19 @@ Peters et al. and a two-degree of freedom typical section model.  This model
 introduces the freestream velocity ``U_\\infty`` and air density ``\\rho_\\infty``
 as additional parameters.
 """
-couple_models(aero::Peters, stru::TypicalSection, flap::Flap2D) = (aero, stru)
+couple_models(aero::Peters, stru::TypicalSection, flap::LinearFlap) = (aero, stru)
 
 # --- traits --- #
 
-inplaceness(::Type{<:Peters}, ::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}) = Linear()
-state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Nonlinear()
-number_of_parameters(::Type{<:Peters}, ::Type{TypicalSection}) = 2
+inplaceness(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = OutOfPlace()
+mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = Linear()
+state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = Nonlinear()
+number_of_parameters(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = 2
 
 # --- methods --- #
 
 function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    s, p, t) where {N,TF,SV,SA}
+    flap::LinearFlap, s, p, t) where {N,TF,SV,SA}
     # extract state variables
     λ = s[SVector{N}(1:N)]
     h, θ, hdot, θdot = s[SVector{4}(N+1:N+4)]
@@ -40,7 +40,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
 end
 
 function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, s, p, t) where {N,TF,SV,SA}
+    stru::TypicalSection, flap::LinearFlap, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
     # local freestream velocity components
@@ -61,7 +61,7 @@ end
 # --- performance overloads --- #
 
 function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, s, p, t) where {N,TF,SV,SA}
+    stru::TypicalSection, flap::LinearFlap, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
     # extract model constants
@@ -85,7 +85,7 @@ end
 # --- unit testing methods --- #
 
 function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    ds, s, p, t) where {N,TF,SV,SA}
+    flap::LinearFlap, ds, s, p, t) where {N,TF,SV,SA}
     # extract state rates
     dλ = ds[SVector{N}(1:N)]
     dh, dθ, dhdot, dθdot = ds[SVector{4}(N+1:N+4)]

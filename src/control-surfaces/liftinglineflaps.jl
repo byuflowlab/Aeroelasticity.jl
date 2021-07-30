@@ -14,20 +14,20 @@ struct LiftingLineFlaps{NS,NF,T} <: AbstractModel
 end
 
 """
-    LiftingLineSectionControl <: AbstractModel
+    LiftingLineControl <: AbstractModel
 
-Lifting line flap section model with state variables ``\\delta_1, \\delta_2,
-\\dots, \\delta_N``, zero inputs, and zero parameters.  Two-dimensional control
-surface models may be extended to three dimensional models by coupling with this
-model.  Note that this model has no rate equations of its own since its state
-variables are defined as functions of the 3D system's control variables.
+Lifting line flap section model with state variable ``\\delta``, zero inputs,
+and zero parameters.  Two-dimensional control surface models may be extended to
+three dimensional models by coupling with this model.  Note that this model has
+no rate equations of its own since its state variables are defined as functions
+of the 3D system's control variables.
 """
-struct LiftingLineSectionControl <: AbstractModel end
+struct LiftingLineControl <: AbstractModel end
 
-number_of_states(::Type{LiftingLineSectionControl{NS,NF,T}}) where {NS,NF,T} = NF
-number_of_inputs(::Type{<:LiftingLineSectionControl}) = 0
-number_of_parameters(::Type{<:LiftingLineSectionControl}) = 0
-inplaceness(::Type{LiftingLineSectionControl}) = OutOfPlace()
+number_of_states(::Type{LiftingLineControl}) = 1
+number_of_inputs(::Type{<:LiftingLineControl}) = 0
+number_of_parameters(::Type{<:LiftingLineControl}) = 0
+inplaceness(::Type{LiftingLineControl}) = OutOfPlace()
 
 # --- Constructors --- #
 
@@ -56,7 +56,7 @@ end
 Construct a lifting line control surface model using `NS` instances of `model`
 and the control deflection gains for each control surface.
 """
-function LiftingLineFlaps{NS}(model, flaps) where {N,T}
+function LiftingLineFlaps{NS}(model, flaps) where NS
     models = ntuple(i->model, N)
     return LiftingLineFlaps(models, flaps)
 end
@@ -73,7 +73,7 @@ end
 
 number_of_parameters(model::LiftingLineFlaps) = sum(number_of_parameters.(model.models))
 
-inplaceness(::Type{<:LiftingLineFlaps}) where  = InPlace()
+inplaceness(::Type{<:LiftingLineFlaps}) = InPlace()
 
 function mass_matrix_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
     model_types = (T.parameters...,)
