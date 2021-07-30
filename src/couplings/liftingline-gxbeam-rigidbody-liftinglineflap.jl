@@ -34,19 +34,19 @@ function mass_matrix_type(::Type{LiftingLine{NS,TS}}, ::Type{<:GEBT},
     aero_model_types = TS.parameters
     flap_model_types = TF.parameters
     if all(isempty.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isempty.(mass_matrix_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(isempty.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Empty()
     elseif all(iszero.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(iszero.(mass_matrix_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(iszero.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Zeros()
     elseif all(isidentity.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isidentity.(mass_matrix_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(isidentity.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Identity()
     elseif all(isconstant.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isconstant.(mass_matrix_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(isconstant.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Constant()
     elseif all(islinear.(mass_matrix_type.(model_types, Ref(LiftingLineSection)))) &&
-        all(islinear.(mass_matrix_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(islinear.(mass_matrix_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Linear()
     else
         return Nonlinear()
@@ -59,19 +59,19 @@ function state_jacobian_type(::Type{LiftingLine{NS,TS}}, ::Type{<:GEBT},
     aero_model_types = TS.parameters
     flap_model_types = TF.parameters
     if all(isempty.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isempty.(state_jacobian_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(isempty.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Empty()
     elseif all(iszero.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(iszero.(state_jacobian_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(iszero.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Zeros()
     elseif all(isidentity.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isidentity.(state_jacobian_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(isidentity.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Identity()
     elseif all(isconstant.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isconstant.(state_jacobian_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(isconstant.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Constant()
     elseif all(islinear.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(islinear.(state_jacobian_type.(flap_model_types, Ref(LiftingLineFlapSection))))
+        all(islinear.(state_jacobian_type.(flap_model_types, Ref(LiftingLineSectionControl))))
         return Linear()
     else
         return Nonlinear()

@@ -14,7 +14,7 @@ struct LiftingLineFlaps{NS,NF,T} <: AbstractModel
 end
 
 """
-    LiftingLineFlapSection <: AbstractModel
+    LiftingLineSectionControl <: AbstractModel
 
 Lifting line flap section model with state variables ``\\delta_1, \\delta_2,
 \\dots, \\delta_N``, zero inputs, and zero parameters.  Two-dimensional control
@@ -22,12 +22,12 @@ surface models may be extended to three dimensional models by coupling with this
 model.  Note that this model has no rate equations of its own since its state
 variables are defined as functions of the 3D system's control variables.
 """
-struct LiftingLineFlapSection <: AbstractModel end
+struct LiftingLineSectionControl <: AbstractModel end
 
-number_of_states(::Type{LiftingLineFlapSection{NS,NF,T}}) where {NS,NF,T} = NF
-number_of_inputs(::Type{<:LiftingLineFlapSection}) = 0
-number_of_parameters(::Type{<:LiftingLineFlapSection}) = 0
-inplaceness(::Type{LiftingLineFlapSection}) = OutOfPlace()
+number_of_states(::Type{LiftingLineSectionControl{NS,NF,T}}) where {NS,NF,T} = NF
+number_of_inputs(::Type{<:LiftingLineSectionControl}) = 0
+number_of_parameters(::Type{<:LiftingLineSectionControl}) = 0
+inplaceness(::Type{LiftingLineSectionControl}) = OutOfPlace()
 
 # --- Constructors --- #
 
