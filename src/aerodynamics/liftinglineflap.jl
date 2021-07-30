@@ -16,15 +16,15 @@ end
 """
     LiftingLineFlapSection <: AbstractModel
 
-Lifting line flap section model with state variable ``\\delta``, zero inputs,
-and zero parameters.  Two-dimensional aerodynamic section and control surface
-models may be extended to three-dimensional models by coupling with this model.
-Note that this model has no rate equations of its own since its state variables
-are defined as functions of the 3D structural model's state variables.
+Lifting line flap section model with state variables ``\\delta_1, \\delta_2,
+\\dots, \\delta_N``, zero inputs, and zero parameters.  Two-dimensional control
+surface models may be extended to three dimensional models by coupling with this
+model.  Note that this model has no rate equations of its own since its state
+variables are defined as functions of the 3D system's control variables.
 """
 struct LiftingLineFlapSection <: AbstractModel end
 
-number_of_states(::Type{<:LiftingLineFlapSection}) = 1
+number_of_states(::Type{LiftingLineFlapSection{NS,NF,T}}) where {NS,NF,T} = NF
 number_of_inputs(::Type{<:LiftingLineFlapSection}) = 0
 number_of_parameters(::Type{<:LiftingLineFlapSection}) = 0
 inplaceness(::Type{LiftingLineFlapSection}) = OutOfPlace()
@@ -63,12 +63,19 @@ end
 
 # --- Traits --- #
 
-number_of_states(model::LiftingLineFlaps) = sum(number_of_states.(model.models))
-number_of_inputs(model::LiftingLineFlaps) = sum(number_of_inputs.(model.models))
-number_of_parameters(model::LiftingLineFlaps) = sum(number_of_parameters.(model.models))
-inplaceness(::Type{LiftingLineFlaps{N,T}}) where {N,T} = InPlace()
+function number_of_states(model::LiftingLineFlaps)
+    return sum(number_of_states.(model.models))
+end
 
-function mass_matrix_type(::Type{LiftingLineFlaps{N,T}}) where {N,T}
+function number_of_inputs(model::LiftingLineFlaps{NS,NF,T}) where {NS,NF,T}
+    return sum(number_of_inputs.(model.models)) + NF
+end
+
+number_of_parameters(model::LiftingLineFlaps) = sum(number_of_parameters.(model.models))
+
+inplaceness(::Type{<:LiftingLineFlaps}) where  = InPlace()
+
+function mass_matrix_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
     model_types = (T.parameters...,)
     if all(isempty.(mass_matrix_type.(model_types)))
         return Empty()
@@ -85,7 +92,7 @@ function mass_matrix_type(::Type{LiftingLineFlaps{N,T}}) where {N,T}
     end
 end
 
-function state_jacobian_type(::Type{LiftingLineFlaps{N,T}}) where {N,T}
+function state_jacobian_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
     model_types = (T.parameters...,)
     if all(isempty.(state_jacobian_type.(model_types)))
         return Empty()
@@ -102,7 +109,7 @@ function state_jacobian_type(::Type{LiftingLineFlaps{N,T}}) where {N,T}
     end
 end
 
-function input_jacobian_type(::Type{LiftingLineFlaps{N,T}}) where {N,T}
+function input_jacobian_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
     model_types = (T.parameters...,)
     if all(isempty.(input_jacobian_type.(model_types)))
         return Empty()

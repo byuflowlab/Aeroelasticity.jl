@@ -436,9 +436,11 @@ end
 
 In general, we suggest that the following model order is used when constructing coupled models.
 
-1. Aerodynamics
-2. Structural
-3. Rigid Body (when present)
+1. Aerodynamics Model(s)
+2. Structural Model(s)
+3. Rigid Body Model(s)
+4. Control Surface Model(s)
+5. Controller Model(s)
 
 ## Avoiding Mass Matrices
 

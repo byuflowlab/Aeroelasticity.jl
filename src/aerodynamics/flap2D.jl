@@ -15,4 +15,4 @@ Flap2D()
 
 # --- Traits --- #
 
-number_of_parameters(::Type{Flap2D}) = 2
+number_of_parameters(::Type{Flap2D}) = 3
