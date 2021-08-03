@@ -1022,7 +1022,9 @@ end
 Calculate the portion of the inputs which are dependent on the state rates.  This
 function is used to test the mass matrices associated with each input mass matrix.
 """
-get_inputs_from_state_rates(models, u, p, t)
+function get_inputs_from_state_rates(models::NTuple{N,AbstractModel}, du, u, p, t) where N
+    return get_inputs_from_state_rates(models..., du, u, p, t)
+end
 
 """
     get_inputs(models, u, p, t)
