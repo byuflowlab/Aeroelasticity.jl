@@ -179,12 +179,12 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         ui = vcat(uai, usi)
 
         # section parameters
-        pai = SVector{Nuai}(pas[i]) # aerodynamic parameters
+        pai = SVector{Npai}(pas[i]) # aerodynamic parameters
         psi = SVector(ρ) # structural parameters
         pi = vcat(pai, psi)
 
         # section inputs
-        yi = get_inputs(model, LiftingLineSection(), ui, pi, t)
+        yi = get_inputs(section_models, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)
@@ -194,8 +194,8 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         y[iya[iyas[i]]] .= yai # aerodynamic inputs
 
         # section aerodynamic loads (in body frame)
-        fi = CtCab*R'*SVector(yi[Nyi+1], yi[Nyi+2], yi[Nyi+3])
-        mi = CtCab*R'*SVector(yi[Nyi+4], yi[Nyi+5], yi[Nyi+6])
+        fi = CtCab*R'*SVector(yi[Nyai+1], yi[Nyai+2], yi[Nyai+3])
+        mi = CtCab*R'*SVector(yi[Nyai+4], yi[Nyai+5], yi[Nyai+6])
 
         # add constant distributed loads (in body frame)
         poff = 4 + 6*npoint + 6*(i-1)
@@ -329,12 +329,12 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         ui = vcat(uai, usi)
 
         # section parameters
-        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        pai = SVector{Npai}(pas[i]) # aerodynamic parameters
         psi = SVector(ρ) # structural parameters
         pi = vcat(pai, psi)
 
         # section input mass matrix
-        Myi = get_input_mass_matrix(model, LiftingLineSection(), ui, pi, t)
+        Myi = get_input_mass_matrix(section_models, ui, pi, t)
 
         # separate into component mass matrices
         yai_duai = SMatrix{Nyai,Nuai}(view(Mi, 1:Nyai, 1:Nuai))
@@ -520,7 +520,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
         ui = vcat(uai, usi)
 
         # section parameters
-        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        pai = SVector{Npai}(pas[i]) # aerodynamic parameters
         psi = SVector(ρ) # structural parameters
         pi = vcat(pai, psi)
 
