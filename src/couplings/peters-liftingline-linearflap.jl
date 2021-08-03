@@ -17,25 +17,25 @@ end
 
 # --- traits --- #
 
-function inplaceness(::Type{Peters}, ::Type{LiftingLineSection},
+function inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return OutOfPlace()
 end
 
-function mass_matrix_type(::Type{Peters}, ::Type{LiftingLineSection},
+function mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Linear()
 end
 
-function state_jacobian_type(::Type{Peters}, ::Type{LiftingLineSection},
+function state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Nonlinear()
 end
 
-function number_of_parameters(::Type{Peters}, ::Type{LiftingLineSection},
+function number_of_parameters(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return 1
@@ -60,9 +60,9 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     # calculate aerodynamic loads
     L, M = peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     # add loads due to flap deflections
-    L += ρ*U^2*b*clδ*δ
-    D = ρ*U^2*b*cdδ*δ
-    M += 2*ρ*U^2*b^2*cmδ*δ
+    L += ρ*u^2*b*clδ*δ
+    D = ρ*u^2*b*cdδ*δ
+    M += 2*ρ*u^2*b^2*cmδ*δ
     # forces and moments per unit span
     f = SVector(D, 0, L)
     m = SVector(0, M, 0)
@@ -139,17 +139,20 @@ function get_input_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSec
     L_ωy, M_ωy = peters_loads_ω(a, b, ρ, a0, u)
 
     # add loads due to flap deflections
-    L_δ = ρ*U^2*b*clδ
-    D_δ = ρ*U^2*b*cdδ
-    M_δ += 2*ρ*U^2*b^2*cmδ
+    L_vx += 2*ρ*u*b*clδ*δ
+    D_vx = 2*ρ*u*b*cdδ*δ
+    M_vx += 4*ρ*u*b^2*cmδ*δ
+    L_δ = ρ*u^2*b*clδ
+    D_δ = ρ*u^2*b*cdδ
+    M_δ = 2*ρ*u^2*b^2*cmδ
 
     # construct submatrices
     Jaa = zeros(SMatrix{4,N,TF})
     Jas = @SMatrix [u_vx 0 0 0 0 0; 0 0 0 0 ω_ωy 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
-    Jac = zeros(SVector{4,1,TF})
+    Jac = zeros(SMatrix{4,1,TF})
 
     Jsa = vcat(zero(L_λ'), zero(L_λ'), L_λ', zero(M_λ'), M_λ', zero(M_λ'))
-    Jss = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_vx 0 L_vz 0 L_ωy 0;
+    Jss = @SMatrix [D_vx 0 0 0 0 0; 0 0 0 0 0 0; L_vx 0 L_vz 0 L_ωy 0;
         0 0 0 0 0 0; M_vx 0 M_vz 0 M_ωy 0; 0 0 0 0 0 0]
     Jsc = @SVector [D_δ, 0, L_δ, 0, M_δ, 0]
 

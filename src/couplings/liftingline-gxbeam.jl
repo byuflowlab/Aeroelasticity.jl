@@ -58,7 +58,7 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,
 end
 
 function number_of_parameters(aero::LiftingLine, stru::GEBT)
-    return 10 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam)
+    return 4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6
 end
 
 # --- methods --- #
@@ -72,7 +72,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     nys = number_of_inputs(stru) # number of structural inputs
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     nps = number_of_parameters(stru) # number of structural parameters
-    npc = number_of_parameters(aero, stru) # number of additional parameters
+    npadd = number_of_parameters(aero, stru) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -81,7 +81,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     ius = nua + 1 : nua + nus # indices of structural states
     iys = nya + 1 : nya + nys # indices of structural inputs
     ips = npa + 1 : npa + nps # indices of structural parameters
-    ipc = npa + nps + 1 : npa + nps + npc # indices of additional parameters
+    ipadd = npa + nps + 1 : npa + nps + npadd # indices of additional parameters
     iuas = state_indices(aero.models) # indices of aerodynamic states for each section
     iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
     ipas = parameter_indices(aero.models) # indices of aerodynamic inputs for each section
@@ -93,28 +93,29 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     us = view(u, ius) # structural state variables
     ys = view(y, iys) # structural inputs
     ps = view(p, ips) # structural parameters
-    pc = view(p, ipc) # additional parameters for coupled model
+    padd = view(p, ipadd) # additional parameters for coupled model
     uas = view.(Ref(ua), iuas) # aerodynamic state variables for each section
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
     # global parameters
-    Vx = pc[1]
-    Vy = pc[2]
-    Vz = pc[3]
-    ρ = pc[4]
-    ur = pc[end-5]
-    vr = pc[end-4]
-    wr = pc[end-3]
-    pr = pc[end-2]
-    qr = pc[end-1]
-    rr = pc[end]
+    Vx = padd[1]
+    Vy = padd[2]
+    Vz = padd[3]
+    ρ = padd[4]
+    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
+    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
+    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
+    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
+    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
+    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
+
+    # body linear and angular velocity
+    V = SVector(ur, vr, wr)
+    Ω = SVector(pr, qr, rr)
 
     # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
-
-    # body angular velocity
-    Ω = SVector(pr, qr, rr)
+    Vinf = SVector(Vx, Vy, Vz) - V
 
     # construct assembly from structural parameters
     npoint = length(stru.icol_pt)
@@ -135,14 +136,23 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
 
     # save aerodynamic inputs and distributed loads
     for i = 1:N
-        # aerodynamic model and structural element
-        model = aero.models[i]
-        element = assembly.elements[i]
-        Nui = number_of_states(model)
-        Nyi = number_of_inputs(model)
-        Npi = number_of_parameters(model)
+        # models for this section
+        section_aero = aero.models[i]
+        section_stru = LiftingLineSection()
+        section_models = (section_aero, section_stru)
+
+        # model dimensions for this section
+        Nuai = number_of_states(section_aero)
+        Nyai = number_of_inputs(section_aero)
+        Npai = number_of_parameters(section_aero)
+        Nusi = number_of_states(section_stru)
+        Nysi = number_of_inputs(section_stru)
+        Npsi = number_of_parameters(section_stru)
+        section_models = (section_aero, section_stru)
+
         # section properties
         icol = stru.icol_beam[i]
+        element = assembly.elements[i]
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement
         θ_elem = SVector(us[icol+3], us[icol+4], us[icol+5]) # angular displacement
         F_elem = SVector(us[icol+6], us[icol+7], us[icol+8]) .* stru.force_scaling # internal force
@@ -155,26 +165,43 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1] # local structural to aerodynamic transformation
         vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem) # local linear freestream velocity
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
-        uai = SVector{Nui}(uas[i]) # aerodynamic state variables
-        pai = SVector{Npi}(pas[i]) # aerodynamic parameters
+
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
         # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
         # in the chordwise direction and the z-axis in the (airfoil) normal
         # direction.
         # calculate aerodynamic inputs and section loads
-        ui = vcat(uai, vi, ωi) # section state variables
-        pi = vcat(pai, ρ) # section parameters
+
+        # section state variables
+        uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
+        usi = vcat(vi, ωi) # structural state variables
+        ui = vcat(uai, usi)
+
+        # section parameters
+        pai = SVector{Nuai}(pas[i]) # aerodynamic parameters
+        psi = SVector(ρ) # structural parameters
+        pi = vcat(pai, psi)
+
+        # section inputs
         yi = get_inputs(model, LiftingLineSection(), ui, pi, t)
-        # section aerodynamic inputs
-        y[iya[iyas[i]]] .= view(yi, 1:Nyi)
+
+        # separate inputs
+        yai = view(yi, 1:Nyai)
+        ysi = view(yi, Nyai + 1 : Nyai + Nysi)
+
+        # save local inputs
+        y[iya[iyas[i]]] .= yai # aerodynamic inputs
+
         # section aerodynamic loads (in body frame)
         fi = CtCab*R'*SVector(yi[Nyi+1], yi[Nyi+2], yi[Nyi+3])
         mi = CtCab*R'*SVector(yi[Nyi+4], yi[Nyi+5], yi[Nyi+6])
+
         # add constant distributed loads (in body frame)
         poff = 4 + 6*npoint + 6*(i-1)
-        fi += SVector(pc[poff+1], pc[poff+2], pc[poff+3])
-        mi += SVector(pc[poff+4], pc[poff+5], pc[poff+6])
+        fi += SVector(padd[poff+1], padd[poff+2], padd[poff+3])
+        mi += SVector(padd[poff+4], padd[poff+5], padd[poff+6])
+
         # save distributed loads for this element (in body frame)
         yoff = 6*npoint + 6*(i-1)
         y[iys[yoff+1 : yoff+3]] = fi
@@ -205,7 +232,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     nys = number_of_inputs(stru) # number of structural inputs
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     nps = number_of_parameters(stru) # number of structural parameters
-    npc = number_of_parameters(aero, stru) # number of additional parameters for coupled model
+    npadd = number_of_parameters(aero, stru) # number of additional parameters for coupled model
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -214,7 +241,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     ius = nua + 1 : nua + nus # indices of structural states
     iys = nya + 1 : nya + nys # indices of structural inputs
     ips = npa + 1 : npa + nps # indices of structural parameters
-    ipc = npa + nps + 1 : npa + nps + npc # indices of additional parameters
+    ipadd = npa + nps + 1 : npa + nps + npadd # indices of additional parameters
     iuas = state_indices(aero.models) # indices of aerodynamic states for each section
     iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
     ipas = parameter_indices(aero.models) # indices of aerodynamic inputs for each section
@@ -224,21 +251,21 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     pa = view(p, ipa) # aerodynamic parameters
     us = view(u, ius) # structural state variables
     ps = view(p, ips) # structural parameters
-    pc = view(p, ipc) # additional parameters
+    padd = view(p, ipadd) # additional parameters
     uas = view.(Ref(ua), iuas) # aerodynamic state variables for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
     # global parameters
-    Vx = pc[1]
-    Vy = pc[2]
-    Vz = pc[3]
-    ρ = pc[4]
-    ur = pc[end-5]
-    vr = pc[end-4]
-    wr = pc[end-3]
-    pr = pc[end-2]
-    qr = pc[end-1]
-    rr = pc[end]
+    Vx = padd[1]
+    Vy = padd[2]
+    Vz = padd[3]
+    ρ = padd[4]
+    ur = padd[end-5]
+    vr = padd[end-4]
+    wr = padd[end-3]
+    pr = padd[end-2]
+    qr = padd[end-1]
+    rr = padd[end]
 
     # freestream velocity
     Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
@@ -255,14 +282,23 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
 
     # save aerodynamic inputs and distributed loads
     for i = 1:N
-        # aerodynamic model and structural element
-        model = aero.models[i]
-        element = assembly.elements[i]
-        Nui = number_of_states(model)
-        Nyi = number_of_inputs(model)
-        Npi = number_of_parameters(model)
+        # models for this section
+        section_aero = aero.models[i]
+        section_stru = LiftingLineSection()
+        section_models = (section_aero, section_stru)
+
+        # model dimensions for this section
+        Nuai = number_of_states(section_aero)
+        Nyai = number_of_inputs(section_aero)
+        Npai = number_of_parameters(section_aero)
+        Nusi = number_of_states(section_stru)
+        Nysi = number_of_inputs(section_stru)
+        Npsi = number_of_parameters(section_stru)
+        section_models = (section_aero, section_stru)
+
         # section properties
         icol = stru.icol_beam[i]
+        element = assembly.elements[i]
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement
         θ_elem = SVector(us[icol+3], us[icol+4], us[icol+5]) # angular displacement
         F_elem = SVector(us[icol+6], us[icol+7], us[icol+8]) .* stru.force_scaling # internal force
@@ -275,47 +311,68 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1] # local structural to aerodynamic transformation
         vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem) # local linear freestream velocity
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
-        uai = SVector{Nui}(uas[i]) # aerodynamic state variables
-        pai = SVector{Npi}(pas[i]) # aerodynamic parameters
         dvi_dPi = -R * element.minv11 * stru.mass_scaling
         dvi_dHi = -R * element.minv12 * stru.mass_scaling
         dωi_dPi = R * element.minv12' * stru.mass_scaling
         dωi_dHi = R * element.minv22 * stru.mass_scaling
+
         # NOTE: We assume that the local beam frame y-axis is oriented towards
         # the leading edge and the z-axis is oriented up
+
         # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
         # in the chordwise direction and the z-axis in the (airfoil) normal
         # direction.
-        # calculate aerodynamic input and section loads mass matrices
-        ui = vcat(uai, vi, ωi) # section state variables
-        pi = vcat(pai, ρ) # section parameters
+
+        # section state variables
+        uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
+        usi = vcat(vi, ωi) # structural state variables
+        ui = vcat(uai, usi)
+
+        # section parameters
+        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        psi = SVector(ρ) # structural parameters
+        pi = vcat(pai, psi)
+
+        # section input mass matrix
         Myi = get_input_mass_matrix(model, LiftingLineSection(), ui, pi, t)
+
         # separate into component mass matrices
-        d_dλi = SMatrix{Nyi,Nui}(view(Myi, 1:Nyi, 1:Nui))
-        d_dvi = SMatrix{Nyi,3}(view(Myi, 1:Nyi, Nui+1:Nui+3))
-        d_dωi = SMatrix{Nyi,3}(view(Myi, 1:Nyi, Nui+4:Nui+6))
-        f_dλi = view(Myi, Nyi+1:Nyi+3, 1:Nui)
-        f_dvi = SMatrix{3, 3}(view(Myi, Nyi+1:Nyi+3, Nui+1:Nui+3))
-        f_dωi = SMatrix{3, 3}(view(Myi, Nyi+1:Nyi+3, Nui+4:Nui+6))
-        m_dλi = view(Myi, Nyi+4:Nyi+6, 1:Nui)
-        m_dvi = SMatrix{3, 3}(view(Myi, Nyi+4:Nyi+6, Nui+1:Nui+3))
-        m_dωi = SMatrix{3, 3}(view(Myi, Nyi+4:Nyi+6, Nui+4:Nui+6))
+        yai_duai = SMatrix{Nyai,Nuai}(view(Mi, 1:Nyai, 1:Nuai))
+        yai_dvi = SMatrix{Nyai,3}(view(Mi, 1:Nyai, Nuai+1:Nuai+3))
+        yai_dωi = SMatrix{Nyai,3}(view(Mi, 1:Nyai, Nuai+4:Nuai+6))
+        yai_dufi = SMatrix{Nyai,Nufi}(view(Mi, 1:Nyai, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        yai_duci = SMatrix{Nyai,Nuci}(view(Mi, 1:Nyai, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        f_duai = SMatrix{3,Nuai}(view(Mi, Nyai+1:Nyai+3, 1:Nuai))
+        f_dvi = SMatrix{3,3}(view(Mi, Nyai+1:Nyai+3, Nuai+1:Nuai+3))
+        f_dωi = SMatrix{3,3}(view(Mi, Nyai+1:Nyai+3, Nuai+4:Nuai+6))
+        f_dufi = SMatrix{3,Nufi}(view(Mi, Nyai+1:Nyai+3, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        f_duci = SMatrix{3,Nuci}(view(Mi, Nyai+1:Nyai+3, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        m_duai = SMatrix{3,Nuai}(view(Mi, Nyai+4:Nyai+6, 1:Nuai))
+        m_dvi = SMatrix{3,3}(view(Mi, Nyai+4:Nyai+6, Nuai+1:Nuai+3))
+        m_dωi = SMatrix{3,3}(view(Mi, Nyai+4:Nyai+6, Nuai+4:Nuai+6))
+        m_dufi = SMatrix{3,Nufi}(view(Mi, Nyai+4:Nyai+6, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        m_duci = SMatrix{3,Nuci}(view(Mi, Nyai+4:Nyai+6, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+
         # propagate derivatives using chain rule
-        d_dPi = d_dvi * dvi_dPi + d_dωi * dωi_dPi
-        d_dHi = d_dvi * dvi_dHi + d_dωi * dωi_dHi
+        yai_dPi = yai_dvi * dvi_dPi + yai_dωi * dωi_dPi
+        yai_dHi = yai_dvi * dvi_dHi + yai_dωi * dωi_dHi
         f_dPi = f_dvi * dvi_dPi + f_dωi * dωi_dPi
         f_dHi = f_dvi * dvi_dHi + f_dωi * dωi_dHi
         m_dPi = m_dvi * dvi_dPi + m_dωi * dωi_dPi
         m_dHi = m_dvi * dvi_dHi + m_dωi * dωi_dHi
-        # save aerodynamic input mass matrix entries
+
+        # save local inputs
         icol = stru.icol_beam[i]
-        My[iya[iyas[i]], iua[iuas[i]]] = d_dλi
-        My[iya[iyas[i]], ius[icol+12]:ius[icol+14]] = d_dPi
-        My[iya[iyas[i]], ius[icol+15]:ius[icol+17]] = d_dHi
+
+        # aerodynamic inputs
+        My[iya[iyas[i]], iua[iuas[i]]] = yai_duai
+        My[iya[iyas[i]], ius[icol+12]:ius[icol+14]] = yai_dPi
+        My[iya[iyas[i]], ius[icol+15]:ius[icol+17]] = yai_dHi
+
         # save load mass matrix entries (in body frame)
         offset = 6*npoint + 6*(i-1)
-        My[iys[offset+1 : offset+3], iua[iuas[i]]] = CtCab*R'*f_dλi
-        My[iys[offset+4 : offset+6], iua[iuas[i]]] = CtCab*R'*m_dλi
+        My[iys[offset+1 : offset+3], iua[iuas[i]]] = CtCab*R'*f_duai
+        My[iys[offset+4 : offset+6], iua[iuas[i]]] = CtCab*R'*m_duai
         My[iys[offset+1 : offset+3], ius[icol+12]:ius[icol+14]] = CtCab*R'*f_dPi
         My[iys[offset+1 : offset+3], ius[icol+15]:ius[icol+17]] = CtCab*R'*f_dHi
         My[iys[offset+4 : offset+6], ius[icol+12]:ius[icol+14]] = CtCab*R'*m_dPi
@@ -347,7 +404,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
     nys = number_of_inputs(stru) # number of structural inputs
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     nps = number_of_parameters(stru) # number of structural parameters
-    npc = number_of_parameters(aero, stru) # number of additional parameters for coupled model
+    npadd = number_of_parameters(aero, stru) # number of additional parameters for coupled model
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -356,7 +413,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
     ius = nua + 1 : nua + nus # indices of structural states
     iys = nya + 1 : nya + nys # indices of structural inputs
     ips = npa + 1 : npa + nps # indices of structural parameters
-    ipc = npa + nps + 1 : npa + nps + npc # indices of additional parameters
+    ipadd = npa + nps + 1 : npa + nps + npadd # indices of additional parameters
     iuas = state_indices(aero.models) # indices of aerodynamic states for each section
     iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
     ipas = parameter_indices(aero.models) # indices of aerodynamic inputs for each section
@@ -370,29 +427,30 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
     us = view(u, ius) # structural state variables
     ys = view(y, iys) # structural inputs
     ps = view(p, ips) # structural parameters
-    pc = view(p, ipc) # additional parameters for coupled model
+    padd = view(p, ipadd) # additional parameters for coupled model
     duas = view.(Ref(dua), iuas) # aerodynamic state rates for each section
     uas = view.(Ref(ua), iuas) # aerodynamic state variables for each section
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
     # global parameters
-    Vx = pc[1]
-    Vy = pc[2]
-    Vz = pc[3]
-    ρ = pc[4]
-    ur = pc[end-5]
-    vr = pc[end-4]
-    wr = pc[end-3]
-    pr = pc[end-2]
-    qr = pc[end-1]
-    rr = pc[end]
+    Vx = padd[1]
+    Vy = padd[2]
+    Vz = padd[3]
+    ρ = padd[4]
+    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
+    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
+    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
+    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
+    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
+    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
+
+    # rigid body linear and angular velocity
+    V = SVector(ur, vr, wr)
+    Ω = SVector(pr, qr, rr)
 
     # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
-
-    # body angular velocity
-    Ω = SVector(pr, qr, rr)
+    Vinf = SVector(Vx, Vy, Vz) - V
 
     # construct assembly from parameters
     npoint = length(stru.icol_pt)
@@ -403,14 +461,20 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
 
     # save aerodynamic inputs and distributed loads
     for i = 1:N
-        # aerodynamic model and structural element
-        model = aero.models[i]
-        element = assembly.elements[i]
-        Nui = number_of_states(model)
-        Nyi = number_of_inputs(model)
-        Npi = number_of_parameters(model)
+        # models for this section
+        section_aero = aero.models[i]
+        section_stru = LiftingLineSection()
+        section_models = (section_aero, section_stru)
 
-        # section properties
+        # model dimensions for this section
+        Nuai = number_of_states(section_aero)
+        Nyai = number_of_inputs(section_aero)
+        Npai = number_of_parameters(section_aero)
+        Nusi = number_of_states(section_aero)
+        Nysi = number_of_inputs(section_aero)
+        Npsi = number_of_parameters(section_aero)
+
+        # local section properties
         icol = stru.icol_beam[i]
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement
         θ_elem = SVector(us[icol+3], us[icol+4], us[icol+5]) # angular displacement
@@ -445,30 +509,40 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
         dvi = -R*GXBeam.element_linear_velocity(element, dP_elem, dH_elem)
         dωi = R*GXBeam.element_angular_velocity(element, dP_elem, dH_elem)
 
-        # aerodynamic rates, states, and parameters
-        duai = SVector{Nui}(duas[i]) # aerodynamic rates
-        uai = SVector{Nui}(uas[i]) # aerodynamic states
-        pai = SVector{Npi}(pas[i]) # aerodynamic parameters
+        # section state variable rates
+        duai = SVector{Nuai}(duas[i]) # aerodynamic state variables
+        dusi = vcat(dvi, dωi) # structural state variables
+        dui = vcat(duai, dusi)
 
+        # section state variables
+        uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
+        usi = vcat(vi, ωi) # structural state variables
+        ui = vcat(uai, usi)
 
-        # calculate lifting line section inputs from state rates
-        dui = vcat(duai, dvi, dωi) # section state rates
-        ui = vcat(uai, vi, ωi) # section states
-        pi = vcat(pai, ρ) # section parameters
-        yi = get_inputs_from_state_rates(model, LiftingLineSection(),
-            dui, ui, pi, t)
+        # section parameters
+        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        psi = SVector(ρ) # structural parameters
+        pi = vcat(pai, psi)
 
-        # section aerodynamic inputs
-        y[iya[iyas[i]]] .= view(yi, 1:Nyi)
+        # section inputs (from state rates)
+        yi = get_inputs_from_state_rates(section_models, dui, ui, pi, t)
 
-        # section aerodynamic loads
-        fi = CtCab*R'*SVector(yi[Nyi+1], yi[Nyi+2], yi[Nyi+3])
-        mi = CtCab*R'*SVector(yi[Nyi+4], yi[Nyi+5], yi[Nyi+6])
+        # separate inputs
+        yai = view(yi, 1:Nyai)
+        ysi = view(yi, Nyai + 1 : Nyai + Nysi)
 
-        # section distributed loads
+        # save local inputs
+        y[iya[iyas[i]]] .= yai # aerodynamic inputs
+
+        # section aerodynamic loads (in body frame)
+        fi = CtCab*R'*SVector(yi[Nyai+1], yi[Nyai+2], yi[Nyai+3])
+        mi = CtCab*R'*SVector(yi[Nyai+4], yi[Nyai+5], yi[Nyai+6])
+
+        # save distributed loads for this element (in body frame)
         yoff = 6*npoint + 6*(i-1)
-        y[iys[yoff+1:yoff+3]] = fi
-        y[iys[yoff+4:yoff+6]] = mi
+        y[iys[yoff+1 : yoff+3]] = fi
+        y[iys[yoff+4 : yoff+6]] = mi
+
     end
 
     return y

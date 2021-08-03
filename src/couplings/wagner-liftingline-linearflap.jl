@@ -17,25 +17,25 @@ end
 
 # --- traits --- #
 
-function inplaceness(::Type{Wagner}, ::Type{LiftingLineSection},
+function inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return OutOfPlace()
 end
 
-function mass_matrix_type(::Type{Wagner}, ::Type{LiftingLineSection},
+function mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Linear()
 end
 
-function state_jacobian_type(::Type{Wagner}, ::Type{LiftingLineSection},
+function state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return Nonlinear()
 end
 
-function number_of_parameters(::Type{Wagner}, ::Type{LiftingLineSection},
+function number_of_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineControl})
 
     return 1
@@ -59,9 +59,9 @@ function get_inputs(aero::Wagner, stru::LiftingLineSection,
     # calculate aerodynamic loads
     L, M = wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     # add loads due to flap deflections
-    L += ρ*U^2*b*clδ*δ
-    D = ρ*U^2*b*cdδ*δ
-    M += 2*ρ*U^2*b^2*cmδ*δ
+    L += ρ*u^2*b*clδ*δ
+    D = ρ*u^2*b*cdδ*δ
+    M += 2*ρ*u^2*b^2*cmδ*δ
     # forces and moments per unit span
     f = SVector(D, 0, L)
     m = SVector(0, M, 0)
@@ -118,16 +118,19 @@ function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection,
     L_vz, M_vz = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
     L_ωy, M_ωy = wagner_loads_ω(a, b, ρ, a0, C1, C2, u)
     # add loads due to flap deflections
-    L_δ = ρ*U^2*b*clδ
-    D_δ = ρ*U^2*b*cdδ
-    M_δ += 2*ρ*U^2*b^2*cmδ
+    L_vx += 2*ρ*u*b*clδ*δ
+    D_vx = 2*ρ*u*b*cdδ*δ
+    M_vx += 4*ρ*u*b^2*cmδ*δ
+    L_δ = ρ*u^2*b*clδ
+    D_δ = ρ*u^2*b*cdδ
+    M_δ = 2*ρ*u^2*b^2*cmδ
     # assemble jacobian
     return @SMatrix [
          0      0     u_vx 0   0   0   0    0  0;
          0      0      0   0 v_vz  0   0    0  0;
          0      0      0   0   0   0  ω_ωy  0  0;
 
-         0      0      0   0   0   0   0    0 D_δ;
+         0      0     D_vx 0   0   0   0    0 D_δ;
          0      0      0   0   0   0   0    0  0;
         L_λ[1] L_λ[2] L_vx 0 L_vz  0  L_ωy  0 L_δ;
          0      0      0   0   0   0   0    0  0;

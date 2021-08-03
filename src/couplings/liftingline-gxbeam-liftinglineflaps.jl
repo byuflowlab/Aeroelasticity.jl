@@ -189,15 +189,15 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
         Nuai = number_of_states(section_aero)
         Nyai = number_of_inputs(section_aero)
         Npai = number_of_parameters(section_aero)
-        Nusi = number_of_states(section_aero)
-        Nysi = number_of_inputs(section_aero)
-        Npsi = number_of_parameters(section_aero)
+        Nusi = number_of_states(section_stru)
+        Nysi = number_of_inputs(section_stru)
+        Npsi = number_of_parameters(section_stru)
         Nufi = number_of_states(section_flap)
         Nyfi = number_of_inputs(section_flap)
         Npfi = number_of_parameters(section_flap)
-        Nuci = number_of_states(section_aero)
-        Nyci = number_of_inputs(section_aero)
-        Npci = number_of_parameters(section_aero)
+        Nuci = number_of_states(section_ctrl)
+        Nyci = number_of_inputs(section_ctrl)
+        Npci = number_of_parameters(section_ctrl)
 
         # local section properties
         icol = stru.icol_beam[i]
@@ -608,7 +608,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
         Nyci = number_of_inputs(section_aero)
         Npci = number_of_parameters(section_aero)
 
-        # localsection properties
+        # local section properties
         icol = stru.icol_beam[i]
         element = assembly.elements[i]
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement

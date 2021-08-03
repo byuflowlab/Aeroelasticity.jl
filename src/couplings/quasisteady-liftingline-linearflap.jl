@@ -101,9 +101,9 @@ function get_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection,
     # calculate loads
     L, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # add loads due to flap deflections
-    L += ρ*U^2*b*clδ*δ
-    D = ρ*U^2*b*cdδ*δ
-    M += 2*ρ*U^2*b^2*cmδ*δ
+    L += ρ*u^2*b*clδ*δ
+    D = ρ*u^2*b*cdδ*δ
+    M += 2*ρ*u^2*b^2*cmδ*δ
     # forces and moments per unit span
     f = SVector(D, 0, L)
     m = SVector(0, M, 0)
@@ -124,9 +124,9 @@ function get_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection,
     # calculate aerodynamic loads
     L, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
     # add loads due to flap deflections
-    L += ρ*U^2*b*clδ*δ
-    D = ρ*U^2*b*cdδ*δ
-    M += 2*ρ*U^2*b^2*cmδ*δ
+    L += ρ*u^2*b*clδ*δ
+    D = ρ*u^2*b*cdδ*δ
+    M += 2*ρ*u^2*b^2*cmδ*δ
     # forces and moments per unit span
     f = SVector(D, 0, L)
     m = SVector(0, M, 0)
@@ -147,9 +147,9 @@ function get_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection,
     # calculate aerodynamic loads
     L, M = quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, ω)
     # add loads due to flap deflections
-    L += ρ*U^2*b*clδ*δ
-    D = ρ*U^2*b*cdδ*δ
-    M += 2*ρ*U^2*b^2*cmδ*δ
+    L += ρ*u^2*b*clδ*δ
+    D = ρ*u^2*b*cdδ*δ
+    M += 2*ρ*u^2*b^2*cmδ*δ
     # forces and moments per unit span
     f = SVector(D, 0, L)
     m = SVector(0, M, 0)
@@ -185,11 +185,14 @@ function get_input_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection
     L_u, M_u = quasisteady0_u(a, b, ρ, a0, v)
     L_v, M_v = quasisteady0_v(a, b, ρ, a0, u)
     # add loads due to flap deflections
-    L_δ = ρ*U^2*b*clδ
-    D_δ = ρ*U^2*b*cdδ
-    M_δ += 2*ρ*U^2*b^2*cmδ
+    L_u += 2*ρ*u*b*clδ*δ
+    D_u = 2*ρ*u*b*cdδ*δ
+    M_u += 4*ρ*u*b^2*cmδ*δ
+    L_δ = ρ*u^2*b*clδ
+    D_δ = ρ*u^2*b*cdδ
+    M_δ = 2*ρ*u^2*b^2*cmδ
     # return inputs
-    return @SMatrix [0 0 0 0 0 0 D_δ; 0 0 0 0 0 0 0; L_u 0 L_v 0 0 0 L_δ; 0 0 0 0 0 0 0;
+    return @SMatrix [D_u 0 0 0 0 0 D_δ; 0 0 0 0 0 0 0; L_u 0 L_v 0 0 0 L_δ; 0 0 0 0 0 0 0;
         M_u 0 M_v 0 0 0 M_δ; 0 0 0 0 0 0 0]
 end
 
@@ -208,11 +211,14 @@ function get_input_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection
     L_v, M_v = quasisteady1_v(a, b, ρ, a0, α0, u)
     L_ω, M_ω = quasisteady1_ω(a, b, ρ, a0, u)
     # add loads due to flap deflections
-    L_δ = ρ*U^2*b*clδ
-    D_δ = ρ*U^2*b*cdδ
-    M_δ += 2*ρ*U^2*b^2*cmδ
+    L_u += 2*ρ*u*b*clδ*δ
+    D_u = 2*ρ*u*b*cdδ*δ
+    M_u += 4*ρ*u*b^2*cmδ*δ
+    L_δ = ρ*u^2*b*clδ
+    D_δ = ρ*u^2*b*cdδ
+    M_δ = 2*ρ*u^2*b^2*cmδ
     # return inputs
-    return @SMatrix [0 0 0 0 0 0 D_δ; 0 0 0 0 0 0 0; L_u 0 L_v 0 L_ω 0 L_δ;
+    return @SMatrix [D_u 0 0 0 0 0 D_δ; 0 0 0 0 0 0 0; L_u 0 L_v 0 L_ω 0 L_δ;
         0 0 0 0 0 0 0; M_u 0 M_v 0 M_ω 0 M_δ; 0 0 0 0 0 0 0]
 end
 
@@ -231,11 +237,14 @@ function get_input_state_jacobian(aero::QuasiSteady{2}, stru::LiftingLineSection
     L_v, M_v = quasisteady2_v(a, b, ρ, a0, α0, u)
     L_ω, M_ω = quasisteady2_ω(a, b, ρ, a0, u)
     # add loads due to flap deflections
-    L_δ = ρ*U^2*b*clδ
-    D_δ = ρ*U^2*b*cdδ
-    M_δ += 2*ρ*U^2*b^2*cmδ
+    L_u += 2*ρ*u*b*clδ*δ
+    D_u = 2*ρ*u*b*cdδ*δ
+    M_u += 4*ρ*u*b^2*cmδ*δ
+    L_δ = ρ*u^2*b*clδ
+    D_δ = ρ*u^2*b*cdδ
+    M_δ = 2*ρ*u^2*b^2*cmδ
     # return inputs
-    return @SMatrix [0 0 0 0 0 0 D_δ; 0 0 0 0 0 0 0; L_u 0 L_v 0 L_ω 0 L_δ;
+    return @SMatrix [D_u 0 0 0 0 0 D_δ; 0 0 0 0 0 0 0; L_u 0 L_v 0 L_ω 0 L_δ;
         0 0 0 0 0 0 0; M_u 0 M_v 0 M_ω 0 M_δ; 0 0 0 0 0 0 0]
 end
 

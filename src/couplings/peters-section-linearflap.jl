@@ -1,19 +1,20 @@
 """
-    couple_models(aero::Peters, stru::TypicalSection)
+    couple_models(aero::Peters, stru::TypicalSection, flap::LinearFlap)
 
 Create an aerostructural model using the unsteady aerodynamic model defined by
-Peters et al. and a two-degree of freedom typical section model.  This model
-introduces the freestream velocity ``U_\\infty`` and air density ``\\rho_\\infty``
-as additional parameters.
+Peters et al., a two-degree of freedom typical section model, and a linear
+steady-state control surface model.  This model introduces the freestream
+velocity ``U_\\infty``, air density ``\\rho_\\infty``, and flap deflection
+``\\delta`` as additional parameters.
 """
-couple_models(aero::Peters, stru::TypicalSection, flap::LinearFlap) = (aero, stru)
+couple_models(aero::Peters, stru::TypicalSection, flap::LinearFlap) = (aero, stru, flap)
 
 # --- traits --- #
 
-inplaceness(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = OutOfPlace()
-mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = Linear()
-state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = Nonlinear()
-number_of_parameters(::Type{<:Peters}, ::Type{TypicalSection}, ::LinearFlap) = 2
+inplaceness(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = OutOfPlace()
+mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Linear()
+state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Nonlinear()
+number_of_parameters(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = 3
 
 # --- methods --- #
 
