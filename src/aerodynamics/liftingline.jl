@@ -1,30 +1,13 @@
 """
-    LiftingLine{N,T} <: AbstractModel
+    LiftingLine{NA,TA} <: AbstractModel
 
-Lifting line model with `N` cross sections, using the aerodynamic models in `T`.
+Lifting line model with `NA` cross sections, using the aerodynamic models in `TA`.
 State variables, inputs, and parameters correspond to the state variables, inputs,
 and parameters of each of the cross sections concatenated
 """
-struct LiftingLine{N,T} <: AbstractModel
-    models::T
+struct LiftingLine{NA,TA<:NTuple{NA,Any}} <: AbstractModel
+    models::TA
 end
-
-"""
-    LiftingLineSection <: AbstractModel
-
-Lifting line section model with state variables ``v_x, v_y, v_z, \\omega_x,
-\\omega_y, \\omega_z``, inputs ``F_x', F_y', F_z', M_x, M_y, M_z``, and zero
-parameters.  Two-dimensional aerodynamic models may be extended to
-three-dimensional models by coupling with this model.  Note that
-this model has no rate equations of its own since its state variables are
-defined as functions of the 3D structural model's state variables.
-"""
-struct LiftingLineSection <: AbstractModel end
-
-number_of_states(::Type{<:LiftingLineSection}) = 6
-number_of_inputs(::Type{<:LiftingLineSection}) = 6
-number_of_parameters(::Type{<:LiftingLineSection}) = 0
-inplaceness(::Type{LiftingLineSection}) = OutOfPlace()
 
 # --- Constructors --- #
 
@@ -33,29 +16,26 @@ inplaceness(::Type{LiftingLineSection}) = OutOfPlace()
 
 Construct a lifting line aerodynamic model given a tuple of 2D aerodynamic models.
 """
-LiftingLine(models::T) where T<:NTuple{N,Any} where N = LiftingLine{N,T}(models)
+LiftingLine(models)
 
-LiftingLine{N}(models::T) where T<:NTuple{N,Any} where N = LiftingLine{N,T}(models)
+LiftingLine{NA}(models::TA) where TA<:NTuple{NA,Any} where NA = LiftingLine{NA,TA}(models)
 
 """
-    LiftingLine{N}(model)
+    LiftingLine{NA}(model)
 
-Construct a lifting line aerodynamic model using `N` instances of `model`.
+Construct a lifting line aerodynamic model using `NA` instances of `model`.
 """
-function LiftingLine{N}(model) where {N,T}
-    models = ntuple(i->model, N)
-    return LiftingLine(models)
-end
+LiftingLine{NA}(model) where NA = LiftingLine(ntuple(i -> model, NA))
 
 # --- Traits --- #
 
 number_of_states(model::LiftingLine) = sum(number_of_states.(model.models))
 number_of_inputs(model::LiftingLine) = sum(number_of_inputs.(model.models))
 number_of_parameters(model::LiftingLine) = sum(number_of_parameters.(model.models))
-inplaceness(::Type{LiftingLine{N,T}}) where {N,T} = InPlace()
+inplaceness(::Type{<:LiftingLine}) = InPlace()
 
-function mass_matrix_type(::Type{LiftingLine{N,T}}) where {N,T}
-    model_types = (T.parameters...,)
+function mass_matrix_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
+    model_types = (TA.parameters...,)
     if all(isempty.(mass_matrix_type.(model_types)))
         return Empty()
     elseif all(iszero.(mass_matrix_type.(model_types)))
@@ -71,8 +51,8 @@ function mass_matrix_type(::Type{LiftingLine{N,T}}) where {N,T}
     end
 end
 
-function state_jacobian_type(::Type{LiftingLine{N,T}}) where {N,T}
-    model_types = (T.parameters...,)
+function state_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
+    model_types = (TA.parameters...,)
     if all(isempty.(state_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(state_jacobian_type.(model_types)))
@@ -88,8 +68,8 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}) where {N,T}
     end
 end
 
-function input_jacobian_type(::Type{LiftingLine{N,T}}) where {N,T}
-    model_types = (T.parameters...,)
+function input_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
+    model_types = (TA.parameters...,)
     if all(isempty.(input_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(input_jacobian_type.(model_types)))
@@ -203,9 +183,9 @@ function get_input_jacobian(model::LiftingLine)
 
     M = number_of_states(model)
 
-    N = number_of_inputs(model)
+    NA = number_of_inputs(model)
 
-    Jy = LinearMap(f!, M, N; ismutating=true)
+    Jy = LinearMap(f!, M, NA; ismutating=true)
 
     return Jy
 end
@@ -216,9 +196,9 @@ function get_input_jacobian(model::LiftingLine, λ, d, p, t)
 
     M = number_of_states(model)
 
-    N = number_of_inputs(model)
+    NA = number_of_inputs(model)
 
-    Jy = LinearMap(f!, M, N; ismutating=true)
+    Jy = LinearMap(f!, M, NA; ismutating=true)
 
     return Jy
 end

@@ -1,97 +1,90 @@
 """
-    couple_models(aero::LiftingLine, stru::GEBT, flap::LiftingLineFlaps, ctrl::Trim)
+    couple_models(aero::LiftingLine, stru::GEBT, flap::LiftingLineFlaps)
 
-Create an aerostructural model using a lifting line aerodynamic model, a
-geometrically exact beam theory model, a lifting line control surface model,
-and a model which maintains trimmed operating conditions.  This model introduces
-additional parameters corresponding to the freestream velocity components
-``V_x, V_y, V_z``, followed by the air density ``\\rho``, followed by the
-external loads ``F_{x,i}, F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or
-displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i},
-\\theta_{z,i}`` for each node, followed by the constant distributed loads
-``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}`` for each beam element
-(excluding aerodynamic loads), followed by the body frame linear and angular
-velocity ``u, v, w, p, q, r``, and the control surface deflections ``\\delta_1,
-\\delta_2, \\dots, \\delta_N``.
+Create a coupled model using a lifting line aerodynamic model, a
+geometrically exact beam theory model, and a lifting line control surface model.
+This model introduces additional parameters corresponding to the freestream
+air density ``\\rho_\\infty``, followed by the external loads ``F_{x,i}, F_{y,i},
+F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or displacements ``u_{x,i}, u_{y,i}, u_{z,i},
+\\theta_{x,i}, \\theta_{y,i}, \\theta_{z,i}`` for each node, followed by the constant
+distributed loads ``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}``
+applied on each beam element (excluding aerodynamic loads), followed by the body
+frame linear and angular velocities ``u, v, w, p, q, r`` and the control surface
+deflections ``\\delta_1, \\delta_2, \\dots, \\delta_N``.
 
 **NOTE: When using this model, the local frame for each beam element should be
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
 z-axis normal to the surface**
 """
-function couple_models(aero::LiftingLine, stru::GEBT, flap::LiftingLineFlaps,
-    ctrl::Trim)
-
-    return (aero, stru, flap, ctrl)
+function couple_models(aero::LiftingLine, stru::GEBT, flap::LiftingLineFlaps)
+    return (aero, stru, flap)
 end
 
 # --- traits --- #
 
-function inplaceness(::Type{<:LiftingLine}, ::Type{<:GEBT},
-    ::Type{<:LiftingLineFlaps}, ::Type{<:Trim})
-
+function inplaceness(::Type{<:LiftingLine}, ::Type{<:GEBT}, ::Type{<:LiftingLineFlaps})
     return InPlace()
 end
 
-function mass_matrix_type(::Type{LiftingLine{NS,TS}}, ::Type{<:GEBT},
-    ::Type{LiftingLineFlaps{NS,NF,TF}}, ::Type{<:Trim}) where {NS,NF,TS,TF}
+function mass_matrix_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT},
+    ::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NA,NF,NG,TA,TF,TG}
 
-    aero_model_types = TS.parameters
+    aero_model_types = TA.parameters
     flap_model_types = TF.parameters
-    if all(isempty.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isempty.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
+    if all(isempty.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Empty()
-    elseif all(iszero.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(iszero.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(iszero.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Zeros()
-    elseif all(isidentity.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isidentity.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(isidentity.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Identity()
-    elseif all(isconstant.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isconstant.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(isconstant.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Constant()
-    elseif all(islinear.(mass_matrix_type.(model_types, Ref(LiftingLineSection)))) &&
-        all(islinear.(mass_matrix_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(islinear.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Linear()
     else
         return Nonlinear()
     end
 end
 
-function state_jacobian_type(::Type{LiftingLine{NS,TS}}, ::Type{<:GEBT},
-    ::Type{LiftingLineFlaps{NS,NF,TF}}, ::Type{<:Trim}) where {NS,NF,TS,TF}
+function state_jacobian_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT},
+    ::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NA,NF,NG,TA,TF,TG}
 
-    aero_model_types = TS.parameters
+    aero_model_types = TA.parameters
     flap_model_types = TF.parameters
-    if all(isempty.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isempty.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
+    if all(isempty.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Empty()
-    elseif all(iszero.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(iszero.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(iszero.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Zeros()
-    elseif all(isidentity.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isidentity.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(isidentity.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Identity()
-    elseif all(isconstant.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(isconstant.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(isconstant.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Constant()
-    elseif all(islinear.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection)))) &&
-        all(islinear.(state_jacobian_type.(flap_model_types, Ref(LiftingLineControl))))
+    elseif all(islinear.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
         return Linear()
     else
         return Nonlinear()
     end
 end
 
-function number_of_parameters(aero::LiftingLine, stru::GEBT,
-    flap::LiftingLineFlaps{NS,NF,TF}, ctrl::Trim) where {NS,NF,TF}
+function number_of_parameters(aero::LiftingLine, stru::GEBT, flap::LiftingLineFlaps)
 
-    return 4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + NF
+    return 1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + length(flap.gains)
 end
 
 # --- methods --- #
 
-function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
-    flap::LiftingLineFlaps{NS,NF,TF}, ctrl::Trim, u, p, t) where {NS,NF,TS,TF}
+function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT,
+    flap::LiftingLineFlaps{NF,NG,TF,TG}, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # extract number of state variables, inputs, and parameters
     nua = number_of_states(aero) # number of aerodynamic states
@@ -115,7 +108,7 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
     iuf = nua + nus + 1 : nua + nus + nuf # indices of control surface states
     iyf = nya + nys + 1 : nya + nys + nyf # indices of control surface inputs
     ipf = npa + nps + 1 : npa + nps + npf # indices of control surface parameters
-    ipadd = npa + nps + npf : npa + nps + npf + npadd # indices of additional parameters
+    ipadd = npa + nps + npf + 1 : npa + nps + npf + npadd # indices of additional parameters
     iuas = state_indices(aero.models) # indices of aerodynamic states for each section
     iyas = input_indices(aero.models) # indices of aerodynamic inputs for each section
     ipas = parameter_indices(aero.models) # indices of aerodynamic parameters for each section
@@ -141,53 +134,46 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
     yfs = view.(Ref(yf), iyfs) # control surface inputs for each section
     pfs = view.(Ref(pf), ipfs) # control surface parameters for each section
 
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
     # global parameters
-    Vx = padd[1]
-    Vy = padd[2]
-    Vz = padd[3]
-    ρ = padd[4]
-    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
-    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
-    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
-    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
-    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
-    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
-    δ = padd[SVector{NF}(
-        4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + 1 :
-        4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + NF)
-        ] # control surface deflections
+    ρ = padd[1]
+    ur = padd[1 + 6*npoint + 6*nelem + 1]
+    vr = padd[1 + 6*npoint + 6*nelem + 2]
+    wr = padd[1 + 6*npoint + 6*nelem + 3]
+    pr = padd[1 + 6*npoint + 6*nelem + 4]
+    qr = padd[1 + 6*npoint + 6*nelem + 5]
+    rr = padd[1 + 6*npoint + 6*nelem + 6]
+    δ = padd[SVector{NG}(1 + 6*npoint + 6*nelem + 6 + 1 : 1 + 6*npoint + 6*nelem + 6 + NG)]
 
     # body linear and angular velocity
     V = SVector(ur, vr, wr)
     Ω = SVector(pr, qr, rr)
 
-    # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - V
-
     # construct assembly from structural parameters
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
     assembly = gxbeam_assembly(ps, npoint, nelem, stru.start, stru.stop)
 
     # save prescribed point loads/displacements
     for ip = 1:npoint
-        yoff = nya + 6*(ip-1)
-        poff = npa + nps + 4 + 6*(ip-1)
-        y[yoff+1] = p[poff+1]
-        y[yoff+2] = p[poff+2]
-        y[yoff+3] = p[poff+3]
-        y[yoff+4] = p[poff+4]
-        y[yoff+5] = p[poff+5]
-        y[yoff+6] = p[poff+6]
+        yoff = 6*(ip-1)
+        poff = 1 + 6*(ip-1)
+        y[iys[yoff+1]] = padd[poff+1]
+        y[iys[yoff+2]] = padd[poff+2]
+        y[iys[yoff+3]] = padd[poff+3]
+        y[iys[yoff+4]] = padd[poff+4]
+        y[iys[yoff+5]] = padd[poff+5]
+        y[iys[yoff+6]] = padd[poff+6]
     end
 
     # save aerodynamic inputs and distributed loads
-    for i = 1:NS
+    for i = 1:NA
         # models for this section
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
         section_flap = flap.models[i]
-        section_ctrl = LiftingLineControl()
+        section_ctrl = LiftingLineSectionControl()
         section_models = (section_aero, section_stru, section_flap, section_ctrl)
 
         # model dimensions for this section
@@ -217,7 +203,7 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
         θ_elem *= scaling # angular displacement (Wiener-Milenkovic parameters)
         CtCab = GXBeam.get_C(θ_elem)'*element.Cab # local to body transformation
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1] # local structural to aerodynamic transformation
-        vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem) # local linear freestream velocity
+        vi = -R*(CtCab'*V + R*GXBeam.element_linear_velocity(element, P_elem, H_elem)) # local linear freestream velocity
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
@@ -230,13 +216,13 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
         uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
         usi = vcat(vi, ωi) # structural state variables
         ufi = SVector{Nufi}(ufs[i]) # control surface state variables
-        uci = getindex.(flap, i) * δ # controller state variables
+        uci = SMatrix{1,NG}(getindex.(flap.gains, i)) * δ # controller state variables
         ui = vcat(uai, usi, ufi, uci)
 
         # section parameters
-        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        pai = SVector{Npai}(pas[i]) # aerodynamic parameters
         psi = SVector(ρ) # structural parameters
-        pfi = SVector{Nufi}(pfs[i]) # control surface parameters
+        pfi = SVector{Npfi}(pfs[i]) # control surface parameters
         pci = SVector{0,Float64}() # controller parameters
         pi = vcat(pai, psi, pfi, pci)
 
@@ -251,16 +237,16 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
 
         # save local inputs
         y[iya[iyas[i]]] .= yai # aerodynamic inputs
-        y[ifa[iyfs[i]]] .= yfi # control surface inputs
+        y[iyf[iyfs[i]]] .= yfi # control surface inputs
 
         # section aerodynamic loads (in body frame)
         fi = CtCab*R'*SVector(yi[Nyai+1], yi[Nyai+2], yi[Nyai+3])
         mi = CtCab*R'*SVector(yi[Nyai+4], yi[Nyai+5], yi[Nyai+6])
 
         # add constant distributed loads (in body frame)
-        poff = 4 + 6*npoint + 6*(i-1)
-        fi += SVector(pc[poff+1], pc[poff+2], pc[poff+3])
-        mi += SVector(pc[poff+4], pc[poff+5], pc[poff+6])
+        poff = 1 + 6*npoint + 6*(i-1)
+        fi += SVector(padd[poff+1], padd[poff+2], padd[poff+3])
+        mi += SVector(padd[poff+4], padd[poff+5], padd[poff+6])
 
         # save distributed loads for this element (in body frame)
         yoff = 6*npoint + 6*(i-1)
@@ -269,19 +255,19 @@ function get_inputs!(y, aero::LiftingLine{NS,TS}, stru::GEBT,
     end
 
     # save body frame linear/angular velocities
-    yoff = nya + 6*npoint + 6*nelem
-    y[yoff+1] = ur
-    y[yoff+2] = vr
-    y[yoff+3] = wr
-    y[yoff+4] = pr
-    y[yoff+5] = qr
-    y[yoff+6] = rr
+    yoff = 6*npoint + 6*nelem
+    y[iys[yoff+1]] = ur
+    y[iys[yoff+2]] = vr
+    y[iys[yoff+3]] = wr
+    y[iys[yoff+4]] = pr
+    y[iys[yoff+5]] = qr
+    y[iys[yoff+6]] = rr
 
     return y
 end
 
-function get_input_mass_matrix!(My, aero::LiftingLine{NS,TS}, stru::GEBT,
-    flap::LiftingLineFlaps{NS,NF,TF}, ctrl::Trim, u, p, t) where {NS,NF,TS,TF}
+function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
+    flap::LiftingLineFlaps{NF,NG,TF,TG}, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # zero out mass matrix
     My .= 0
@@ -329,58 +315,51 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NS,TS}, stru::GEBT,
     ufs = view.(Ref(uf), iufs) # control surface state variables for each section
     pfs = view.(Ref(pf), ipfs) # control surface parameters for each section
 
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
     # global parameters
-    Vx = padd[1]
-    Vy = padd[2]
-    Vz = padd[3]
-    ρ = padd[4]
-    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
-    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
-    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
-    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
-    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
-    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
-    δ = padd[SVector{NF}(
-        4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + 1 :
-        4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + NF)
-        ] # control surface deflections
+    ρ = padd[1]
+    ur = padd[1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
+    vr = padd[1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
+    wr = padd[1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
+    pr = padd[1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
+    qr = padd[1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
+    rr = padd[1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
+    δ = padd[SVector{NG}(1 + 6*npoint + 6*nelem + 6 + 1 : 1 + 6*npoint + 6*nelem + 6 + NG)]
 
     # rigid body linear and angular velocity
     V = SVector(ur, vr, wr)
     Ω = SVector(pr, qr, rr)
 
-    # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - V
-
     # construct assembly from parameters
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
     assembly = gxbeam_assembly(ps, npoint, nelem, stru.start, stru.stop)
 
     # no point loads are dependent on state rates
 
     # save aerodynamic inputs and distributed loads
-    for i = 1:N
+    for i = 1:NA
         # models for this section
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
         section_flap = flap.models[i]
-        section_ctrl = LiftingLineControl()
+        section_ctrl = LiftingLineSectionControl()
         section_models = (section_aero, section_stru, section_flap, section_ctrl)
 
         # model dimensions for this section
         Nuai = number_of_states(section_aero)
         Nyai = number_of_inputs(section_aero)
         Npai = number_of_parameters(section_aero)
-        Nusi = number_of_states(section_aero)
-        Nysi = number_of_inputs(section_aero)
-        Npsi = number_of_parameters(section_aero)
+        Nusi = number_of_states(section_stru)
+        Nysi = number_of_inputs(section_stru)
+        Npsi = number_of_parameters(section_stru)
         Nufi = number_of_states(section_flap)
         Nyfi = number_of_inputs(section_flap)
         Npfi = number_of_parameters(section_flap)
-        Nuci = number_of_states(section_aero)
-        Nyci = number_of_inputs(section_aero)
-        Npci = number_of_parameters(section_aero)
+        Nuci = number_of_states(section_ctrl)
+        Nyci = number_of_inputs(section_ctrl)
+        Npci = number_of_parameters(section_ctrl)
 
         # local section properties
         icol = stru.icol_beam[i]
@@ -395,7 +374,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NS,TS}, stru::GEBT,
         θ_elem *= scaling # angular displacement (Wiener-Milenkovic parameters)
         CtCab = GXBeam.get_C(θ_elem)'*element.Cab # local to body transformation
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1] # local structural to aerodynamic transformation
-        vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem) # local linear freestream velocity
+        vi = -R*(CtCab'*V + GXBeam.element_linear_velocity(element, P_elem, H_elem)) # local linear freestream velocity
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
         dvi_dPi = -R * element.minv11 * stru.mass_scaling
         dvi_dHi = -R * element.minv12 * stru.mass_scaling
@@ -412,13 +391,13 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NS,TS}, stru::GEBT,
         uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
         usi = vcat(vi, ωi) # structural state variables
         ufi = SVector{Nufi}(ufs[i]) # control surface state variables
-        uci = getindex.(flap, i) .* δ # controller state variables
+        uci = SMatrix{1,NG}(getindex.(flap.gains, i)) .* δ # controller state variables
         ui = vcat(uai, usi, ufi, uci)
 
         # section parameters
-        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        pai = SVector{Npai}(pas[i]) # aerodynamic parameters
         psi = SVector(ρ) # structural parameters
-        pfi = SVector{Nufi}(pfs[i]) # control surface parameters
+        pfi = SVector{Npfi}(pfs[i]) # control surface parameters
         pci = SVector{0,Float64}() # controller parameters
         pi = vcat(pai, psi, pfi, pci)
 
@@ -426,31 +405,31 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NS,TS}, stru::GEBT,
         Myi = get_input_mass_matrix(section_models, ui, pi, t)
 
         # separate into component mass matrices
-        yai_duai = SMatrix{Nyai,Nuai}(view(Mi, 1:Nyai, 1:Nuai))
-        yai_dvi = SMatrix{Nyai,3}(view(Mi, 1:Nyai, Nuai+1:Nuai+3))
-        yai_dωi = SMatrix{Nyai,3}(view(Mi, 1:Nyai, Nuai+4:Nuai+6))
-        yai_dufi = SMatrix{Nyai,Nufi}(view(Mi, 1:Nyai, Nuai+Nusi+1:Nuai+Nusi+Nufi))
-        yai_duci = SMatrix{Nyai,Nuci}(view(Mi, 1:Nyai, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
-        f_duai = SMatrix{3,Nuai}(view(Mi, Nyai+1:Nyai+3, 1:Nuai))
-        f_dvi = SMatrix{3,3}(view(Mi, Nyai+1:Nyai+3, Nuai+1:Nuai+3))
-        f_dωi = SMatrix{3,3}(view(Mi, Nyai+1:Nyai+3, Nuai+4:Nuai+6))
-        f_dufi = SMatrix{3,Nufi}(view(Mi, Nyai+1:Nyai+3, Nuai+Nusi+1:Nuai+Nusi+Nufi))
-        f_duci = SMatrix{3,Nuci}(view(Mi, Nyai+1:Nyai+3, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
-        m_duai = SMatrix{3,Nuai}(view(Mi, Nyai+4:Nyai+6, 1:Nuai))
-        m_dvi = SMatrix{3,3}(view(Mi, Nyai+4:Nyai+6, Nuai+1:Nuai+3))
-        m_dωi = SMatrix{3,3}(view(Mi, Nyai+4:Nyai+6, Nuai+4:Nuai+6))
-        m_dufi = SMatrix{3,Nufi}(view(Mi, Nyai+4:Nyai+6, Nuai+Nusi+1:Nuai+Nusi+Nufi))
-        m_duci = SMatrix{3,Nuci}(view(Mi, Nyai+4:Nyai+6, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
-        yfi_duai = SMatrix{Nyfi,Nuai}(view(Mi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, 1:Nuai))
-        yfi_dvi = SMatrix{Nyfi,3}(view(Mi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+1:Nuai+3))
-        yfi_dωi = SMatrix{Nyfi,3}(view(Mi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+4:Nuai+6))
-        yfi_dufi = SMatrix{Nyfi,Nufi}(view(Mi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+Nusi+1:Nuai+Nusi+Nufi))
-        yfi_duci = SMatrix{Nyfi,Nuci}(view(Mi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
-        yci_duai = SMatrix{Nyci,Nuai}(view(Mi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, 1:Nuai))
-        yci_dvi = SMatrix{Nyci,3}(view(Mi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+1:Nuai+3))
-        yci_dωi = SMatrix{Nyci,3}(view(Mi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+4:Nuai+6))
-        yci_dufi = SMatrix{Nyci,Nufi}(view(Mi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+Nusi+1:Nuai+Nusi+Nufi))
-        yci_duci = SMatrix{Nyci,Nuci}(view(Mi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        yai_duai = SMatrix{Nyai,Nuai}(view(Myi, 1:Nyai, 1:Nuai))
+        yai_dvi = SMatrix{Nyai,3}(view(Myi, 1:Nyai, Nuai+1:Nuai+3))
+        yai_dωi = SMatrix{Nyai,3}(view(Myi, 1:Nyai, Nuai+4:Nuai+6))
+        yai_dufi = SMatrix{Nyai,Nufi}(view(Myi, 1:Nyai, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        yai_duci = SMatrix{Nyai,Nuci}(view(Myi, 1:Nyai, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        f_duai = SMatrix{3,Nuai}(view(Myi, Nyai+1:Nyai+3, 1:Nuai))
+        f_dvi = SMatrix{3,3}(view(Myi, Nyai+1:Nyai+3, Nuai+1:Nuai+3))
+        f_dωi = SMatrix{3,3}(view(Myi, Nyai+1:Nyai+3, Nuai+4:Nuai+6))
+        f_dufi = SMatrix{3,Nufi}(view(Myi, Nyai+1:Nyai+3, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        f_duci = SMatrix{3,Nuci}(view(Myi, Nyai+1:Nyai+3, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        m_duai = SMatrix{3,Nuai}(view(Myi, Nyai+4:Nyai+6, 1:Nuai))
+        m_dvi = SMatrix{3,3}(view(Myi, Nyai+4:Nyai+6, Nuai+1:Nuai+3))
+        m_dωi = SMatrix{3,3}(view(Myi, Nyai+4:Nyai+6, Nuai+4:Nuai+6))
+        m_dufi = SMatrix{3,Nufi}(view(Myi, Nyai+4:Nyai+6, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        m_duci = SMatrix{3,Nuci}(view(Myi, Nyai+4:Nyai+6, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        yfi_duai = SMatrix{Nyfi,Nuai}(view(Myi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, 1:Nuai))
+        yfi_dvi = SMatrix{Nyfi,3}(view(Myi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+1:Nuai+3))
+        yfi_dωi = SMatrix{Nyfi,3}(view(Myi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+4:Nuai+6))
+        yfi_dufi = SMatrix{Nyfi,Nufi}(view(Myi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        yfi_duci = SMatrix{Nyfi,Nuci}(view(Myi, Nyai+Nysi+1:Nyai+Nysi+Nyfi, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
+        yci_duai = SMatrix{Nyci,Nuai}(view(Myi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, 1:Nuai))
+        yci_dvi = SMatrix{Nyci,3}(view(Myi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+1:Nuai+3))
+        yci_dωi = SMatrix{Nyci,3}(view(Myi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+4:Nuai+6))
+        yci_dufi = SMatrix{Nyci,Nufi}(view(Myi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+Nusi+1:Nuai+Nusi+Nufi))
+        yci_duci = SMatrix{Nyci,Nuci}(view(Myi, Nyai+Nysi+Nyfi+1:Nyai+Nysi+Nyfi+Nyci, Nuai+Nusi+Nufi+1:Nuai+Nusi+Nufi+Nuci))
 
         # propagate derivatives using chain rule
         yai_dPi = yai_dvi * dvi_dPi + yai_dωi * dωi_dPi
@@ -498,8 +477,8 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
-    flap::LiftingLineFlaps{NS,NF,TF}, ctrl::Trim, du, u, p, t) where {NS,NF,TS,TF}
+function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
+    flap::LiftingLineFlaps{NF,NG,TF,TG}, du, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # initialize input vector
     models = (aero, stru, flap)
@@ -560,58 +539,52 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
     yfs = view.(Ref(yf), iyfs) # control surface inputs for each section
     pfs = view.(Ref(pf), ipfs) # control surface parameters for each section
 
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
     # global parameters
-    Vx = padd[1]
-    Vy = padd[2]
-    Vz = padd[3]
-    ρ = padd[4]
-    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
-    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
-    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
-    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
-    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
-    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
-    δ = padd[SVector{NF}(
-        4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + 1 :
-        4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6 + NF)
-        ] # control surface deflections
+    ρ = padd[1]
+    ur = padd[1 + 6*npoint + 6*nelem + 1]
+    vr = padd[1 + 6*npoint + 6*nelem + 2]
+    wr = padd[1 + 6*npoint + 6*nelem + 3]
+    pr = padd[1 + 6*npoint + 6*nelem + 4]
+    qr = padd[1 + 6*npoint + 6*nelem + 5]
+    rr = padd[1 + 6*npoint + 6*nelem + 6]
+    δ = padd[SVector{NG}(1 + 6*npoint + 6*nelem + 6 + 1 : 1 + 6*npoint + 6*nelem + 6 + NG)]
+    dδ = zero(δ)
 
     # rigid body linear and angular velocity
     V = SVector(ur, vr, wr)
     Ω = SVector(pr, qr, rr)
 
-    # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - V
-
     # construct assembly from parameters
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
     assembly = gxbeam_assembly(ps, npoint, nelem, stru.start, stru.stop)
 
     # no point loads are dependent on state rates
 
     # save aerodynamic inputs and distributed loads
-    for i = 1:N
+    for i = 1:NA
         # models for this section
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
         section_flap = flap.models[i]
-        section_ctrl = LiftingLineControl()
+        section_ctrl = LiftingLineSectionControl()
         section_models = (section_aero, section_stru, section_flap, section_ctrl)
 
         # model dimensions for this section
         Nuai = number_of_states(section_aero)
         Nyai = number_of_inputs(section_aero)
         Npai = number_of_parameters(section_aero)
-        Nusi = number_of_states(section_aero)
-        Nysi = number_of_inputs(section_aero)
-        Npsi = number_of_parameters(section_aero)
+        Nusi = number_of_states(section_stru)
+        Nysi = number_of_inputs(section_stru)
+        Npsi = number_of_parameters(section_stru)
         Nufi = number_of_states(section_flap)
         Nyfi = number_of_inputs(section_flap)
         Npfi = number_of_parameters(section_flap)
-        Nuci = number_of_states(section_aero)
-        Nyci = number_of_inputs(section_aero)
-        Npci = number_of_parameters(section_aero)
+        Nuci = number_of_states(section_ctrl)
+        Nyci = number_of_inputs(section_ctrl)
+        Npci = number_of_parameters(section_ctrl)
 
         # local section properties
         icol = stru.icol_beam[i]
@@ -623,8 +596,6 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
         P_elem = SVector(us[icol+12], us[icol+13], us[icol+14]) .* stru.mass_scaling # linear momentum
         H_elem = SVector(us[icol+15], us[icol+16], us[icol+17]) .* stru.mass_scaling # angular momentum
 
-        du_elem = SVector(dus[icol], dus[icol+1], dus[icol+2]) # linear displacement
-        dθ_elem = SVector(dus[icol+3], dus[icol+4], dus[icol+5]) # angular displacement
         dF_elem = SVector(dus[icol+6], dus[icol+7], dus[icol+8]) .* stru.force_scaling # internal force
         dM_elem = SVector(dus[icol+9], dus[icol+10], dus[icol+11]) .* stru.force_scaling # internal moment
         dP_elem = SVector(dus[icol+12], dus[icol+13], dus[icol+14]) .* stru.mass_scaling # linear momentum
@@ -633,7 +604,6 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
         # convert rotation parameter to Wiener-Milenkovic parameters
         scaling = GXBeam.rotation_parameter_scaling(θ_elem)
         θ_elem *= scaling # angular displacement (Wiener-Milenkovic parameters)
-        dθ_elem *= scaling # angular displacement rate (Wiener-Milenkovic parameters)
 
         # local to body transformation
         CtCab = GXBeam.get_C(θ_elem)'*element.Cab
@@ -642,8 +612,8 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
 
         # local freestream linear and angular velocities
-        vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
-        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
+        vi = -R*(CtCab'*V + GXBeam.element_linear_velocity(element, P_elem, H_elem)) # local linear freestream velocity
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
 
         # local freestream linear and angular accelerations
         dvi = -R*GXBeam.element_linear_velocity(element, dP_elem, dH_elem)
@@ -653,20 +623,20 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
         duai = SVector{Nuai}(duas[i]) # aerodynamic state variables
         dusi = vcat(dvi, dωi) # structural state variables
         dufi = SVector{Nufi}(dufs[i]) # control surface state variables
-        duci = getindex.(flap, i) * dδ # controller state variables
+        duci = SMatrix{1,NG}(getindex.(flap.gains, i))* dδ # controller state variables
         dui = vcat(duai, dusi, dufi, duci)
 
         # section state variables
         uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
         usi = vcat(vi, ωi) # structural state variables
         ufi = SVector{Nufi}(ufs[i]) # control surface state variables
-        uci = getindex.(flap, i) * δ # controller state variables
+        uci = SMatrix{1,NG}(getindex.(flap.gains, i)) * δ # controller state variables
         ui = vcat(uai, usi, ufi, uci)
 
         # section parameters
-        pai = SVector{Nupi}(pas[i]) # aerodynamic parameters
+        pai = SVector{Npai}(pas[i]) # aerodynamic parameters
         psi = SVector(ρ) # structural parameters
-        pfi = SVector{Nufi}(pfs[i]) # control surface parameters
+        pfi = SVector{Npfi}(pfs[i]) # control surface parameters
         pci = SVector{0,Float64}() # controller parameters
         pi = vcat(pai, psi, pfi, pci)
 
@@ -681,7 +651,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NS,TS}, stru::GEBT,
 
         # save local inputs
         y[iya[iyas[i]]] .= yai # aerodynamic inputs
-        y[ifa[iyfs[i]]] .= yfi # control surface inputs
+        y[iyf[iyfs[i]]] .= yfi # control surface inputs
 
         # section aerodynamic loads (in body frame)
         fi = CtCab*R'*SVector(yi[Nyai+1], yi[Nyai+2], yi[Nyai+3])

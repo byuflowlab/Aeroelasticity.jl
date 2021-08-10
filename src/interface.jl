@@ -18,13 +18,13 @@ number_of_states(model::TM) where TM = number_of_states(TM)
 number_of_states(::Type{T}) where T<:NoStateModel = 0
 
 # combined models have concatenated state variables
-function number_of_states(models::NTuple{N,AbstractModel}) where N
-    sum(number_of_states.(models))
+function number_of_states(models::NTuple{N,Any}) where N
+    return sum(number_of_states.(models))
 end
 
 # combined models have concatenated state variables
-function number_of_states(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    sum(number_of_states.(T.parameters))
+function number_of_states(::Type{T}) where T<:NTuple{N,Any} where N
+    return sum(number_of_states.(T.parameters))
 end
 
 """
@@ -41,12 +41,12 @@ number_of_inputs(model::TM) where TM = number_of_inputs(TM)
 number_of_inputs(::Type{T}) where T<:NoStateModel = 0
 
 # combined models have concatenated inputs
-function number_of_inputs(models::NTuple{N,AbstractModel}) where N
+function number_of_inputs(models::NTuple{N,Any}) where N
     sum(number_of_inputs.(models))
 end
 
 # combined models have concatenated inputs
-function number_of_inputs(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+function number_of_inputs(::Type{T}) where T<:NTuple{N,Any} where N
     sum(number_of_inputs.(T.parameters))
 end
 
@@ -61,12 +61,12 @@ number_of_parameters
 number_of_parameters(models...) = number_of_parameters(typeof.(models)...)
 
 # combined models have concatenated parameters
-function number_of_parameters(models::NTuple{N,AbstractModel}) where N
+function number_of_parameters(models::NTuple{N,Any}) where N
     sum(number_of_parameters.(models)) + number_of_parameters(models...)
 end
 
 # combined models have concatenated parameters
-function number_of_parameters(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+function number_of_parameters(::Type{T}) where T<:NTuple{N,Any} where N
     sum(number_of_parameters.(T.parameters)) + number_of_parameters(T.parameters...)
 end
 
@@ -75,7 +75,7 @@ end
 
 Return the indices corresponding to the state variables for each model in `models`
 """
-function state_indices(models::NTuple{N,AbstractModel}) where N
+function state_indices(models)
     # input indices
     Nu = number_of_states.(models)
     iu2 = cumsum(Nu)
@@ -88,7 +88,7 @@ end
 
 Return the indices corresponding to the input variables for each model in `models`
 """
-function input_indices(models::NTuple{N,AbstractModel}) where N
+function input_indices(models)
     # input indices
     Ny = number_of_inputs.(models)
     iy2 = cumsum(Ny)
@@ -101,12 +101,46 @@ end
 
 Return the indices corresponding to the parameters for each model in `models`
 """
-function parameter_indices(models::NTuple{N,AbstractModel}) where N
+function parameter_indices(models)
     # parameter indices
     Np = number_of_parameters.(models)
     ip2 = cumsum(Np)
     ip1 = ip2 .- Np .+ 1
     return UnitRange.(ip1, ip2)
+end
+
+"""
+    separate_states(models, u)
+
+Return views containing the state variables corresponding to each model in `models`
+"""
+separate_states(models, u) = view.(u, state_indices.(models))
+
+"""
+    separate_inputs(models)
+
+Return views containing the inputs corresponding to each model in `models`
+"""
+separate_inputs(models, y) = view.(y, input_indices.(models))
+
+"""
+    separate_parameters(models)
+
+Return views containing the parameters corresponding to each model in `models`.
+"""
+separate_parameters(models, p) = view.(p, parameter_indices.(models))
+
+"""
+    separate_parameters(models)
+
+Return views containing the parameters corresponding to each model in `models`,
+followed by a view containing any additional parameters.
+"""
+function separate_additional_parameters(models, p)
+    np = length(p)
+    npadd = number_of_parameters(models)
+    ipadd = np - npadd + 1 : np
+    return view(p, ipadd)
 end
 
 """
@@ -137,6 +171,15 @@ end
 # return an empty matrix
 function _get_mass_matrix(::Empty, ::OutOfPlace, models, args...; kwargs...)
     return SMatrix{0, 0, Float64}()
+end
+
+# return the identity matrix
+function _get_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
+    kwargs...) where TM
+
+    Nu = number_of_states(TM)
+
+    return zero(SMatrix{Nu, Nu, Float64})
 end
 
 # return the identity matrix
@@ -285,6 +328,11 @@ end
 # return an empty matrix
 function _get_mass_matrix!(M, ::Empty, ::InPlace, models, args...; kwargs...)
     return M
+end
+
+# return the identity matrix
+function _get_mass_matrix!(M, ::Zeros, ::InPlace, models, args...; kwargs...)
+    return M .= 0
 end
 
 # return the identity matrix
@@ -498,6 +546,12 @@ function _get_state_jacobian(::Empty, ::OutOfPlace, models, args...)
     return SMatrix{0, 0, Float64}()
 end
 
+# return a zero matrix
+function _get_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Nu = number_of_states(TM)
+    return zero(SMatrix{Nu, Nu, Float64})
+end
+
 # return the identity matrix
 function _get_state_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
     Nu = number_of_states(TM)
@@ -653,6 +707,11 @@ function _get_state_jacobian!(J, ::Empty, ::InPlace, models, args...; kwargs...)
 end
 
 # return the identity matrix
+function _get_state_jacobian!(J, ::Zeros, ::InPlace, models, args...; kwargs...)
+    return J .= 0
+end
+
+# return the identity matrix
 function _get_state_jacobian!(J, ::Identity, ::InPlace, models, args...; kwargs...)
     J .= 0
     for i = 1:N
@@ -785,6 +844,14 @@ function _get_input_jacobian(::Zeros, models, args...)
     Ny = number_of_inputs(models)
     Nu = number_of_states(models)
     return FillMap(0, Ny, Nu)
+end
+
+# return an identity matrix
+function _get_input_jacobian(::Identity, models, args...)
+    Ny = number_of_inputs(models)
+    Nu = number_of_states(models)
+    @assert Ny == Nu
+    return LinearMap(I, Ny)
 end
 
 # dispatch to the `get_input_jacobian` function without arguments

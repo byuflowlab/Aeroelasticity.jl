@@ -89,10 +89,9 @@ function run_coupling_tests(models...;
     return nothing
 end
 
-@testset "Typical Section" begin
-    # test on its own
-    run_model_tests(TypicalSection())
-end
+# --- Two-Dimensional Models --- #
+
+# Aerodynamic Models (2D)
 
 @testset "QuasiSteady" begin
     # test on its own
@@ -101,33 +100,9 @@ end
     run_model_tests(QuasiSteady{2}())
 end
 
-@testset "QuasiSteady + TypicalSection" begin
-    # test coupling with TypicalSection()
-    run_coupling_tests(QuasiSteady{0}(), TypicalSection())
-    run_coupling_tests(QuasiSteady{1}(), TypicalSection())
-    run_coupling_tests(QuasiSteady{2}(), TypicalSection())
-end
-
-@testset "QuasiSteady + LiftingLineSection" begin
-    # test coupling with LiftingLineSection()
-    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection())
-    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection())
-    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection())
-end
-
 @testset "Wagner" begin
     # test on its own
     run_model_tests(Wagner())
-end
-
-@testset "Wagner + TypicalSection" begin
-    # test coupling with TypicalSection()
-    run_coupling_tests(Wagner(), TypicalSection())
-end
-
-@testset "Wagner + LiftingLineSection" begin
-    # test coupling with LiftingLineSection()
-    run_coupling_tests(Wagner(), AD.LiftingLineSection())
 end
 
 @testset "Peters' Finite State" begin
@@ -135,18 +110,37 @@ end
     run_model_tests(Peters{4}())
 end
 
-@testset "Peters' Finite State + TypicalSection" begin
-    # test coupling with TypicalSection()
-    run_coupling_tests(Peters{4}(), TypicalSection())
+# Structural Models (2D)
+
+@testset "Typical Section" begin
+    # test on its own
+    run_model_tests(TypicalSection())
 end
 
-@testset "Peters' Finite State + LiftingLineSection" begin
-    # test coupling with LiftingLineSection()
-    run_coupling_tests(Peters{4}(), AD.LiftingLineSection())
-end
+# Control Surface Models (2D)
 
 @testset "LinearFlap" begin
     run_model_tests(LinearFlap())
+end
+
+# Controller Models (2D)
+
+# Coupled Models (2D)
+@testset "QuasiSteady + TypicalSection" begin
+    # test coupling with TypicalSection()
+    run_coupling_tests(QuasiSteady{0}(), TypicalSection())
+    run_coupling_tests(QuasiSteady{1}(), TypicalSection())
+    run_coupling_tests(QuasiSteady{2}(), TypicalSection())
+end
+
+@testset "Wagner + TypicalSection" begin
+    # test coupling with TypicalSection()
+    run_coupling_tests(Wagner(), TypicalSection())
+end
+
+@testset "Peters' Finite State + TypicalSection" begin
+    # test coupling with TypicalSection()
+    run_coupling_tests(Peters{4}(), TypicalSection())
 end
 
 @testset "QuasiSteady + TypicalSection + LinearFlap" begin
@@ -163,23 +157,56 @@ end
     run_coupling_tests(Peters{4}(), TypicalSection(), LinearFlap())
 end
 
-@testset "QuasiSteady + LiftingLineSection + LinearFlap + LiftingLineControl" begin
-    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineControl())
-    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineControl())
-    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineControl())
+
+@testset "QuasiSteady + LiftingLineSection" begin
+    # test coupling with LiftingLineSection()
+    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection())
+    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection())
+    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection())
 end
 
-@testset "Wagner + LiftingLineSection + LinearFlap + LiftingLineControl" begin
-    run_coupling_tests(Wagner(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineControl())
+@testset "Wagner + LiftingLineSection" begin
+    # test coupling with LiftingLineSection()
+    run_coupling_tests(Wagner(), AD.LiftingLineSection())
 end
 
-@testset "Peters + LiftingLineSection + LinearFlap + LiftingLineControl" begin
-    run_coupling_tests(Peters{4}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineControl())
+@testset "Peters' Finite State + LiftingLineSection" begin
+    # test coupling with LiftingLineSection()
+    run_coupling_tests(Peters{4}(), AD.LiftingLineSection())
 end
 
-@testset "Rigid Body" begin
-    run_model_tests(RigidBody())
+@testset "QuasiSteady + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
+    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
 end
+
+@testset "Wagner + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
+    run_coupling_tests(Wagner(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+end
+
+@testset "Peters + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
+    run_coupling_tests(Peters{4}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+end
+
+# --- Three Dimensional Models --- #
+
+# Aerodynamic Models (3D)
+
+@testset "Lifting Line" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # test on its own
+    run_model_tests(LiftingLine{N}(QuasiSteady{0}()))
+    run_model_tests(LiftingLine{N}(QuasiSteady{1}()))
+    run_model_tests(LiftingLine{N}(QuasiSteady{2}()))
+    run_model_tests(LiftingLine{N}(Wagner()))
+    run_model_tests(LiftingLine{N}(Peters{4}()))
+end
+
+# Structural Models (3D)
 
 @testset "Geometrically Exact Beam Theory" begin
 
@@ -250,18 +277,34 @@ end
     run_model_tests(model)
 end
 
-@testset "Lifting Line" begin
+# Dynamics Models (3D)
+
+@testset "RigidBody" begin
+    run_model_tests(RigidBody())
+end
+
+# Control Surface Models (3D)
+
+@testset "LiftingLineFlaps" begin
 
     # number of lifting line sections
     N = 2
 
+    # number of control inputs
+    NG = 1
+
     # test on its own
-    run_model_tests(LiftingLine{N}(QuasiSteady{0}()))
-    run_model_tests(LiftingLine{N}(QuasiSteady{1}()))
-    run_model_tests(LiftingLine{N}(QuasiSteady{2}()))
-    run_model_tests(LiftingLine{N}(Wagner()))
-    run_model_tests(LiftingLine{N}(Peters{4}()))
+    run_model_tests(LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
 end
+
+# Controller Models (3D)
+
+@testset "Trim" begin
+    run_model_tests(Trim())
+end
+
+# Coupled Models
 
 @testset "Lifting Line + RigidBody" begin
 
@@ -408,4 +451,441 @@ end
     run_coupling_tests(LiftingLine{N}(QuasiSteady{2}()), structural_model, RigidBody())
     run_coupling_tests(LiftingLine{N}(Wagner()), structural_model, RigidBody())
     run_coupling_tests(LiftingLine{N}(Peters{4}()), structural_model, RigidBody())
+end
+
+@testset "Lifting Line + RigidBody + Lifting Line Flaps" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # number of control surface inputs
+    NG = 1
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{0}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{1}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{2}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(Wagner()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(Peters{4}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+end
+
+@testset "Lifting Line + GXBeam + Lifting Line Flaps" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # number of control surface inputs
+    NG = 1
+
+    # point locations
+    x = range(0, 60, length=N+1)
+    y = zero(x)
+    z = zero(x)
+    points = [[x[i],y[i],z[i]] for i = 1:length(x)]
+
+    # element connectivity
+    start = 1:N
+    stop = 2:N+1
+
+    # element orientation
+    e1 = [1, 0, 0]
+    e2 = [0, 1, 0]
+    e3 = [0, 0, 1]
+    frame = hcat(e1, e2, e3)
+
+    # element stiffness properties
+    stiffness = [
+         2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
+         1.524e6  4.334e8 -3.741e6 -2.935e5  1.527e7  3.835e5
+         6.734e6 -3.741e6  2.743e7 -4.592e5 -6.869e5 -4.742e6
+        -3.382e7 -2.935e5 -4.592e5  2.167e7 -6.279e5  1.430e6
+        -2.627e7  1.527e7 -6.869e5 -6.279e5  1.970e7  1.209e7
+        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8
+        ]
+    compliance = inv(stiffness)
+    compliance_entries = [compliance[i,j] for i = 1:6 for j = i:6]
+
+    # element inertial properties
+    mass = [
+         258.053      0.0        0.0      0.0      7.07839  -71.6871
+           0.0      258.053      0.0     -7.07839  0.0        0.0
+           0.0        0.0      258.053   71.6871   0.0        0.0
+           0.0       -7.07839   71.6871  48.59     0.0        0.0
+           7.07839    0.0        0.0      0.0      2.172      0.0
+         -71.6871     0.0        0.0      0.0      0.0       46.418
+         ]
+
+    # construct assembly
+    assembly = Assembly(points, start, stop;
+        frames = fill(frame, N),
+        stiffness = fill(stiffness, N),
+        mass = fill(mass, N))
+
+    # define boundary conditions and applied loads
+    prescribed = Dict(
+            # fixed left side
+            1 => PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
+            # force on right side
+            N+1 => PrescribedConditions(Fz=1e5)
+            )
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{0}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{1}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{2}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(Wagner()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(Peters{4}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+end
+
+@testset "Lifting Line + GXBeam + RigidBody + Lifting Line Flaps" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # number of control surface inputs
+    NG = 1
+
+    # point locations
+    x = range(0, 60, length=N+1)
+    y = zero(x)
+    z = zero(x)
+    points = [[x[i],y[i],z[i]] for i = 1:length(x)]
+
+    # element connectivity
+    start = 1:N
+    stop = 2:N+1
+
+    # element orientation
+    e1 = [1, 0, 0]
+    e2 = [0, 1, 0]
+    e3 = [0, 0, 1]
+    frame = hcat(e1, e2, e3)
+
+    # element stiffness properties
+    stiffness = [
+         2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
+         1.524e6  4.334e8 -3.741e6 -2.935e5  1.527e7  3.835e5
+         6.734e6 -3.741e6  2.743e7 -4.592e5 -6.869e5 -4.742e6
+        -3.382e7 -2.935e5 -4.592e5  2.167e7 -6.279e5  1.430e6
+        -2.627e7  1.527e7 -6.869e5 -6.279e5  1.970e7  1.209e7
+        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8
+        ]
+    compliance = inv(stiffness)
+    compliance_entries = [compliance[i,j] for i = 1:6 for j = i:6]
+
+    # element inertial properties
+    mass = [
+         258.053      0.0        0.0      0.0      7.07839  -71.6871
+           0.0      258.053      0.0     -7.07839  0.0        0.0
+           0.0        0.0      258.053   71.6871   0.0        0.0
+           0.0       -7.07839   71.6871  48.59     0.0        0.0
+           7.07839    0.0        0.0      0.0      2.172      0.0
+         -71.6871     0.0        0.0      0.0      0.0       46.418
+         ]
+
+    # construct assembly
+    assembly = Assembly(points, start, stop;
+        frames = fill(frame, N),
+        stiffness = fill(stiffness, N),
+        mass = fill(mass, N))
+
+    # define boundary conditions and applied loads
+    prescribed = Dict(
+            # fixed left side
+            1 => PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
+            # force on right side
+            N+1 => PrescribedConditions(Fz=1e5)
+            )
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{0}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{1}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{2}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(Wagner()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+
+    run_coupling_tests(
+        LiftingLine{N}(Peters{4}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+end
+
+@testset "Lifting Line + RigidBody + Lifting Line Flaps + Trim" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # number of control surface inputs
+    NG = 6
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{0}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{1}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{2}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(Wagner()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(Peters{4}()),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+end
+
+@testset "Lifting Line + GXBeam + Lifting Line Flaps + Trim" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # number of control surface inputs
+    NG = 6
+
+    # point locations
+    x = range(0, 60, length=N+1)
+    y = zero(x)
+    z = zero(x)
+    points = [[x[i],y[i],z[i]] for i = 1:length(x)]
+
+    # element connectivity
+    start = 1:N
+    stop = 2:N+1
+
+    # element orientation
+    e1 = [1, 0, 0]
+    e2 = [0, 1, 0]
+    e3 = [0, 0, 1]
+    frame = hcat(e1, e2, e3)
+
+    # element stiffness properties
+    stiffness = [
+         2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
+         1.524e6  4.334e8 -3.741e6 -2.935e5  1.527e7  3.835e5
+         6.734e6 -3.741e6  2.743e7 -4.592e5 -6.869e5 -4.742e6
+        -3.382e7 -2.935e5 -4.592e5  2.167e7 -6.279e5  1.430e6
+        -2.627e7  1.527e7 -6.869e5 -6.279e5  1.970e7  1.209e7
+        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8
+        ]
+    compliance = inv(stiffness)
+    compliance_entries = [compliance[i,j] for i = 1:6 for j = i:6]
+
+    # element inertial properties
+    mass = [
+         258.053      0.0        0.0      0.0      7.07839  -71.6871
+           0.0      258.053      0.0     -7.07839  0.0        0.0
+           0.0        0.0      258.053   71.6871   0.0        0.0
+           0.0       -7.07839   71.6871  48.59     0.0        0.0
+           7.07839    0.0        0.0      0.0      2.172      0.0
+         -71.6871     0.0        0.0      0.0      0.0       46.418
+         ]
+
+    # construct assembly
+    assembly = Assembly(points, start, stop;
+        frames = fill(frame, N),
+        stiffness = fill(stiffness, N),
+        mass = fill(mass, N))
+
+    # define boundary conditions and applied loads
+    prescribed = Dict(
+            # fixed left side
+            1 => PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
+            # force on right side
+            N+1 => PrescribedConditions(Fz=1e5)
+            )
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{0}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{1}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{2}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(Wagner()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(Peters{4}()),
+        GEBT(assembly, prescribed),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+end
+
+@testset "Lifting Line + GXBeam + RigidBody + Lifting Line Flaps + Trim" begin
+
+    # number of lifting line sections
+    N = 2
+
+    # number of control surface inputs
+    NG = 6
+
+    # point locations
+    x = range(0, 60, length=N+1)
+    y = zero(x)
+    z = zero(x)
+    points = [[x[i],y[i],z[i]] for i = 1:length(x)]
+
+    # element connectivity
+    start = 1:N
+    stop = 2:N+1
+
+    # element orientation
+    e1 = [1, 0, 0]
+    e2 = [0, 1, 0]
+    e3 = [0, 0, 1]
+    frame = hcat(e1, e2, e3)
+
+    # element stiffness properties
+    stiffness = [
+         2.389e9  1.524e6  6.734e6 -3.382e7 -2.627e7 -4.736e8
+         1.524e6  4.334e8 -3.741e6 -2.935e5  1.527e7  3.835e5
+         6.734e6 -3.741e6  2.743e7 -4.592e5 -6.869e5 -4.742e6
+        -3.382e7 -2.935e5 -4.592e5  2.167e7 -6.279e5  1.430e6
+        -2.627e7  1.527e7 -6.869e5 -6.279e5  1.970e7  1.209e7
+        -4.736e8  3.835e5 -4.742e6  1.430e6  1.209e7  4.406e8
+        ]
+    compliance = inv(stiffness)
+    compliance_entries = [compliance[i,j] for i = 1:6 for j = i:6]
+
+    # element inertial properties
+    mass = [
+         258.053      0.0        0.0      0.0      7.07839  -71.6871
+           0.0      258.053      0.0     -7.07839  0.0        0.0
+           0.0        0.0      258.053   71.6871   0.0        0.0
+           0.0       -7.07839   71.6871  48.59     0.0        0.0
+           7.07839    0.0        0.0      0.0      2.172      0.0
+         -71.6871     0.0        0.0      0.0      0.0       46.418
+         ]
+
+    # construct assembly
+    assembly = Assembly(points, start, stop;
+        frames = fill(frame, N),
+        stiffness = fill(stiffness, N),
+        mass = fill(mass, N))
+
+    # define boundary conditions and applied loads
+    prescribed = Dict(
+            # fixed left side
+            1 => PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
+            # force on right side
+            N+1 => PrescribedConditions(Fz=1e5)
+            )
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{0}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{1}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(QuasiSteady{2}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(Wagner()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
+
+    run_coupling_tests(
+        LiftingLine{N}(Peters{4}()),
+        GEBT(assembly, prescribed),
+        RigidBody(),
+        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        Trim())
 end

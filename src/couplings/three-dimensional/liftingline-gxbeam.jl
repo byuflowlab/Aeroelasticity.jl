@@ -1,15 +1,15 @@
 """
     couple_models(aero::LiftingLine, stru::GEBT)
 
-Create an aerostructural model using a lifting line aerodynamic model coupled
-with a geometrically exact beam theory model.  This model introduces additional
-parameters corresponding to the freestream velocity components ``V_x, V_y, V_z``,
-followed by the air density ``\\rho``, followed by the external loads ``F_{x,i},
-F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or displacements ``u_{x,i},
-u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i}, \\theta_{z,i}`` for each node,
-followed by the constant distributed loads ``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i},
-m_{y,i}, m_{z,i}`` for each beam element (excluding aerodynamic loads), followed
-by the body frame linear and angular velocity ``u, v, w, p, q, r``.
+Create a coupled model using a lifting line aerodynamic model and a
+geometrically exact beam theory model.  This model introduces additional
+parameters corresponding to the freestream air density ``\\rho_\\infty``,
+followed by the external loads ``F_{x,i}, F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i},
+M_{z,i}`` or displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i},
+\\theta_{y,i}, \\theta_{z,i}`` for each node, followed by the constant
+distributed loads ``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}``
+applied on each beam element (excluding aerodynamic loads), followed by the
+body frame linear and angular velocities ``u, v, w, p, q, r``.
 
 **NOTE: When using this model, the local frame for each beam element should be
 oriented with the x-axis along the beam's axis, the y-axis forward, and the
@@ -19,12 +19,12 @@ couple_models(aero::LiftingLine, stru::GEBT) = (aero, stru)
 
 # --- traits --- #
 
-function inplaceness(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,T}
+function inplaceness(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}) where {NA,TA}
     return InPlace()
 end
 
-function mass_matrix_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,T}
-    model_types = T.parameters
+function mass_matrix_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}) where {NA,TA}
+    model_types = TA.parameters
     if all(isempty.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
         return Empty()
     elseif all(iszero.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
@@ -40,8 +40,8 @@ function mass_matrix_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,T}
     end
 end
 
-function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,T}
-    model_types = T.parameters
+function state_jacobian_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}) where {NA,TA}
+    model_types = TA.parameters
     if all(isempty.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
         return Empty()
     elseif all(iszero.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
@@ -58,12 +58,12 @@ function state_jacobian_type(::Type{LiftingLine{N,T}}, ::Type{<:GEBT}) where {N,
 end
 
 function number_of_parameters(aero::LiftingLine, stru::GEBT)
-    return 4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6
+    return 1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6
 end
 
 # --- methods --- #
 
-function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
+function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, u, p, t) where {NA,TA}
 
     # extract number of state variables, inputs, and parameters
     nua = number_of_states(aero) # number of aerodynamic states
@@ -98,44 +98,40 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
     # global parameters
-    Vx = padd[1]
-    Vy = padd[2]
-    Vz = padd[3]
-    ρ = padd[4]
-    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
-    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
-    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
-    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
-    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
-    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
+    ρ = padd[1]
+    ur = padd[1 + 6*npoint + 6*nelem + 1]
+    vr = padd[1 + 6*npoint + 6*nelem + 2]
+    wr = padd[1 + 6*npoint + 6*nelem + 3]
+    pr = padd[1 + 6*npoint + 6*nelem + 4]
+    qr = padd[1 + 6*npoint + 6*nelem + 5]
+    rr = padd[1 + 6*npoint + 6*nelem + 6]
 
     # body linear and angular velocity
     V = SVector(ur, vr, wr)
     Ω = SVector(pr, qr, rr)
 
-    # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - V
-
     # construct assembly from structural parameters
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
     assembly = gxbeam_assembly(ps, npoint, nelem, stru.start, stru.stop)
 
-    # save prescribed point loads/displacements
+    # set prescribed point loads/displacements
     for ip = 1:npoint
-        yoff = nya + 6*(ip-1)
-        poff = npa + nps + 4 + 6*(ip-1)
-        y[yoff+1] = p[poff+1]
-        y[yoff+2] = p[poff+2]
-        y[yoff+3] = p[poff+3]
-        y[yoff+4] = p[poff+4]
-        y[yoff+5] = p[poff+5]
-        y[yoff+6] = p[poff+6]
+        yoff = 6*(ip-1)
+        poff = 1 + 6*(ip-1)
+        ys[yoff+1] = padd[poff+1]
+        ys[yoff+2] = padd[poff+2]
+        ys[yoff+3] = padd[poff+3]
+        ys[yoff+4] = padd[poff+4]
+        ys[yoff+5] = padd[poff+5]
+        ys[yoff+6] = padd[poff+6]
     end
 
-    # save aerodynamic inputs and distributed loads
-    for i = 1:N
+    # set aerodynamic inputs and distributed loads
+    for i = 1:NA
         # models for this section
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
@@ -148,7 +144,6 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         Nusi = number_of_states(section_stru)
         Nysi = number_of_inputs(section_stru)
         Npsi = number_of_parameters(section_stru)
-        section_models = (section_aero, section_stru)
 
         # section properties
         icol = stru.icol_beam[i]
@@ -163,7 +158,7 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         θ_elem *= scaling # angular displacement (Wiener-Milenkovic parameters)
         CtCab = GXBeam.get_C(θ_elem)'*element.Cab # local to body transformation
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1] # local structural to aerodynamic transformation
-        vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem) # local linear freestream velocity
+        vi = -R*(CtCab'*V + GXBeam.element_linear_velocity(element, P_elem, H_elem)) # local linear freestream velocity
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
 
         # NOTE: We assume that the local beam frame y-axis is oriented towards
@@ -171,8 +166,6 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         # NOTE: We assume the local aerodynamic frame is oriented with the x-axis
         # in the chordwise direction and the z-axis in the (airfoil) normal
         # direction.
-
-        # calculate aerodynamic inputs and section loads
 
         # section state variables
         uai = SVector{Nuai}(uas[i]) # aerodynamic state variables
@@ -195,11 +188,11 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
         y[iya[iyas[i]]] .= yai # aerodynamic inputs
 
         # section aerodynamic loads (in body frame)
-        fi = CtCab*R'*SVector(yi[Nyai+1], yi[Nyai+2], yi[Nyai+3])
-        mi = CtCab*R'*SVector(yi[Nyai+4], yi[Nyai+5], yi[Nyai+6])
+        fi = CtCab*R'*SVector(ysi[1], ysi[2], ysi[3])
+        mi = CtCab*R'*SVector(ysi[4], ysi[5], ysi[6])
 
         # add constant distributed loads (in body frame)
-        poff = 4 + 6*npoint + 6*(i-1)
+        poff = 1 + 6*npoint + 6*(i-1)
         fi += SVector(padd[poff+1], padd[poff+2], padd[poff+3])
         mi += SVector(padd[poff+4], padd[poff+5], padd[poff+6])
 
@@ -210,18 +203,18 @@ function get_inputs!(y, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
     end
 
     # save body frame linear/angular velocities
-    yoff = nya + 6*npoint + 6*nelem
-    y[yoff+1] = ur
-    y[yoff+2] = vr
-    y[yoff+3] = wr
-    y[yoff+4] = pr
-    y[yoff+5] = qr
-    y[yoff+6] = rr
+    yoff = 6*npoint + 6*nelem
+    y[iys[yoff+1]] = ur
+    y[iys[yoff+2]] = vr
+    y[iys[yoff+3]] = wr
+    y[iys[yoff+4]] = pr
+    y[iys[yoff+5]] = qr
+    y[iys[yoff+6]] = rr
 
     return y
 end
 
-function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t) where {N,T}
+function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT, u, p, t) where {NA,TA}
 
     # zero out mass matrix
     My .= 0
@@ -256,33 +249,30 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
     uas = view.(Ref(ua), iuas) # aerodynamic state variables for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
     # global parameters
-    Vx = padd[1]
-    Vy = padd[2]
-    Vz = padd[3]
-    ρ = padd[4]
-    ur = padd[end-5]
-    vr = padd[end-4]
-    wr = padd[end-3]
-    pr = padd[end-2]
-    qr = padd[end-1]
-    rr = padd[end]
+    ρ = padd[1]
+    ur = padd[1 + 6*npoint + 6*nelem + 1]
+    vr = padd[1 + 6*npoint + 6*nelem + 2]
+    wr = padd[1 + 6*npoint + 6*nelem + 3]
+    pr = padd[1 + 6*npoint + 6*nelem + 4]
+    qr = padd[1 + 6*npoint + 6*nelem + 5]
+    rr = padd[1 + 6*npoint + 6*nelem + 6]
 
-    # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - SVector(ur, vr, wr)
-
-    # body angular velocity
+    # body linear and angular velocity
+    V = SVector(ur, vr, wr)
     Ω = SVector(pr, qr, rr)
 
     # construct assembly from parameters
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
     assembly = gxbeam_assembly(ps, npoint, nelem, stru.start, stru.stop)
 
     # no point loads are dependent on state rates
 
     # save aerodynamic inputs and distributed loads
-    for i = 1:N
+    for i = 1:NA
         # models for this section
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
@@ -295,7 +285,6 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         Nusi = number_of_states(section_stru)
         Nysi = number_of_inputs(section_stru)
         Npsi = number_of_parameters(section_stru)
-        section_models = (section_aero, section_stru)
 
         # section properties
         icol = stru.icol_beam[i]
@@ -310,7 +299,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
         θ_elem *= scaling # angular displacement (Wiener-Milenkovic parameters)
         CtCab = GXBeam.get_C(θ_elem)'*element.Cab # local to body transformation
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1] # local structural to aerodynamic transformation
-        vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem) # local linear freestream velocity
+        vi = -R*(CtCab'*V + GXBeam.element_linear_velocity(element, P_elem, H_elem)) # local linear freestream velocity
         ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
         dvi_dPi = -R * element.minv11 * stru.mass_scaling
         dvi_dHi = -R * element.minv12 * stru.mass_scaling
@@ -358,8 +347,6 @@ function get_input_mass_matrix!(My, aero::LiftingLine{N,T}, stru::GEBT, u, p, t)
 
         # save local inputs
         icol = stru.icol_beam[i]
-
-        # aerodynamic inputs
         My[iya[iyas[i]], iua[iuas[i]]] = yai_duai
         My[iya[iyas[i]], ius[icol+12]:ius[icol+14]] = yai_dPi
         My[iya[iyas[i]], ius[icol+15]:ius[icol+17]] = yai_dHi
@@ -383,8 +370,8 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
-    du, u, p, t) where {N,T}
+function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
+    du, u, p, t) where {NA,TA}
 
     # initialize input vector
     models = (aero, stru)
@@ -428,34 +415,30 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
     yas = view.(Ref(ya), iyas) # aerodynamic inputs for each section
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
+    # number of points and elements
+    npoint = length(stru.icol_pt)
+    nelem = length(stru.icol_beam)
+
     # global parameters
-    Vx = padd[1]
-    Vy = padd[2]
-    Vz = padd[3]
-    ρ = padd[4]
-    ur = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 1]
-    vr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 2]
-    wr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 3]
-    pr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 4]
-    qr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 5]
-    rr = padd[4 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam) + 6]
+    ρ = padd[1]
+    ur = padd[1 + 6*npoint + 6*nelem + 1]
+    vr = padd[1 + 6*npoint + 6*nelem + 2]
+    wr = padd[1 + 6*npoint + 6*nelem + 3]
+    pr = padd[1 + 6*npoint + 6*nelem + 4]
+    qr = padd[1 + 6*npoint + 6*nelem + 5]
+    rr = padd[1 + 6*npoint + 6*nelem + 6]
 
     # rigid body linear and angular velocity
     V = SVector(ur, vr, wr)
     Ω = SVector(pr, qr, rr)
 
-    # freestream velocity
-    Vinf = SVector(Vx, Vy, Vz) - V
-
     # construct assembly from parameters
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
     assembly = gxbeam_assembly(ps, npoint, nelem, stru.start, stru.stop)
 
     # no point loads are dependent on state rates
 
     # save aerodynamic inputs and distributed loads
-    for i = 1:N
+    for i = 1:NA
         # models for this section
         section_aero = aero.models[i]
         section_stru = LiftingLineSection()
@@ -498,8 +481,8 @@ function get_inputs_from_state_rates(aero::LiftingLine{N,T}, stru::GEBT,
         R = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
 
         # local freestream linear and angular velocities
-        vi = R*CtCab'*Vinf - R*GXBeam.element_linear_velocity(element, P_elem, H_elem)
-        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem)
+        vi = -R*(CtCab'*V + GXBeam.element_linear_velocity(element, P_elem, H_elem)) # local linear freestream velocity
+        ωi = R*GXBeam.element_angular_velocity(element, P_elem, H_elem) # local angular freestream velocity
 
         # local freestream linear and angular accelerations
         dvi = -R*GXBeam.element_linear_velocity(element, dP_elem, dH_elem)

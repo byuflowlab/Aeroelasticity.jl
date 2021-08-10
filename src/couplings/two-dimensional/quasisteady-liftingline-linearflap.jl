@@ -1,6 +1,6 @@
 """
     couple_models(aero::QuasiSteady, stru::LiftingLineSection, flap::LinearFlap,
-        ctrl::LiftingLineControl)
+        ctrl::LiftingLineSectionControl)
 
 Create an aerostructural model using a quasi-steady aerodynamics model, a
 lifting line aerodynamic model, and a linear, steady-state control surface model.
@@ -9,7 +9,7 @@ to be used with [`LiftingLine`](@ref) and [`LiftingLineFlaps`](@ref). This model
 introduces the freestream air density ``\\rho`` as an additional parameter.
 """
 function couple_models(aero::QuasiSteady, stru::LiftingLineSection, flap::LinearFlap,
-    ctrl::LiftingLineControl)
+    ctrl::LiftingLineSectionControl)
 
     return (aero, stru, flap, ctrl)
 end
@@ -17,80 +17,80 @@ end
 # --- traits --- #
 
 function inplaceness(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return OutOfPlace()
 end
 
 function mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Zeros()
 end
 
 function state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Nonlinear()
 end
 
 function number_of_parameters(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return 1
 end
 
 function inplaceness(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return OutOfPlace()
 end
 
 function mass_matrix_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Zeros()
 end
 
 function state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Nonlinear()
 end
 
 function number_of_parameters(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return 1
 end
 
 function inplaceness(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return OutOfPlace()
 end
 
 function mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Linear()
 end
 
 function state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Nonlinear()
 end
 
 function number_of_parameters(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineControl})
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
     return 1
 end
 
 # --- methods --- #
 
 function get_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -112,7 +112,7 @@ function get_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection,
 end
 
 function get_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -135,7 +135,7 @@ function get_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection,
 end
 
 function get_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -158,7 +158,7 @@ function get_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection,
 end
 
 function get_input_mass_matrix(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract parameters
     a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
     # calculate loads
@@ -173,7 +173,7 @@ end
 # --- performance overloads --- #
 
 function get_input_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -197,7 +197,7 @@ function get_input_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection
 end
 
 function get_input_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -223,7 +223,7 @@ function get_input_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection
 end
 
 function get_input_state_jacobian(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -251,19 +251,19 @@ end
 # --- unit testing methods --- #
 
 function get_inputs_from_state_rates(aero::QuasiSteady{0}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, dx, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
 
     return @SVector zeros(6)
 end
 
 function get_inputs_from_state_rates(aero::QuasiSteady{1}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, dx, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
 
     return @SVector zeros(6)
 end
 
 function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineControl, dx, x, p, t)
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
     # extract state rates
     dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx
     # extract parameters

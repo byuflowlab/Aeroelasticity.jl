@@ -1,64 +1,36 @@
 """
-    LiftingLineFlaps{NS,NF,T} <: AbstractModel
+    LiftingLineFlaps{NF,NG,TF,TG} <: AbstractModel
 
-Lifting line control surface model with `NS` cross sections and `NF`
-independent flaps, constructed by using the control surface models in `T`.
-State variables and parameters correspond to the state variables and parameters
-of each of the cross sections concatenated.  Inputs correspond to the state
-variables and parameters of each of the cross sections concatenated, followed by
-the deflection angle for each control surface.
+Lifting line control surface model with `NF` cross sections and `NG` independent
+control inputs, constructed by using the control surface models in `TF` and the
+gains for each control input in `TG`.  State variables, inputs, and parameters
+correspond to the state variables and parameters of each of the cross sections
+concatenated.
 """
-struct LiftingLineFlaps{NS,NF,T} <: AbstractModel
-    models::T
-    flaps::NTuple{NF, Vector{Int}}
+struct LiftingLineFlaps{NF,NG,TF<:NTuple{NF,Any},TG<:NTuple{NG,Any}} <: AbstractModel
+    models::TF
+    gains::TG
 end
-
-"""
-    LiftingLineControl <: AbstractModel
-
-Lifting line flap section model with state variable ``\\delta``, zero inputs,
-and zero parameters.  Two-dimensional control surface models may be extended to
-three dimensional models by coupling with this model.  Note that this model has
-no rate equations of its own since its state variables are defined as functions
-of the 3D system's control variables.
-"""
-struct LiftingLineControl <: AbstractModel end
-
-number_of_states(::Type{LiftingLineControl}) = 1
-number_of_inputs(::Type{<:LiftingLineControl}) = 0
-number_of_parameters(::Type{<:LiftingLineControl}) = 0
-inplaceness(::Type{LiftingLineControl}) = OutOfPlace()
 
 # --- Constructors --- #
 
 """
-    LiftingLineFlaps(models, flaps)
+    LiftingLineFlaps(models::NTuple, gains::NTuple)
 
-Construct a lifting line control surface model given a tuple of 2D control surface
-models corresponding to each section and the control deflection gains for each
-control surface.
+Construct a lifting line control surface model given the control surface models for each
+section and the gains associated with each control input.
 """
-function LiftingLineFlaps(models::T, flaps::TF) where {T<:NTuple{NS,Any},TF<:NTuple{NF,Any}} where {NS,NF}
-    return LiftingLineFlaps{NS,NF,T}(models, flaps)
-end
-
-function LiftingLineFlaps{NS}(models::T, flaps::TF) where {T<:NTuple{NS,Any},TF<:NTuple{NF,Any}} where {NS,NF}
-    return LiftingLineFlaps{NS,NF,T}(models, flaps)
-end
-
-function LiftingLineFlaps{NS,NF}(models::T, flaps::TF) where {T<:NTuple{NS,Any},TF<:NTuple{NF,Any}} where {NS,NF}
-    return LiftingLineFlaps{NS,NF,T}(models, flaps)
-end
+LiftingLineFlaps(models, gains)
 
 """
-    LiftingLineFlaps{NS}(model, flaps)
+    LiftingLineFlaps{NF}(model, gains)
 
-Construct a lifting line control surface model using `NS` instances of `model`
-and the control deflection gains for each control surface.
+Construct a lifting line control surface model using `NF` instances of `model`
+and the gains in `gains` associated with each control input.
 """
-function LiftingLineFlaps{NS}(model, flaps) where NS
-    models = ntuple(i->model, N)
-    return LiftingLineFlaps(models, flaps)
+function LiftingLineFlaps{NF}(model, gains) where NF
+    models = ntuple(i->model, NF)
+    return LiftingLineFlaps(models, gains)
 end
 
 # --- Traits --- #
@@ -67,16 +39,16 @@ function number_of_states(model::LiftingLineFlaps)
     return sum(number_of_states.(model.models))
 end
 
-function number_of_inputs(model::LiftingLineFlaps{NS,NF,T}) where {NS,NF,T}
-    return sum(number_of_inputs.(model.models)) + NF
+function number_of_inputs(model::LiftingLineFlaps)
+    return sum(number_of_inputs.(model.models))
 end
 
 number_of_parameters(model::LiftingLineFlaps) = sum(number_of_parameters.(model.models))
 
 inplaceness(::Type{<:LiftingLineFlaps}) = InPlace()
 
-function mass_matrix_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
-    model_types = (T.parameters...,)
+function mass_matrix_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(mass_matrix_type.(model_types)))
         return Empty()
     elseif all(iszero.(mass_matrix_type.(model_types)))
@@ -92,8 +64,8 @@ function mass_matrix_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
     end
 end
 
-function state_jacobian_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
-    model_types = (T.parameters...,)
+function state_jacobian_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(state_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(state_jacobian_type.(model_types)))
@@ -109,8 +81,8 @@ function state_jacobian_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
     end
 end
 
-function input_jacobian_type(::Type{LiftingLineFlaps{NS,NF,T}}) where {NS,NF,T}
-    model_types = (T.parameters...,)
+function input_jacobian_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(input_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(input_jacobian_type.(model_types)))
