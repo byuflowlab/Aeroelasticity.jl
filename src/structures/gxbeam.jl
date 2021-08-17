@@ -19,82 +19,107 @@ the beam element's inertial properties ``\\mu, x_{m,2}, x_{m,3}, i_{22}, i_{33},
 i_{23}``.
 """
 struct GEBT{TF,TI,TC,TB} <: AbstractModel
-    force_scaling::TF
-    mass_scaling::TF
-    irow_pt::TI
-    irow_beam::TI
-    irow_beam1::TI
-    irow_beam2::TI
-    icol_pt::TI
-    icol_beam::TI
+    # element connectivity
     start::TC
     stop::TC
-    isforce::TB
+    # boolean matrix indicating location and degree of freedom of displacement constraints
+    displacement::TB
+    # scaling parameters for the system
+    force_scaling::TF
+    mass_scaling::TF
+    # indices for accessing governing equations for each point and element
+    irow_point::TI
+    irow_elem::TI
+    irow_elem1::TI
+    irow_elem2::TI
+    # indices for accessing state variables for each point and beam
+    icol_point::TI
+    icol_elem::TI
 end
 
 # --- Constructors --- #
 
 """
-    GEBT(GXBeam.assembly, prescribed = Dict(Int, <:GXBeam.PrescribedConditions))
+    GEBT(start, stop, displacement; kwargs...)
+
+Construct a geometrically exact beam theory structural model with beam elements
+which extend from the point indices in `start` to the point indices in
+`stop` and points with prescribed displacements as specified in
+`displacement`.
+
+# Arguments
+ - `start`: Vector containing point index where each beam element starts
+ - `stop`: Vector containing point index where each beam element stops
+ - `displacement`: Boolean matrix indicating the point index and degree of
+    freedom of the system's displacement constraints.  Rows correspond to the
+    degrees of freedom ``x, y, z, \\theta_x, \\theta_y, \\theta_z`` and
+    columns correspond to the point indices ``1, 2, \\dots, N_p`` where ``N_p``
+    is the total number of points.
+
+# Keyword Arguments
+ - `force_scaling = 1.0`: Factor used to scale system forces/moments internally
+ - `moment_scaling = 1.0`: Factor used to scale system mass/inertia internally
+"""
+function GEBT(start, stop, displacement; force_scaling=1.0, mass_scaling=1.0)
+
+    # system matrix pointers
+    N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
+        GXBeam.system_indices(start, stop, false)
+
+    return GEBT(start, stop, displacement, force_scaling, mass_scaling,
+        irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
+end
+
+"""
+    GEBT(assembly, prescribed; kwargs...)
 
 Construct a geometrically exact beam theory structural model with connectivity
-as specified in ``assembly`` and prescribed displacements (rather than forces)
-as specified in ``prescribed``.
-"""
-function GEBT(assembly, prescribed)
+as specified in `assembly` and displacement constraints as specified in
+`prescribed`.
 
-    # get the number of points, elements, and element connections for each point
+# Keyword Arguments
+ - `force_scaling`: Factor used to scale system forces/moments internally.  If
+    not specified, a suitable default will be chosen based on the entries of the
+    compliance matrix.
+ - `mass_scaling`: Factor used to scale system mass/inertia internally.  If not
+    specified, a suitable default will be chosen based on the entries of the
+    mass matrix.
+"""
+function GEBT(assembly, prescribed;
+    force_scaling = GXBeam.default_force_scaling(assembly),
+    mass_scaling = GXBeam.default_mass_scaling(assembly))
+
+    # system dimensions
     npoint = length(assembly.points)
     nelem = length(assembly.elements)
-    nconn = GXBeam.point_connections(assembly)
 
-    # set the force scaling based on the average compliance matrix value
-    compliance_entries = vcat([vcat(elem.C11..., elem.C12..., elem.C22...)
-        for elem in assembly.elements]...)
-    compliance_nonzero_indices = findall(xi -> abs(xi) > eps(xi), compliance_entries)
-    if isempty(compliance_nonzero_indices)
-        force_scaling = 1.0
-    else
-        nonzero_compliance_entries = compliance_entries[compliance_nonzero_indices]
-        force_scaling = nextpow(2.0, length(nonzero_compliance_entries)/
-            sum(nonzero_compliance_entries)/100)
-    end
+    # include linear and angular momentum
+    static = false
 
-    # set the mass scaling based on the average inverse mass matrix value
-    minv_entries = vcat([vcat(elem.minv11..., elem.minv12..., elem.minv22...)
-        for elem in assembly.elements]...)
-    minv_nonzero_indices = findall(xi -> abs(xi) > eps(xi), minv_entries)
-    if isempty(minv_nonzero_indices)
-        mass_scaling = 1.0
-    else
-        nonzero_minv_entries = minv_entries[minv_nonzero_indices]
-        mass_scaling = nextpow(2.0, length(nonzero_minv_entries)/
-            sum(nonzero_minv_entries))
-    end
+    # initialize system pointers
+    N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
+        GXBeam.system_indices(assembly.start, assembly.stop, static)
 
-    # construct pointers into the system matrix
-    n, irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam =
-        GXBeam.system_indices(assembly, 1:npoint, nconn, false)
-
-    # flags indicating whether point condition is a force or displacement
-    isload = fill((@SVector ones(Bool, 6)), npoint)
+    # set displacement constraint indices and degree of freedom
+    displacement = zeros(Bool, 6, npoint)
     for key in keys(prescribed)
-        isload[key] = prescribed[key].force
+        displacement[:,key] .= prescribed[key].force
     end
 
-    return GEBT(force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
-        irow_beam2, icol_pt, icol_beam, assembly.start, assembly.stop, isload)
+    return GEBT(assembly.start, assembly.stop, displacement, force_scaling,
+        mass_scaling, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point,
+        icol_elem)
 end
 
 # --- Traits --- #
 
-number_of_states(model::GEBT) = 18*length(model.icol_beam) + 6*length(model.icol_pt)
+number_of_states(model::GEBT) = 18*length(model.icol_elem) + 6*length(model.icol_point)
 
 function number_of_inputs(model::GEBT)
-    return 6*length(model.icol_pt) + 6*length(model.icol_beam) + 6
+    return 6*length(model.icol_point) + 6*length(model.icol_elem) + 6
 end
 
-number_of_parameters(model::GEBT) = 3*length(model.icol_pt) + 36*length(model.icol_beam)
+number_of_parameters(model::GEBT) = 3*length(model.icol_point) + 36*length(model.icol_elem)
 
 inplaceness(::Type{<:GEBT}) = InPlace()
 
@@ -106,67 +131,80 @@ input_jacobian_type(::Type{<:GEBT}) = Linear()
 
 # --- Methods --- #
 
-function get_rates!(dq, model::GEBT, q, r, p, t)
+function get_rates!(Mdq, model::GEBT, q, r, p, t)
 
     # number of points and elements
-    npoint = length(model.icol_pt)
-    nelem = length(model.icol_beam)
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
 
-    # construct assembly from parameters
-    assembly = gxbeam_assembly(p, npoint, nelem, model.start, model.stop)
+    # index of beginning and end of each beam element
+    start = model.start
+    stop = model.stop
 
-    # set prescribed and distributed displacements/loads from inputs
-    prescribed, distributed = gxbeam_loads(r, npoint, nelem, model.isforce,
-        assembly.elements)
-
-    # set origin, linear velocity, and angular velocity from inputs
-    x0 = @SVector zeros(3)
-    v0 = SVector(r[end-5], r[end-4], r[end-3])
-    ω0 = SVector(r[end-2], r[end-1], r[end])
-
-    # extract scaling parameters
+    # scaling parameters
     force_scaling = model.force_scaling
     mass_scaling = model.mass_scaling
 
-    # extract model pointers
-    irow_pt = model.irow_pt
-    irow_beam = model.irow_beam
-    irow_beam1 = model.irow_beam1
-    irow_beam2 = model.irow_beam2
-    icol_pt = model.icol_pt
-    icol_beam = model.icol_beam
+    # model pointers
+    irow_point = model.irow_point
+    irow_elem = model.irow_elem
+    irow_elem1 = model.irow_elem1
+    irow_elem2 = model.irow_elem2
+    icol_point = model.icol_point
+    icol_elem = model.icol_elem
+
+    # location and degree of freedom of displacement constraints
+    displacement = model.displacement
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(p, np, ne, start, stop)
+
+    # extract newly created beam elements
+    elements = assembly.elements
+
+    # construct point and element loads from inputs
+    prescribed, distributed = gxbeam_loads(r, np, ne, displacement, elements)
+
+    # origin, linear velocity, and angular velocity
+    x0 = @SVector zeros(3)
+    v0 = @SVector [r[end-5], r[end-4], r[end-3]]
+    ω0 = @SVector [r[end-2], r[end-1], r[end]]
 
     # return mass matrix multiplied state rates
-    return gxbeam_rates!(dq, q, assembly, prescribed, distributed,
-        force_scaling, mass_scaling, irow_pt, irow_beam,
-        irow_beam1, irow_beam2, icol_pt, icol_beam,
+    return gxbeam_rates!(Mdq, q, assembly, prescribed, distributed,
+        force_scaling, mass_scaling, irow_point, irow_elem,
+        irow_elem1, irow_elem2, icol_point, icol_elem,
         x0, v0, ω0)
 end
 
 function get_mass_matrix!(M, model::GEBT, q, r, p, t)
 
     # number of points and elements
-    npoint = length(model.icol_pt)
-    nelem = length(model.icol_beam)
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
 
-    # construct assembly from parameters
-    assembly = gxbeam_assembly(p, npoint, nelem, model.start, model.stop)
+    # index of beginning and end of each beam element
+    start = model.start
+    stop = model.stop
 
-    # extract scaling parameters
+    # scaling parameters
     force_scaling = model.force_scaling
     mass_scaling = model.mass_scaling
 
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(p, np, ne, start, stop)
+
     # extract model pointers
-    irow_pt = model.irow_pt
-    irow_beam = model.irow_beam
-    irow_beam1 = model.irow_beam1
-    irow_beam2 = model.irow_beam2
-    icol_pt = model.icol_pt
-    icol_beam = model.icol_beam
+    irow_point = model.irow_point
+    irow_elem = model.irow_elem
+    irow_elem1 = model.irow_elem1
+    irow_elem2 = model.irow_elem2
+    icol_point = model.icol_point
+    icol_elem = model.icol_elem
 
     # return mass matrix
     return gxbeam_mass_matrix!(M, q, assembly, force_scaling, mass_scaling,
-        irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam)
+        irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
 end
 
 # --- Performance Overloads --- #
@@ -174,37 +212,46 @@ end
 function get_state_jacobian!(J, model::GEBT, q, r, p, t)
 
     # number of points and elements
-    npoint = length(model.icol_pt)
-    nelem = length(model.icol_beam)
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
 
-    # construct assembly from parameters
-    assembly = gxbeam_assembly(p, npoint, nelem, model.start, model.stop)
+    # index of beginning and end of each beam element
+    start = model.start
+    stop = model.stop
 
-    # set prescribed and distributed displacements/loads from inputs
-    prescribed, distributed = gxbeam_loads(r, npoint, nelem, model.isforce,
-        assembly.elements)
-
-    # set origin, linear velocity, and angular velocity from inputs
-    x0 = @SVector zeros(3)
-    v0 = SVector(r[end-5], r[end-4], r[end-3])
-    ω0 = SVector(r[end-2], r[end-1], r[end])
-
-    # extract scaling parameters
+    # scaling parameters
     force_scaling = model.force_scaling
     mass_scaling = model.mass_scaling
 
-    # extract model pointers
-    irow_pt = model.irow_pt
-    irow_beam = model.irow_beam
-    irow_beam1 = model.irow_beam1
-    irow_beam2 = model.irow_beam2
-    icol_pt = model.icol_pt
-    icol_beam = model.icol_beam
+    # model pointers
+    irow_point = model.irow_point
+    irow_elem = model.irow_elem
+    irow_elem1 = model.irow_elem1
+    irow_elem2 = model.irow_elem2
+    icol_point = model.icol_point
+    icol_elem = model.icol_elem
+
+    # location and degree of freedom of displacement constraints
+    displacement = model.displacement
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(p, np, ne, start, stop)
+
+    # extract newly created beam elements
+    elements = assembly.elements
+
+    # construct point and element loads from inputs
+    prescribed, distributed = gxbeam_loads(r, np, ne, displacement, elements)
+
+    # origin, linear velocity, and angular velocity
+    x0 = @SVector zeros(3)
+    v0 = @SVector [r[end-5], r[end-4], r[end-3]]
+    ω0 = @SVector [r[end-2], r[end-1], r[end]]
 
     # return jacobian of right hand side with respect to state variables
     return gxbeam_state_jacobian!(J, q, assembly, prescribed,
-        distributed, force_scaling, mass_scaling, irow_pt, irow_beam,
-        irow_beam1, irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+        distributed, force_scaling, mass_scaling, irow_point, irow_elem,
+        irow_elem1, irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 end
 
 # TODO: Update this function to include prescribed conditions and body velocities
@@ -223,14 +270,14 @@ end
 #     # extract system constants and pointers
 #     force_scaling = system.force_scaling
 #     mass_scaling = system.mass_scaling
-#     irow_pt = system.irow_pt
+#     irow_point = system.irow_point
 #
 #     # get elements to which distributed loads are applied
 #     element_indices = keys(distributed)
 #
 #     # return input jacobian linear map
 #     return gxbeam_input_jacobian(q, r, elements, start, stop, force_scaling,
-#         mass_scaling, irow_pt, element_indices)
+#         mass_scaling, irow_point, element_indices)
 # end
 
 # --- Unit Testing Methods --- #
@@ -238,46 +285,158 @@ end
 function get_lhs(model::GEBT, dq, q, r, p, t)
 
     # number of points and elements
-    npoint = length(model.icol_pt)
-    nelem = length(model.icol_beam)
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
 
-    # construct assembly from parameters
-    assembly = gxbeam_assembly(p, npoint, nelem, model.start, model.stop)
+    # index of beginning and end of each beam element
+    start = model.start
+    stop = model.stop
 
-    # set prescribed and distributed displacements/loads from inputs
-    prescribed, distributed = gxbeam_loads(r, npoint, nelem, model.isforce,
-        assembly.elements)
-
-    # set origin, linear velocity, and angular velocity from inputs
-    x0 = @SVector zeros(3)
-    v0 = SVector(r[end-5], r[end-4], r[end-3])
-    ω0 = SVector(r[end-2], r[end-1], r[end])
-
-    # extract scaling parameters
+    # scaling parameters
     force_scaling = model.force_scaling
     mass_scaling = model.mass_scaling
 
-    # extract model pointers
-    irow_pt = model.irow_pt
-    irow_beam = model.irow_beam
-    irow_beam1 = model.irow_beam1
-    irow_beam2 = model.irow_beam2
-    icol_pt = model.icol_pt
-    icol_beam = model.icol_beam
+    # model pointers
+    irow_point = model.irow_point
+    irow_elem = model.irow_elem
+    irow_elem1 = model.irow_elem1
+    irow_elem2 = model.irow_elem2
+    icol_point = model.icol_point
+    icol_elem = model.icol_elem
+
+    # location and degree of freedom of displacement constraints
+    displacement = model.displacement
+
+    # construct assembly from parameters
+    assembly = gxbeam_assembly(p, np, ne, start, stop)
+
+    # extract newly created beam elements
+    elements = assembly.elements
+
+    # construct point and element loads from inputs
+    prescribed, distributed = gxbeam_loads(r, np, ne, displacement, elements)
+
+    # origin, linear velocity, and angular velocity
+    x0 = @SVector zeros(3)
+    v0 = @SVector [r[end-5], r[end-4], r[end-3]]
+    ω0 = @SVector [r[end-2], r[end-1], r[end]]
 
     return gxbeam_lhs(q, dq, assembly, prescribed, distributed, force_scaling,
-        mass_scaling, irow_pt, irow_beam, irow_beam1, irow_beam2, icol_pt,
-        icol_beam, x0, v0, ω0)
+        mass_scaling, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point,
+        icol_elem, x0, v0, ω0)
 end
 
 # --- Convenience Functions --- #
 
-function set_parameters(model::GEBT, assembly)
+function set_states!(x, model::GEBT;
+    u_e = nothing, theta_e = nothing, F_e = nothing, M_e = nothing,
+    P_e = nothing, H_e = nothing, u_p = nothing, theta_p = nothing,
+    F_p = nothing, M_p = nothing)
 
-    p = zeros(number_of_parameters(model))
+    icol_elem = model.icol_elem
+    icol_point = model.icol_point
 
-    np = length(model.icol_pt)
-    ne = length(model.icol_beam)
+    displacement = model.displacement
+
+    force_scaling = model.force_scaling
+    mass_scaling = model.mass_scaling
+
+    nelem = length(icol_elem)
+    npoint = length(icol_point)
+
+    for ielem = 1:nelem
+
+        icol = icol_elem[ielem]
+
+        if !isnothing(u_e)
+            GXBeam.set_element_deflections!(x, icol, u_e[ielem])
+        end
+
+        if !isnothing(theta_e)
+            GXBeam.set_element_rotations!(x, icol, theta_e[ielem])
+        end
+
+        if !isnothing(F_e)
+            GXBeam.set_element_forces!(x, icol, F_e[ielem], force_scaling)
+        end
+
+        if !isnothing(M_e)
+            GXBeam.set_element_moments!(x, icol, M_e[ielem], force_scaling)
+        end
+
+        if !isnothing(P_e)
+            GXBeam.set_element_linear_momenta!(x, icol, P_e[ielem], mass_scaling)
+        end
+
+        if !isnothing(H_e)
+            GXBeam.set_element_angular_momenta!(x, icol, H_e[ielem], mass_scaling)
+        end
+    end
+
+    for ipoint = 1:npoint
+
+        icol = icol_point[ipoint]
+
+        prescribed_forces = SVector{6}(view(displacement, :, ipoint)) .== false
+
+        if !isnothing(u_p)
+            GXBeam.set_point_deflections!(x, icol, u_p[ipoint], prescribed_forces)
+        end
+
+        if !isnothing(theta_p)
+            GXBeam.set_point_rotations!(x, icol, theta_p[ipoint], prescribed_forces)
+        end
+
+        if !isnothing(F_p)
+            GXBeam.set_point_forces!(x, icol, F_p[ipoint], prescribed_forces, force_scaling)
+        end
+
+        if !isnothing(M_p)
+            GXBeam.set_point_moments!(x, icol, M_p[ipoint], prescribed_forces, force_scaling)
+        end
+    end
+
+    return x
+end
+
+function set_inputs!(y, model::GEBT; point_conditions, element_loads, V, Omega)
+
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
+
+    for ip = 1:np
+        y[6*(ip-1) + 1] = point_conditions[1,ip]
+        y[6*(ip-1) + 2] = point_conditions[2,ip]
+        y[6*(ip-1) + 3] = point_conditions[3,ip]
+        y[6*(ip-1) + 4] = point_conditions[4,ip]
+        y[6*(ip-1) + 5] = point_conditions[5,ip]
+        y[6*(ip-1) + 6] = point_conditions[6,ip]
+    end
+
+    for ie = 1:ne
+        y[6*np + 6*(ie-1) + 1] = element_loads[1,ie]
+        y[6*np + 6*(ie-1) + 2] = element_loads[2,ie]
+        y[6*np + 6*(ie-1) + 3] = element_loads[3,ie]
+        y[6*np + 6*(ie-1) + 4] = element_loads[4,ie]
+        y[6*np + 6*(ie-1) + 5] = element_loads[5,ie]
+        y[6*np + 6*(ie-1) + 6] = element_loads[6,ie]
+    end
+
+    y[6*np + 6*ne + 1] = V[1]
+    y[6*np + 6*ne + 2] = V[2]
+    y[6*np + 6*ne + 3] = V[3]
+
+    y[6*np + 6*ne + 4] = Omega[1]
+    y[6*np + 6*ne + 5] = Omega[2]
+    y[6*np + 6*ne + 6] = Omega[3]
+
+    return y
+end
+
+function set_parameters!(p, model::GEBT; assembly)
+
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
 
     for ip = 1:np
         p[3*(ip-1) + 1] = assembly.points[ip][1]
@@ -288,7 +447,11 @@ function set_parameters(model::GEBT, assembly)
     for ie = 1:ne
         element = assembly.elements[ie]
         minv11, minv12, minv22 = element.minv11, element.minv12, element.minv22
-        element_mass = inv([minv11 minv12; minv12' minv22])
+        Msub = inv((@SMatrix [
+            minv11[1,1] minv12[1,2] minv12[1,3];
+            minv12[1,2] minv22[2,2] minv22[2,3];
+            minv12[1,3] minv22[3,2] minv22[3,3];
+            ]))
         p[3*np + 36*(ie-1) + 1] = element.Cab[1,1]
         p[3*np + 36*(ie-1) + 2] = element.Cab[2,1]
         p[3*np + 36*(ie-1) + 3] = element.Cab[3,1]
@@ -319,73 +482,107 @@ function set_parameters(model::GEBT, assembly)
         p[3*np + 36*(ie-1) + 28] = element.C22[2,2]
         p[3*np + 36*(ie-1) + 29] = element.C22[2,3]
         p[3*np + 36*(ie-1) + 30] = element.C22[3,3]
-        p[3*np + 36*(ie-1) + 31] = element_mass[1,1] # μ
-        p[3*np + 36*(ie-1) + 32] = element_mass[3,4]/element_mass[1,1] # xm2
-        p[3*np + 36*(ie-1) + 33] = element_mass[1,5]/element_mass[1,1] # xm3
-        p[3*np + 36*(ie-1) + 34] = element_mass[5,5] # i22
-        p[3*np + 36*(ie-1) + 35] = element_mass[6,6] # i33
-        p[3*np + 36*(ie-1) + 36] = element_mass[5,6] # i23
+        p[3*np + 36*(ie-1) + 31] =  Msub[1,1] # μ
+        p[3*np + 36*(ie-1) + 32] = -Msub[1,3]/Msub[1,1] # xm2
+        p[3*np + 36*(ie-1) + 33] =  Msub[1,2]/Msub[1,1] # xm3
+        p[3*np + 36*(ie-1) + 34] =  Msub[2,2] # i22
+        p[3*np + 36*(ie-1) + 35] =  Msub[3,3] # i33
+        p[3*np + 36*(ie-1) + 36] = -Msub[2,3] # i23
     end
 
     return p
 end
 
-function set_inputs(model::GEBT, assembly; prescribed=nothing,
-    distributed=nothing, V=nothing, Ω=nothing)
+function separate_states(model::GEBT, x)
 
-    y = zeros(number_of_inputs(model))
+    TF = eltype(x)
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
 
-    np = length(model.icol_pt)
-    ne = length(model.icol_beam)
+    u_p = Vector{SVector{3,TF}}(undef, np)
+    theta_p = Vector{SVector{3,TF}}(undef, np)
+    F_p = Vector{SVector{3,TF}}(undef, np)
+    M_p = Vector{SVector{3,TF}}(undef, np)
 
-    if !isnothing(prescribed)
-        for ip = 1:np
-            if ip in keys(prescribed)
-                @assert model.isforce[ip] == prescribed[ip].force
-                @assert iszero(prescribed[ip].follower)
-                y[6*(ip-1) + 1] = prescribed[ip].value[1]
-                y[6*(ip-1) + 2] = prescribed[ip].value[2]
-                y[6*(ip-1) + 3] = prescribed[ip].value[3]
-                y[6*(ip-1) + 4] = prescribed[ip].value[4]
-                y[6*(ip-1) + 5] = prescribed[ip].value[5]
-                y[6*(ip-1) + 6] = prescribed[ip].value[6]
-            end
-        end
+    u_e = Vector{SVector{3,TF}}(undef, ne)
+    theta_e = Vector{SVector{3,TF}}(undef, ne)
+    F_e = Vector{SVector{3,TF}}(undef, ne)
+    M_e = Vector{SVector{3,TF}}(undef, ne)
+    P_e = Vector{SVector{3,TF}}(undef, ne)
+    H_e = Vector{SVector{3,TF}}(undef, ne)
+
+    for ip = 1:np
+
+        icol = model.icol_point[ip]
+
+        prescribed_forces = SVector{6}(view(model.displacement, :, ip)) .== false
+
+        # get the displacement and rotations of the point
+        u_p[ip] = SVector(ifelse(prescribed_forces[1], x[icol  ], NaN),
+                    ifelse(prescribed_forces[2], x[icol+1], NaN),
+                    ifelse(prescribed_forces[3], x[icol+2], NaN))
+        theta_p[ip] = SVector(ifelse(prescribed_forces[4], x[icol+3], NaN),
+                    ifelse(prescribed_forces[5], x[icol+4], NaN),
+                    ifelse(prescribed_forces[6], x[icol+5], NaN))
+
+        # overwrite external forces/moments with solved for forces/moments
+        F_p[ip] = SVector(ifelse(prescribed_forces[1], NaN, x[icol  ] * model.force_scaling),
+                    ifelse(prescribed_forces[2], NaN, x[icol+1] * model.force_scaling),
+                    ifelse(prescribed_forces[3], NaN, x[icol+2] * model.force_scaling))
+        M_p[ip] = SVector(ifelse(prescribed_forces[4], NaN, x[icol+3] * model.force_scaling),
+                    ifelse(prescribed_forces[5], NaN, x[icol+4] * model.force_scaling),
+                    ifelse(prescribed_forces[6], NaN, x[icol+5] * model.force_scaling))
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(theta_p[ip])
+        theta_p[ip] *= scaling
+
     end
 
-    if !isnothing(distributed)
-        for ie = 1:ne
-            if ie in keys(distributed)
-                @assert iszero(distributed[ie].f1_follower)
-                @assert iszero(distributed[ie].f2_follower)
-                @assert iszero(distributed[ie].m1_follower)
-                @assert iszero(distributed[ie].m2_follower)
-                @assert isapprox(f1, f2)
-                @assert isapprox(m1, m2)
-                ΔL = assembly.elements[ie].L
-                y[6*np + 6*(ie-1) + 1] = ΔL*(distributed[ie].f1[1] + distributed[ie].f2[1])
-                y[6*np + 6*(ie-1) + 2] = ΔL*(distributed[ie].f1[2] + distributed[ie].f2[2])
-                y[6*np + 6*(ie-1) + 3] = ΔL*(distributed[ie].f1[3] + distributed[ie].f2[3])
-                y[6*np + 6*(ie-1) + 4] = ΔL*(distributed[ie].m1[1] + distributed[ie].m2[1])
-                y[6*np + 6*(ie-1) + 5] = ΔL*(distributed[ie].m1[2] + distributed[ie].m2[2])
-                y[6*np + 6*(ie-1) + 6] = ΔL*(distributed[ie].m1[3] + distributed[ie].m2[3])
-            end
-        end
+    for ie = 1:ne
+
+        icol = model.icol_elem[ie]
+
+        u_e[ie] = SVector(x[icol], x[icol+1], x[icol+2])
+        theta_e[ie] = SVector(x[icol+3], x[icol+4], x[icol+5])
+        F_e[ie] = SVector(x[icol+6], x[icol+7], x[icol+8]) .* model.force_scaling
+        M_e[ie] = SVector(x[icol+9], x[icol+10], x[icol+11]) .* model.force_scaling
+        P_e[ie] = SVector(x[icol+12], x[icol+13], x[icol+14]) .* model.mass_scaling
+        H_e[ie] = SVector(x[icol+15], x[icol+16], x[icol+17]) .* model.mass_scaling
+
+        # convert rotation parameter to Wiener-Milenkovic parameters
+        scaling = GXBeam.rotation_parameter_scaling(theta_e[ie])
+        theta_e[ie] *= scaling
+
     end
 
-    if !isnothing(V)
-        y[6*np + 6*ne + 1] = V[1]
-        y[6*np + 6*ne + 2] = V[2]
-        y[6*np + 6*ne + 3] = V[3]
-    end
+    return (u_p = u_p, theta_p = theta_p, F_p = F_p, M_p = M_p,
+        u_e = u_e, theta_e = theta_e, F_e = F_e, M_e = M_e, P_e = P_e, H_e = H_e)
+end
 
-    if !isnothing(Ω)
-        y[6*np + 6*ne + 4] = Ω[1]
-        y[6*np + 6*ne + 5] = Ω[2]
-        y[6*np + 6*ne + 6] = Ω[3]
-    end
+function separate_inputs(model::GEBT, y)
 
-    return y
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
+
+    point_conditions = reshape(view(y, 1 : 6*np), 6, np)
+
+    element_loads = reshape(view(y, 6*np + 1 : 6*np + 6*ne), 6, ne)
+
+    V = view(y, 6*np + 6*ne + 1 : 6*np + 6*ne + 3)
+
+    Omega = view(y, 6*np + 6*ne + 4 : 6*np + 6*ne + 6)
+
+    return (point_conditions = point_conditions, element_loads = element_loads,
+        V = V, Omega = Omega)
+end
+
+function separate_parameters(model::GEBT, p)
+    np = length(model.icol_point)
+    ne = length(model.icol_elem)
+    start = model.start
+    stop = model.stop
+    return (assembly = gxbeam_assembly(p, np, ne, start, stop),)
 end
 
 # --- Internal --- #
@@ -419,7 +616,7 @@ function gxbeam_element(p, points, start, stop)
         ]
     # element inverse mass matrix
     minv = inv(@SMatrix [
-            μ       0     0       0 μ*xm3 -μ*xm3;
+            μ       0     0       0 μ*xm3 -μ*xm2;
             0       μ     0  -μ*xm3     0      0;
             0       0     μ   μ*xm2     0      0;
             0  -μ*xm3 μ*xm2 i22+i33     0      0;
@@ -436,16 +633,17 @@ function gxbeam_element(p, points, start, stop)
     return GXBeam.Element(ΔL, x, C, minv, Cab)
 end
 
-function gxbeam_loads(r, np, ne, isforce, elements)
+function gxbeam_loads(r, np, ne, d, elements)
     prescribed = Dict(ip => gxbeam_point_load(view(r,
-        6*(ip-1) + 1 : 6*(ip-1) + 6), isforce[ip]) for ip = 1:np)
+        6*(ip-1) + 1 : 6*(ip-1) + 6), view(d, :, ip)) for ip = 1:np)
     distributed = Dict(ie => gxbeam_distributed_load(view(r,
         6*np + 6*(ie-1) + 1 : 6*np + 6*(ie-1) + 6), elements[ie].L) for ie = 1:ne)
     return prescribed, distributed
 end
 
-function gxbeam_point_load(r, isforce)
-    force = isforce
+function gxbeam_point_load(r, d)
+    displacement = SVector{6}(d)
+    force = displacement .== false
     value = SVector{6}(r)
     follower = @SVector zeros(6)
     return PrescribedConditions(force, value, follower)
@@ -463,43 +661,43 @@ function gxbeam_distributed_load(r, ΔL)
 end
 
 function gxbeam_lhs(q, dq, assembly, prescribed, distributed,
-    force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1, irow_beam2,
-    icol_pt, icol_beam, x0, v0, ω0)
+    force_scaling, mass_scaling, irow_point, irow_elem, irow_elem1, irow_elem2,
+    icol_point, icol_elem, x0, v0, ω0)
 
     steady_residual = similar(dq)
     dynamic_residual = similar(dq)
 
     GXBeam.steady_state_system_residual!(steady_residual, q, assembly, prescribed,
-        distributed, force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
-        irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+        distributed, force_scaling, mass_scaling, irow_point, irow_elem, irow_elem1,
+        irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     GXBeam.dynamic_system_residual!(dynamic_residual, q, dq, assembly, prescribed,
-        distributed, force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
-        irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+        distributed, force_scaling, mass_scaling, irow_point, irow_elem, irow_elem1,
+        irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     return steady_residual - dynamic_residual
 end
 
 function gxbeam_rhs!(out, u, assembly, prescribed,
-    distributed, force_scaling, mass_scaling, irow_pt, irow_beam,
-    irow_beam1, irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+    distributed, force_scaling, mass_scaling, irow_point, irow_elem,
+    irow_elem1, irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     # mass matrix multiplied rates are equal to steady state GXBeam residuals
     GXBeam.steady_state_system_residual!(out, u, assembly, prescribed,
-        distributed, force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
-        irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+        distributed, force_scaling, mass_scaling, irow_point, irow_elem, irow_elem1,
+        irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     return out
 end
 
-function gxbeam_mass_matrix!(M, u, assembly, force_scaling, mass_scaling, irow_pt,
-    irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam)
+function gxbeam_mass_matrix!(M, u, assembly, force_scaling, mass_scaling, irow_point,
+    irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
 
     M .= 0
 
     # mass matrix is GXBeam mass matrix, moved to LHS
-    GXBeam.system_mass_matrix!(M, u, assembly, force_scaling, mass_scaling, irow_pt,
-        irow_beam, irow_beam1, irow_beam2, icol_pt, icol_beam)
+    GXBeam.system_mass_matrix!(M, u, assembly, force_scaling, mass_scaling, irow_point,
+        irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
 
     M .*= -1
 
@@ -507,35 +705,35 @@ function gxbeam_mass_matrix!(M, u, assembly, force_scaling, mass_scaling, irow_p
 end
 
 function gxbeam_rates!(Mdu, u, assembly, prescribed,
-    distributed, force_scaling, mass_scaling, irow_pt, irow_beam,
-    irow_beam1, irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+    distributed, force_scaling, mass_scaling, irow_point, irow_elem,
+    irow_elem1, irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     gxbeam_rhs!(Mdu, u, assembly, prescribed,
-        distributed, force_scaling, mass_scaling, irow_pt, irow_beam,
-        irow_beam1, irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+        distributed, force_scaling, mass_scaling, irow_point, irow_elem,
+        irow_elem1, irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     return Mdu
 end
 
 function gxbeam_state_jacobian!(K, u, assembly, prescribed,
-    distributed, force_scaling, mass_scaling, irow_pt, irow_beam,
-    irow_beam1, irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+    distributed, force_scaling, mass_scaling, irow_point, irow_elem,
+    irow_elem1, irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     K .= 0
 
     # jacobian of mass matrix multiplied rates is equal to steady state jacobian
     GXBeam.steady_state_system_jacobian!(K, u, assembly, prescribed,
-        distributed, force_scaling, mass_scaling, irow_pt, irow_beam, irow_beam1,
-        irow_beam2, icol_pt, icol_beam, x0, v0, ω0)
+        distributed, force_scaling, mass_scaling, irow_point, irow_elem, irow_elem1,
+        irow_elem2, icol_point, icol_elem, x0, v0, ω0)
 
     return K
 end
 
 # function gxbeam_input_jacobian(q, r, elements, start, stop, force_scaling, mass_scaling,
-#     irow_pt, element_indices)
+#     irow_point, element_indices)
 #
 #     f! = (y, x) -> gxbeam_jac_vec!(y, x, r, elements, start, stop, force_scaling,
-#         mass_scaling, irow_pt, element_indices)
+#         mass_scaling, irow_point, element_indices)
 #     M = length(q)
 #     N = length(r)
 #
@@ -544,7 +742,7 @@ end
 #
 # # input jacobian vector product
 # function gxbeam_jac_vec!(y, x, r, elements, start, stop, force_scaling, mass_scaling,
-#     irow_pt, element_indices)
+#     irow_point, element_indices)
 #
 #     nelem = length(start)
 #
@@ -558,8 +756,8 @@ end
 #     for ielem = 1:nelem
 #         if ielem in element_indices
 #             # get point indices
-#             irow_p1 = irow_pt[start[ielem]]
-#             irow_p2 = irow_pt[stop[ielem]]
+#             irow_p1 = irow_point[start[ielem]]
+#             irow_p2 = irow_point[stop[ielem]]
 #             # initialize element load jacobians
 #             f_r = Diagonal((@SVector ones(3)))
 #             m_r = Diagonal((@SVector ones(3)))

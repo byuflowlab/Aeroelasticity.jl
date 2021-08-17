@@ -13,7 +13,9 @@ I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M
 ```
 where ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_θ`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.
 
-We use the non-dimensional parameters
+This package has a number of different two-dimensional aerodynamic models which we may use to model the aerodynamics of the typical section model.  These models include a steady-state model, a quasi-steady model, an unsteady aerodynamic model based on Wagner's function, and Peters' finite state aerodynamic model.  We will perform an aeroelastic analysis using each of these models and compare the results.
+
+The non-dimensional parameters we will use are
 ```math
 a = -1/5 \quad e = -1/10  \\
 r^2 = \frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
@@ -23,8 +25,6 @@ where ``a`` is the normalized distance from the semichord to the reference point
 ```math
 \omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}
 ```
-
-We perform aeroelastic analyses using a variety of aerodynamic models in order to compare the various models.
 
 ```@setup typical-section-stability
 using Plots
@@ -82,8 +82,12 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
     # eigenvalue storage
     λ[ia] = zeros(ComplexF64, number_of_states(model), length(V))
 
+    # left eigenvector matrix from the previous iteration
+    local Uλpi
+
     # loop through each reduced frequency
     for i = 1:length(V)
+
         # state variables
         u_aero = zeros(number_of_states(aerodynamic_model))
         u_stru = zeros(number_of_states(structural_model))
@@ -102,28 +106,38 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
         y = get_inputs(model, u, p, t)
 
         # perform linear stability analysis
-        λ[ia][:,i], Uλ, Vλ = get_eigen(model, u, y, p, t)
+        λi, Uλi, Vλi = get_eigen(model, u, y, p, t)
+
+        # correlate eigenvalues
+        if i > 1
+            # calculate mass matrix
+            Mi = get_mass_matrix(model, u, y, p, t)
+
+            # use correlation matrix to correlate eigenmodes
+            perm, corruption = correlate_eigenmodes(Uλpi, Mi, Vλi)
+
+            # re-arrange eigenmodes
+            λi = λi[perm]
+            Uλi = Uλi[perm,:]
+            Vλi = Vλi[:,perm]
+        end
+
+        # save eigenvalues
+        λ[ia][:,i] = λi
+
+        # save previous left eigenvector matrix
+        Uλpi = Uλi
     end
 end
 
 nothing #hide
 ```
 
-We now plot the results predicted using each aerodynamic model.
+We now plot the results for each aerodynamic model.
 
 ```@example typical-section-stability
 using Plots
 pyplot()
-
-default(
-    titlefontsize = 14,
-    legendfontsize = 11,
-    guidefontsize = 14,
-    tickfontsize = 11,
-    foreground_color_legend = nothing,
-    background_color_legend = nothing,
-    minorgrid=true,
-    framestyle = :zerolines)
 
 sp1 = plot(
     title = "Non-Dimensional Frequency",
@@ -133,7 +147,15 @@ sp1 = plot(
     ylim = (0, 1.05),
     ytick = 0.0:0.2:1.0,
     ylabel = "\$ \\frac{\\Omega}{\\omega_\\theta} \$",
-    legend = :topright
+    framestyle = :zerolines,
+    titlefontsize = 14,
+    guidefontsize = 14,
+    legendfontsize = 11,
+    tickfontsize = 11,
+    legend = :topleft,
+    foreground_color_legend = nothing,
+    background_color_legend = nothing,
+    minorgrid=true
     )
 
 sp2 = plot(
@@ -144,14 +166,22 @@ sp2 = plot(
     ylim = (-0.7, 0.605),
     ytick = -0.6:0.2:0.6,
     ylabel = "\$ \\frac{Γ}{\\omega_\\theta} \$",
-    legend = :topleft
+    framestyle = :zerolines,
+    titlefontsize = 14,
+    guidefontsize = 14,
+    legendfontsize = 11,
+    tickfontsize = 11,
+    legend = :topleft,
+    foreground_color_legend = nothing,
+    background_color_legend = nothing,
+    minorgrid = true
     )
 
 labels = ["Steady", "Quasi-Steady", "Wagner", "Peters (N=6)"]
 
 for ia = 1:length(aerodynamic_models)
 
-    scatter!(sp1, V, imag.(λ[ia][1,:])/ωθ,
+    plot!(sp1, V, imag.(λ[ia][1,:])/ωθ,
         label = labels[ia],
         color = ia,
         markersize = 1,
@@ -159,7 +189,7 @@ for ia = 1:length(aerodynamic_models)
         )
 
     for i = 2:size(λ[ia], 1)
-        scatter!(sp1, V, imag.(λ[ia][i,:])/ωθ,
+        plot!(sp1, V, imag.(λ[ia][i,:])/ωθ,
             label = "",
             color = ia,
             markersize = 1,
@@ -167,7 +197,7 @@ for ia = 1:length(aerodynamic_models)
             )
     end
 
-    scatter!(sp2, V, real.(λ[ia][1,:])/ωθ,
+    plot!(sp2, V, real.(λ[ia][1,:])/ωθ,
         label = labels[ia],
         color = ia,
         markersize = 1,
@@ -175,7 +205,7 @@ for ia = 1:length(aerodynamic_models)
         )
 
     for i = 2:size(λ[ia], 1)
-        scatter!(sp2, V, real.(λ[ia][i,:])/ωθ,
+        plot!(sp2, V, real.(λ[ia][i,:])/ωθ,
             label = "",
             color = ia,
             markersize = 1,
@@ -193,17 +223,180 @@ nothing #hide
 
 ![](typical-section-stability.svg)
 
-The same analysis and results are presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity" for the steady state and Peters' Finite State aerodynamic models.  The results shown here match with those provided by Hodges and Pierce, thus validating our implementation of these models.
+Using the Wagner and/or Peters aerodynamic models yields a flutter reduced velocity of 2.2, while the steady and/or quasi-steady aerodynamic models predict significantly lower flutter velocities.  The lift and moment calculated by the steady-state and quasi-steady models are fully determined by the typical section's structural states, while the lift and moment calculated by the Wagner and Peters models are dependent on aerodynamic state variables as well.  The aerodynamic state variables of the Wagner and Peters models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the steady-state and quasi-steady models.
 
-## Aeroelastic Analysis of a Cantilever Wing
+The non-dimensional parameters match those used by Hodges in Pierce in "Introduction to Structural Dynamics and Aeroelasticity".  We can therefore verify that our models are implemented correctly by comparing our results with those presented by Hodges and Pierce.
 
-In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with various aerodynamic models.  We perform this analysis using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been extensively used for validation.  
+The results presented here for the steady-state and Peters' finite state models match the results presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity", which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters' models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.
+
+For this example, all of our aeroelastic systems were linear, so we used a linear stability analysis to assess their stability. Alternatively, we perform time domain simulations in order to determine the system's stability.  To perform these time domain simulations, we first create objects of type `DifferentialEquations.ODEFunction` using [`get_ode`](@ref), then use the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package to solve the ordinary differential equation corresponding to the model.
+
+```@example typical-section-stability
+using DifferentialEquations
+
+# models
+aerodynamic_model = Peters{6}()
+structural_model = TypicalSection()
+coupled_model = couple_models(aerodynamic_model, structural_model)
+
+# non-dimensional parameters
+a = -1/5 # reference point normalized location
+e = -1/10 # center of mass normalized location
+μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
+r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
+σ = 2/5 # = ωh/ωθ (natural frequency ratio)
+xθ = e - a
+a0 = 2*pi # lift curve slope
+α0 = 0 # zero lift angle
+V = 1.0 # = U/(b*ωθ) (reduced velocity)
+
+# chosen dimensional parameters
+b = 1
+ρ = 1
+ωθ = 1
+
+# derived dimensional parameters
+m = μ*ρ*pi*b^2
+Sθ = m*xθ*b
+Iθ = r2*m*b^2
+ωh = σ*ωθ
+kh = m*ωh^2
+kθ = Iθ*ωθ^2
+U = V*b*ωθ
+
+# parameter vector
+p_aero = [a, b, a0, α0]
+p_stru = [kh, kθ, m, Sθ, Iθ]
+p_additional = [U, ρ]
+p = vcat(p_aero, p_stru, p_additional)
+
+# initial state variables
+u0_aero = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+u0_stru = [1.0, 0.0, 0.0, 0.0] # non-zero plunge degree of freedom
+u0 = vcat(u0_aero, u0_stru)
+
+# simulate from 0 to 10 seconds
+tspan = (0.0, 100.0)
+
+# construct ODE function
+f = get_ode(coupled_model)
+
+# construct ODE problem
+prob = DifferentialEquations.ODEProblem(f, u0, tspan, p)
+
+# solve ODE
+sol = DifferentialEquations.solve(prob)
+
+nothing #hide
+```
+
+We can then plot the solution using DifferentialEquations' built-in interface with the [Plots](https://github.com/JuliaPlots/Plots.jl) package.
+
+```@example typical-section-stability
+using Plots
+pyplot()
+
+plot(sol,
+    vars = [7,8,9,10],
+    xlabel = "t",
+    ylabel = permutedims([
+        "\$\h\$",
+        "\$\\theta\$",
+        "\$\\dot{h}\$",
+        "\$\\dot{\\theta}\$",
+        ]),
+    label = "",
+    layout = (4, 1),
+    size = (600,1200)
+    )
+
+savefig("typical-section-solution.svg") #hide
+
+nothing #hide
+```
+
+![](typical-section-solution.svg)
+
+We can also visualize and/or create animations of the solution geometry with the help of custom plot recipes.
+
+```@example typical-section-stability
+# Plot Recipes:
+# - plot(model, x, p, t)
+# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
+# - plot(model, sol, t) # plots the solution geometry at time `t`
+
+# create animation
+anim = @animate for t in range(tspan[1], tspan[2], length=200)
+    plot(coupled_model, sol, t)
+end
+
+# save animation
+gif(anim, "typical-section-simulation.gif")
+
+nothing #hide
+```
+
+![](typical-section-simulation.gif)
+
+The ability to visualize and/or create animations of the solution geometry is also helpful for visualizing eigenmodes.
+
+```julia
+
+# states
+u = u0
+
+# time
+t = 0
+
+# inputs
+y = get_inputs(model, u, p, t)
+
+# perform linear stability analysis
+λ, Uλ, Vλ = get_eigen(coupled_model, u, y, p, t)
+
+# use first eigenmode
+λi = λ[1]
+vλ = Vλ[:,1]
+
+# create animation
+damping = real(λi)
+period = 2*pi/imag(λi)
+cycles = 5
+
+anim = @animate for t in range(-period*cycles, 0.0, length=200)
+    plot(coupled_model, sol, t)
+end
+
+# save animation
+gif(anim, "typical-section-simulation.gif")
+
+
+function write_vtk(name, assembly, state, λ, eigenstate;
+    sections = nothing,
+    scaling=1.0,
+    mode_scaling=1.0,
+    cycles = 1,
+    steps = 100)
+```
+
+
+## Aeroelastic Analysis of the Goland Wing
+
+![](goland-wing.png)
+
+In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been extensively used for validation.
 
 ```@setup goland-stability
 using Plots
 pyplot()
 nothing #hide
 ```
+
+The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its airfoil consists of a 4% thick parabolic arc.  There are two configurations for this wing, one with a tip store and one without.  The configuration we consider in this example is the configuration without a tip store.
+
+The deflections of Goland wing are relatively small, so linear structural models are sufficient for modeling the wing's structure.  However, to demonstrate the capabilities of this package, we will use a nonlinear geometrically exact beam theory model.  
+
+For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is likely inappropriate for this wing due to the wing's low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.
 
 ```@example goland-stability
 using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
@@ -212,8 +405,8 @@ using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
 N = 8 # number of elements
 
 # geometric properties
-span = 6.096 # m (wing half span)
-chord = 1.8288 # m (chord)
+span = 6.096 # m (20 ft span)
+chord = 1.8288 # m (6 ft chord)
 
 # structural section properties
 xea = 0.33*chord # m (elastic axis, from leading edge)
@@ -275,12 +468,11 @@ model = couple_models(aerodynamic_model, structural_model)
 # eigenvalue storage
 λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
 
+# initial guess for state variables
 u0 = zeros(number_of_states(model))
 
 # loop through each velocity
 for i = 1:length(Vinf)
-
-    println("Vinf: ", Vinf[i])
 
     # set state variables, parameters, and current time
     p_aero = vcat(fill([a, b, a0, α0], N)...)

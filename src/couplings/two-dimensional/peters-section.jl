@@ -10,10 +10,10 @@ couple_models(aero::Peters, stru::TypicalSection) = (aero, stru)
 
 # --- traits --- #
 
-inplaceness(::Type{<:Peters}, ::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}) = Linear()
-state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Nonlinear()
-number_of_parameters(::Type{<:Peters}, ::Type{TypicalSection}) = 2
+number_of_additional_parameters(::Type{<:Peters}, ::Type{TypicalSection}) = 2
+coupling_inplaceness(::Type{<:Peters}, ::Type{TypicalSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}) = Linear()
+coupling_state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Nonlinear()
 
 # --- methods --- #
 
@@ -36,7 +36,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     return SVector(u, ω, 0, 0, L, M)
 end
 
-function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
+function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
@@ -57,7 +57,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
+function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
@@ -81,7 +81,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
+function get_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     ds, s, p, t) where {N,TF,SV,SA}
     # extract state rates
     dλ = ds[SVector{N}(1:N)]
@@ -95,4 +95,43 @@ function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSect
     L, M = peters_rate_loads(a, b, ρ, vdot, ωdot)
     # return inputs
     return SVector(0, 0, vdot, ωdot, L, M)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::Peters, stru::TypicalSection; U, rho)
+
+    padd[1] = U
+    padd[2] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::Peters, stru::TypicalSection, padd)
+
+    return (U = padd[1], rho = padd[2])
+end
+
+# --- plotting --- #
+
+@recipe function f(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
+    x, y, p, t) where {N,TF,SV,SA}
+
+    framestyle --> :origin
+    grid --> false
+    xlims --> (-1.0, 1.0)
+    ylims --> (-1.5, 1.5)
+    label --> @sprintf("t = %6.3f", t)
+
+    # extract state variables
+    λ = x[SVector{N}(1:N)]
+    h, θ, hdot, θdot = x[SVector{4}(N+1:N+4)]
+
+    # extract parameters
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+
+    xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
+    yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]
+
+    return xplot, yplot
 end

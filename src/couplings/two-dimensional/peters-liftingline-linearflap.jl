@@ -17,28 +17,28 @@ end
 
 # --- traits --- #
 
-function inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection},
+function number_of_additional_parameters(::Type{<:Peters}, ::Type{LiftingLineSection},
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
+
+    return 1
+end
+
+function coupling_inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return OutOfPlace()
 end
 
-function mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection},
+function coupling_mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Linear()
 end
 
-function state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection},
+function coupling_state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Nonlinear()
-end
-
-function number_of_parameters(::Type{<:Peters}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
-
-    return 1
 end
 
 # --- methods --- #
@@ -70,7 +70,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     return SVector(u, ω, 0, 0, f..., m...)
 end
 
-function get_input_mass_matrix(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
+function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
 
     # extract parameters
@@ -110,7 +110,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
+function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
 
     # extract model constants
@@ -162,7 +162,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
+function get_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     flap::LinearFlap, ctrl::LiftingLineSectionControl, dx, x, p, t) where {N,TF,SV,SA}
     # extract state variables
     dλ = dx[SVector{N}(1:N)]
@@ -180,4 +180,20 @@ function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLine
     m = SVector(0, M, 0)
     # return inputs
     return vcat(0, 0, vdot, ωdot, f, m)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::Peters, stru::LiftingLineSection,
+    flap::LinearFlap, ctrl::LiftingLineSectionControl; rho)
+
+    padd[1] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::Peters, stru::LiftingLineSection,
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, padd)
+
+    return (rho = padd[1],)
 end

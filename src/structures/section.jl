@@ -69,6 +69,72 @@ function get_lhs(::TypicalSection, dq, q, r, p, t)
     return section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)
 end
 
+# --- Plotting --- #
+
+@recipe function f(model::TypicalSection, x, y, p, t)
+
+    framestyle --> :origin
+    grid --> false
+    xticks --> false
+    xlims --> (-1.0, 1.0)
+    ylims --> (-1.5, 1.5)
+    label --> @sprintf("t = %6.3f", t)
+
+    h = x[1]
+    θ = x[2]
+
+    xplot = [-0.5*cos(θ),  0.5*cos(θ)]
+    yplot = [ 0.5*sin(θ)-h, -0.5*sin(θ)-h]
+
+    xplot, yplot
+end
+
+# --- Convenience Functions --- #
+
+function set_states!(x, model::TypicalSection; h, theta, hdot, thetadot)
+
+    x[1] = h
+    x[2] = theta
+    x[3] = hdot
+    x[4] = thetadot
+
+    return x
+end
+
+function set_inputs!(y, model::TypicalSection; L, M)
+
+    y[1] = L
+    y[2] = M
+
+    return y
+end
+
+function set_parameters!(p, model::TypicalSection; kh, ktheta, m, Stheta, Itheta)
+
+    p[1] = kh
+    p[2] = ktheta
+    p[3] = m
+    p[4] = Stheta
+    p[5] = Itheta
+
+    return p
+end
+
+function separate_states(model::TypicalSection, x)
+
+    return (h = x[1], theta = x[2], hdot = x[3], thetadot = x[4])
+end
+
+function separate_inputs(model::TypicalSection, y)
+
+    return (L = y[1], M = y[2])
+end
+
+function separate_parameters(model::TypicalSection, p)
+
+    return (kh = p[1], ktheta = p[2], m = p[3], Stheta = p[4], Itheta = p[5])
+end
+
 # --- Internal Methods --- #
 
 # left side of rate equations

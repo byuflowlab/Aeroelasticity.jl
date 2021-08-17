@@ -20,64 +20,64 @@ end
 
 # --- traits --- #
 
-function inplaceness(::Type{<:LiftingLine}, ::Type{<:RigidBody}, ::Type{<:LiftingLineFlaps})
-    return InPlace()
-end
-
-function mass_matrix_type(::Type{LiftingLine{NA,TA}}, ::Type{<:RigidBody},
-    ::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NA,NF,NG,TA,TF,TG}
-
-    aero_model_types = TA.parameters
-    flap_model_types = TF.parameters
-    if all(isempty.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Empty()
-    elseif all(iszero.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Zeros()
-    elseif all(isidentity.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Identity()
-    elseif all(isconstant.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Constant()
-    elseif all(islinear.(mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Linear()
-    else
-        return Nonlinear()
-    end
-end
-
-function state_jacobian_type(::Type{LiftingLine{NA,TA}}, ::Type{<:RigidBody},
-    ::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NA,NF,NG,TA,TF,TG}
-
-    aero_model_types = TA.parameters
-    flap_model_types = TF.parameters
-    if all(isempty.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Empty()
-    elseif all(iszero.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Zeros()
-    elseif all(isidentity.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Identity()
-    elseif all(isconstant.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Constant()
-    elseif all(islinear.(state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
-        flap_model_types, Ref(LiftingLineSectionControl))))
-        return Linear()
-    else
-        return Nonlinear()
-    end
-end
-
-function number_of_parameters(::LiftingLine{NA,TA}, ::RigidBody,
+function number_of_additional_parameters(::LiftingLine{NA,TA}, ::RigidBody,
     ::LiftingLineFlaps{NF,NG,TF,TG}) where {NA,NF,NG,TA,TF,TG}
 
     return 13*NA + 14 + NG
+end
+
+function coupling_inplaceness(::Type{<:LiftingLine}, ::Type{<:RigidBody}, ::Type{<:LiftingLineFlaps})
+    return InPlace()
+end
+
+function coupling_mass_matrix_type(::Type{LiftingLine{NA,TA}}, ::Type{<:RigidBody},
+    ::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NA,NF,NG,TA,TF,TG}
+
+    aero_model_types = TA.parameters
+    flap_model_types = TF.parameters
+    if all(isempty.(coupling_mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Empty()
+    elseif all(iszero.(coupling_mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Zeros()
+    elseif all(isidentity.(coupling_mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Identity()
+    elseif all(isconstant.(coupling_mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Constant()
+    elseif all(islinear.(coupling_mass_matrix_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Linear()
+    else
+        return Nonlinear()
+    end
+end
+
+function coupling_state_jacobian_type(::Type{LiftingLine{NA,TA}}, ::Type{<:RigidBody},
+    ::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NA,NF,NG,TA,TF,TG}
+
+    aero_model_types = TA.parameters
+    flap_model_types = TF.parameters
+    if all(isempty.(coupling_state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Empty()
+    elseif all(iszero.(coupling_state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Zeros()
+    elseif all(isidentity.(coupling_state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Identity()
+    elseif all(isconstant.(coupling_state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Constant()
+    elseif all(islinear.(coupling_state_jacobian_type.(aero_model_types, Ref(LiftingLineSection),
+        flap_model_types, Ref(LiftingLineSectionControl))))
+        return Linear()
+    else
+        return Nonlinear()
+    end
 end
 
 # --- methods --- #
@@ -95,7 +95,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, dyn::RigidBody,
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     npd = number_of_parameters(dyn) # number of rigid body parameters
     npf = number_of_parameters(flap) # number of control surface parameters
-    npadd = number_of_parameters(aero, dyn, flap) # number of additional parameters
+    npadd = number_of_additional_parameters(aero, dyn, flap) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -250,7 +250,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, dyn::RigidBody,
     return y
 end
 
-function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, dyn::RigidBody,
+function get_coupling_mass_matrix!(My, aero::LiftingLine{NA,TA}, dyn::RigidBody,
     flap::LiftingLineFlaps{NF,NG,TF,TG}, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # zero out mass matrix
@@ -266,7 +266,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, dyn::RigidBody,
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     npd = number_of_parameters(dyn) # number of rigid body parameters
     npf = number_of_parameters(flap) # number of control surface parameters
-    npadd = number_of_parameters(aero, dyn, flap) # number of additional parameters
+    npadd = number_of_additional_parameters(aero, dyn, flap) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -380,7 +380,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, dyn::RigidBody,
         pi = vcat(pai, psi, pfi, pci)
 
         # local section input mass matrix
-        Myi = get_input_mass_matrix(section_models, ui, pi, t)
+        Myi = get_coupling_mass_matrix(section_models, ui, pi, t)
 
         # separate into component mass matrices
         yai_duai = SMatrix{Nyai,Nuai}(view(Myi, 1:Nyai, 1:Nuai))
@@ -471,7 +471,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
+function get_inputs_using_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
     flap::LiftingLineFlaps{NF,NG,TF,TG}, du, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # initialize input vector
@@ -490,7 +490,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     npd = number_of_parameters(dyn) # number of rigid body parameters
     npf = number_of_parameters(flap) # number of control surface parameters
-    npadd = number_of_parameters(aero, dyn, flap) # number of additional parameters
+    npadd = number_of_additional_parameters(aero, dyn, flap) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -624,7 +624,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
         pi = vcat(pai, psi, pfi, pci)
 
         # section inputs
-        yi = get_inputs_from_state_rates(section_models, dui, ui, pi, t)
+        yi = get_inputs_using_state_rates(section_models, dui, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)
@@ -656,4 +656,67 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
     y[iyd[13]] = Ma[3]
 
     return y
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, model::LiftingLine{NA,TA},
+    dyn::RigidBody, flap::LiftingLineFlaps{NF,NG,TF,TG}; section_parameters, rho, m, Ixx,
+    Iyy, Izz, Ixz, Ixy, Iyz, Fbx, Fby, Fbz, Mbx, Mby, Mbz, delta) where {NA,NF,NG,TA,TF,TG}
+
+    for i = 1:NA
+        padd[13*(i-1)+1] = section_parameters[i].L
+        padd[13*(i-1)+2 : 13*(i-1)+4] = section_parameters[i].pe
+        padd[13*(i-1)+5 : 13*(i-1)+7] = section_parameters[i].e1
+        padd[13*(i-1)+8 : 13*(i-1)+10] = section_parameters[i].e2
+        padd[13*(i-1)+11 : 13*(i-1)+13] = section_parameters[i].e3
+    end
+
+    padd[13*NA+1] = rho
+    padd[13*NA+2] = m
+    padd[13*NA+3] = Ixx
+    padd[13*NA+4] = Iyy
+    padd[13*NA+5] = Izz
+    padd[13*NA+6] = Ixz
+    padd[13*NA+7] = Ixy
+    padd[13*NA+8] = Iyz
+    padd[13*NA+9] = Fbx
+    padd[13*NA+10] = Fby
+    padd[13*NA+11] = Fbz
+    padd[13*NA+12] = Mbx
+    padd[13*NA+13] = Mby
+    padd[13*NA+14] = Mbz
+    padd[13*NA+14+1 : 13*NA+14+NG] = delta
+
+    return padd
+end
+
+function separate_additional_parameters(model::LiftingLine{NA,TA},
+    dyn::RigidBody, flap::LiftingLineFlaps{NF,NG,TF,TG}, padd) where {NA,NF,NG,TA,TF,TG}
+
+    # section parameters
+    return (
+        section_parameters = ntuple(i -> (
+            L = padd[13*(i-1)+1], # element length
+            pe = view(padd, 13*(i-1)+2 : 13*(i-1)+4), # local frame position
+            e1 = view(padd, 13*(i-1)+5 : 13*(i-1)+7), # local frame x-axis
+            e2 = view(padd, 13*(i-1)+8 : 13*(i-1)+10), # local frame y-axis
+            e3 = view(padd, 13*(i-1)+11 : 13*(i-1)+13), # local frame z-axis
+            ), NA),
+        rho = padd[13*NA+1],
+        m = padd[13*NA+2],
+        Ixx = padd[13*NA+3],
+        Iyy = padd[13*NA+4],
+        Izz = padd[13*NA+5],
+        Ixz = padd[13*NA+6],
+        Ixy = padd[13*NA+7],
+        Iyz = padd[13*NA+8],
+        Fbx = padd[13*NA+9],
+        Fby = padd[13*NA+10],
+        Fbz = padd[13*NA+11],
+        Mbx = padd[13*NA+12],
+        Mby = padd[13*NA+13],
+        Mbz = padd[13*NA+14],
+        delta = view(padd, 13*NA+14+1 : 13*NA+14+NG),
+        )
 end

@@ -53,10 +53,5 @@ Peters
 Peters()
 ```
 
-## Example Initialization
-
-```@example peters
-using AerostructuralDynamics #hide
-model = Peters{6}()
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)

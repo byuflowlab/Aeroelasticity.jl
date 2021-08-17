@@ -104,7 +104,7 @@ input_jacobian_type(::Type{TypicalSection}) = Constant()
 
 ### Defining Methods for Governing Equations
 
-Once the properties of a model have been defined, methods must be provided for the model which define its governing equations.  The right hand side of the governing structural differential equations is calculated using the [`get_rates`](@ref) function for out-of-place models or the [`get_rates!`](@ref) function for in-place models.  For models with mass matrices, a new method must also be defined for the [`get_mass_matrix`](@ref) function (or [`get_mass_matrix!`](@ref) function if the model's functions are in-place functions).  For constant mass matrices (`mass_matrix_type(typeof(model)) == Constant()`), this function should be defined without the `x`, `y`, `p`, and `t` arguments.  
+Once the properties of a model have been defined, methods must be provided for the model which define its governing equations.  The right hand side of the governing structural differential equations is calculated using the [`get_rates`](@ref) function for out-of-place models or the [`get_rates!`](@ref) function for in-place models.  For models with mass matrices, a new method must also be defined for the [`get_mass_matrix`](@ref) function (or [`get_mass_matrix!`](@ref) function if the model's functions are in-place).  For constant mass matrices (`mass_matrix_type(typeof(model)) == Constant()`), this function should be defined without the `x`, `y`, `p`, and `t` arguments.  
 
 For example, the governing equations for the [`TypicalSection`](@ref) model may be defined using the following block of code
 
@@ -164,9 +164,63 @@ function get_lhs(::TypicalSection, dq, q, r, p, t)
 end
 ```
 
+### Defining Convenience Methods
+
+To aid users in defining state, input, and parameter vectors, new methods for the [`set_states!`](@ref), [`set_inputs!`](@ref), and [`set_parameters!`](@ref) functions should be provided.  For the [`TypicalSection`](@ref) model, these new methods may be defined using the following block of code.
+
+```julia
+function set_states!(x, model::TypicalSection; h, theta, hdot, thetadot)
+
+    x[1] = h
+    x[2] = theta
+    x[3] = hdot
+    x[4] = thetadot
+
+    return x
+end
+
+function set_inputs!(y, model::TypicalSection; L, M)
+
+    y[1] = L
+    y[2] = M
+
+    return y
+end
+
+function set_parameters!(p, model::TypicalSection; kh, ktheta, m, Stheta, Itheta)
+
+    p[1] = kh
+    p[2] = ktheta
+    p[3] = m
+    p[4] = Stheta
+    p[5] = Itheta
+
+    return p
+end
+```
+
+To aid users in interpreting state, input, and parameter vector values, new methods for the [`separate_states`](@ref), [`separate_inputs`](@ref), and [`separate_parameters`](@ref) functions should be provided.  For the [`TypicalSection`](@ref) model, these new methods may be defined using the following block of code.
+
+```julia
+function separate_states(model::TypicalSection, x)
+
+    return (h = x[1], theta = x[2], hdot = x[3], thetadot = x[4])
+end
+
+function separate_inputs(model::TypicalSection, y)
+
+    return (L = y[1], M = y[2])
+end
+
+function separate_parameters(model::TypicalSection, p)
+
+    return (kh = p[1], ktheta = p[1], m = p[1], Stheta = p[1], Itheta = p[1])
+end
+```
+
 ## Creating a New Model Coupling
 
-In this section, we describe in detail how to construct a new model by coupling multiple existing models together.  To demonstrate this process, we also how one might implement the [`Wagner`](@ref) and [`TypicalSection`](@ref) model coupling.
+In this section, we describe in detail how to construct a new model by coupling multiple existing models together.  To demonstrate this process, we also show how one might implement the [`Wagner`](@ref) and [`TypicalSection`](@ref) model coupling.
 
 ### Coupled Model Theory
 
@@ -255,26 +309,26 @@ couple_models(aero::Wagner, stru::TypicalSection) = (aero, stru)
 
 ### Defining the Coupled Model's Traits
 
-The next step in defining a coupled model is to define a model's properties.  At a minimum, this requires defining new methods for the [`number_of_parameters`](@ref) and [`inplaceness`](@ref AerostructuralDynamics.inplaceness) functions, though additional method definitions may be necessary.
+The next step in defining a coupled model is to define the model's properties.  At a minimum, this requires defining new methods for the [`number_of_additional_parameters`](@ref) and [`coupling_inplaceness`](@ref AerostructuralDynamics.inplaceness) functions, though additional method definitions may be necessary.
 
-The number of additional parameters introduced by the coupled model is specified by defining a new method for the [`number_of_parameters`](@ref) function.  For out-of-place models, these methods must operate on the model types so that the length of the parameter vector is completely inferrable. For in-place models, this restriction is loosened and this methods may operate on model instances instead.
+The number of additional parameters introduced by the coupled model is specified by defining a new method for the [`number_of_additional_parameters`](@ref) function.  For out-of-place models, these methods must operate on the model types so that the length of the parameter vector is completely inferrable. For in-place models, this restriction is loosened and this methods may operate on model instances instead.
 
-Whether the coupled model uses an in-place or out-of-place coupling function is defined by the [`inplaceness`](@ref AerostructuralDynamics.inplaceness) function, which operates on the model type. For performance reasons, in-place functions are generally preferred. The one exception is for coupled models with small numbers of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.
+Whether the coupled model uses an in-place or out-of-place coupling function is defined by the [`coupling_inplaceness`](@ref AerostructuralDynamics.coupling_inplaceness) function, which operates on the model type. For performance reasons, in-place functions are generally preferred. The one exception is for coupled models with small numbers of state variables, in which case the preferred approach is to use static arrays with out-of-place functions.
 
-The properties of the coupling function's mass matrix and/or state jacobian are defined by defining new methods for the [`mass_matrix_type`](@ref AerostructuralDynamics.mass_matrix_type) and/or [`state_jacobian_type`](@ref AerostructuralDynamics.state_jacobian_type) functions, respectively. By default, these properties assume their loosest possible definitions.
+The properties of the coupling function's mass matrix and/or state jacobian are defined by defining new methods for the [`coupling_mass_matrix_type`](@ref AerostructuralDynamics.mass_matrix_type) and/or [`coupling_state_jacobian_type`](@ref AerostructuralDynamics.state_jacobian_type) functions, respectively. By default, these properties assume their loosest possible definitions.
 
 The properties of the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model may be defined using the following block of code.
 
 ```julia
-number_of_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 2
-inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Linear()
-state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
+number_of_additional_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 2
+coupling_inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Linear()
+coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
 ```
 
-### Defining Methods for Defining the Inputs
+### Defining Coupling Function Methods
 
-Once the properties of a coupled model have been defined, methods must be provided for the model which define the values of its inputs. The portion of the inputs which is independent of the state rates is calculated using the [`get_inputs`](@ref) function for out-of-place coupling functions or the [`get_inputs!`](@ref) function for in-place coupling functions. For models with inputs that are also linearly dependent on the state rates, a new method must also be defined for the [`get_input_mass_matrix`](@ref AerostructuralDynamics.get_input_mass_matrix) function (or [`get_input_mass_matrix!`](@ref AerostructuralDynamics.get_input_mass_matrix!) function if the inputs are defined in-place). For constant mass matrices (mass_matrix_type(typeof.(models)...) == Constant()), this function should be defined without the x, p, and t arguments.
+Once the properties of a coupled model have been defined, methods must be provided which define the values of the model's inputs. The portion of the inputs which is independent of the state rates is calculated using the [`get_inputs`](@ref) function for out-of-place coupling functions or the [`get_inputs!`](@ref) function for in-place coupling functions. For models with inputs that are also linearly dependent on the state rates, a new method must also be defined for the [`get_coupling_mass_matrix`](@ref AerostructuralDynamics.get_coupling_mass_matrix) function (or [`get_coupling_mass_matrix!`](@ref AerostructuralDynamics.get_coupling_mass_matrix!) function if the inputs are defined in-place). For constant mass matrices (coupling_mass_matrix_type(typeof.(models)...) == Constant()), this function should be defined without the x, p, and t arguments.
 
 As an example, the expressions defining the inputs for the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model may be defined using the following block of code.
 
@@ -307,7 +361,7 @@ function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     return SVector(u, v, ω, L, M)
 end
 
-function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
+function get_coupling_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # non-circulatory load factor
@@ -330,12 +384,12 @@ end
 
 ### Defining Methods for the Coupling Function's Jacobians
 
-Unless otherwise specified, the jacobian of the expression for the inputs of a given coupled model with respect to the state variables is calculated when necessary using forward automatic differentiation (enabled by the ForwardDiff package). While this approach for computing the jacobians is convenient and exact, alternative methods for computing jacobians may be more computationally efficient. To manually define the jacobian of the coupling function with respect to the state variables, a new method for the [`get_input_state_jacobian`](@ref AerostructuralDynamics.get_input_state_jacobian) (or [`get_input_state_jacobian!`](@ref AerostructuralDynamics.get_input_state_jacobian) for inputs which are defined in-place) may be defined.
+Unless otherwise specified, the jacobian of the coupling function of a given coupled model with respect to the state variables is calculated when necessary using forward automatic differentiation (enabled by the ForwardDiff package). While this approach for computing the jacobians is convenient and exact, alternative methods for computing jacobians may be more computationally efficient. To manually define the jacobian of the coupling function with respect to the state variables, a new method for the [`get_coupling_state_jacobian`](@ref AerostructuralDynamics.get_coupling_state_jacobian) (or [`get_coupling_state_jacobian!`](@ref AerostructuralDynamics.get_coupling_state_jacobian) for inputs which are defined in-place) may be defined.
 
 For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, this jacobian may be defined analytically using the following block of code.
 
 ```julia
-function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
+function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
@@ -406,12 +460,12 @@ end
 
 ### Defining Methods for Unit Testing
 
-In order to test whether the provided mass matrices are correct for a given coupled model, a new method for [`get_inputs_from_state_rates`](@ref AerostructuralDynamics.get_inputs_from_state_rates) (which defines the portion of the inputs that are dependent on the state rates) must be provided.  Since this function is used for testing, there is no in-place version of this function.
+In order to test whether the provided mass matrices are correct for a given coupled model, a new method for [`get_inputs_using_state_rates`](@ref AerostructuralDynamics.get_inputs_using_state_rates) (which defines the portion of the inputs that are dependent on the state rates) must be provided.  Since this function is used for testing, there is no in-place version of this function.
 
 For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, this function could be defined as follows
 
 ```julia
-function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
+function get_inputs_using_state_rates(aero::Wagner, stru::TypicalSection,
     ds, s, p, t)
     # extract state rates
     dλ1, dλ2, dh, dθ, dhdot, dθdot = ds
@@ -431,6 +485,73 @@ function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
     return SVector(0, 0, 0, L, M)
 end
 ```
+
+### Defining Convenience Methods
+
+To aid users in defining state, input, and parameter vectors, new methods for the [`set_states!`](@ref), [`set_inputs!`](@ref), and [`set_parameters!`](@ref) functions should be provided.  For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, these new methods may be defined as follows
+
+```julia
+function set_states!(x, aero::Wagner, stru::TypicalSection; lambda = [0.0, 0.0],
+    h = 0.0, theta = 0.0, hdot = 0.0, thetadot = 0.0)
+
+    models = (aero, stru)
+    xs = view.(x, state_indices.(models))
+
+    set_states!(xs[1], aero; lambda)
+    set_states!(xs[2], stru; h, theta, hdot, thetadot)
+
+    return x
+end
+
+function set_inputs!(y, aero::Wagner, stru::TypicalSection; u=1.0, v=0.0,
+    omega=0.0, L=0.0, M=0.0)
+
+    models = (aero, stru)
+    ys = view.(y, input_indices.(models))
+
+    set_inputs!(ys[1], aero; u, v, omega)
+    set_inputs!(ys[2], stru; L, M)
+
+    return y
+end
+
+function set_parameters!(p, aero::Wagner, stru::TypicalSection; a=0.0, b=0.5,
+    a0=2*pi, alpha0=0.0, kh, ktheta, m, Stheta, Itheta)
+
+    models = (aero, stru)
+    ps = view.(p, input_indices.(models))
+
+    set_inputs!(ps[1], aero; a, b, a0, alpha0)
+    set_inputs!(ps[2], stru; kh, ktheta, m, Stheta, Itheta)
+
+    return y
+end
+```
+
+To aid users in interpreting state, input, and parameter vector values, new methods for the [`separate_states`](@ref), [`separate_inputs`](@ref), and [`separate_parameters`](@ref) functions should be provided.  For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, these new methods may be defined using the following block of code.
+
+```julia
+function separate_states(model::TypicalSection, x)
+
+    return (h = x[1], theta = x[2], hdot = x[3], thetadot = x[4])
+end
+
+function separate_inputs(model::TypicalSection, y)
+
+    return (L = y[1], M = y[2])
+end
+
+function separate_parameters(model::TypicalSection, p)
+
+    return (kh = p[1], ktheta = p[1], m = p[1], Stheta = p[1], Itheta = p[1])
+end
+```
+
+### Defining Visualization Methods
+
+To aid users in visualizing solution geometry new plot recipes
+
+defining state, input, and parameter vectors, new methods for the [`set_states!`](@ref), [`set_inputs!`](@ref), and [`set_parameters!`](@ref) functions should be provided.  For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, these new methods are defined as follows
 
 ### Model Ordering
 

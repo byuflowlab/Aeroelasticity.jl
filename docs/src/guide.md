@@ -34,7 +34,7 @@ Our goal is to create an 2D aeroelastic model which we can use to simulate the b
 
 ## Initializing the Aeroelastic Model
 
-For the aerodynamic model, we will be using Peter's finite state model with four aerodynamic state variables.  For the structural model, we will be using the typical section model.  To couple these models together, we use the [`couple_models`](@ref) function.  
+For the aerodynamic model, we will be using Peters' finite state model with four aerodynamic state variables.  For the structural model, we will be using the typical section model.  To couple these models together, we use the [`couple_models`](@ref) function.  
 
 ```@example guide
 aerodynamic_model = Peters{4}() # we use four aerodynamic state variables
@@ -111,12 +111,47 @@ p_coupled = vcat(p_aero, p_stru, p_additional)
 nothing #hide
 ```
 
-For coupled models, inputs are calculated as a function of the model states, model parameters, and current time using the [`get_inputs`](@ref) function.  For uncoupled models, inputs are provided by the user.
+For coupled models, inputs are calculated as a function of the model states, model parameters, and current time using the [`get_inputs`](@ref) function.  For uncoupled models, inputs must be provided.
 
 ```@example guide
 t = 0 # time
 
 y_coupled = get_inputs(coupled_model, x_coupled, p_coupled, t) # inputs
+nothing #hide
+```
+
+To facilitate the setting of state, input, and/or parameter vector entries for more complex models, the [`set_states`](@ref), [`set_inputs`](@ref), and/or [`set_parameters`](@ref) functions (or their in-place counterparts) may be used.  For example, we could have initialized the state variable and parameter vectors for our coupled model using the following block of code.
+
+```@example guide
+# create state vector
+x_coupled = set_states(coupled_model;
+    lambda = zeros(4)
+    h = 0.0
+    theta = 0.0
+    hdot = 0.0
+    thetadot = 0.0
+    )
+
+# create parameter vector
+p_coupled = set_parameters(coupled_model;
+    a = a,
+    b = b,
+    a0 = a0,
+    alpha0 = alpha0,
+    kh = kh,
+    ktheta = ktheta,
+    m = m,
+    Stheta = Sθ,
+    Itheta = Iθ,
+    U = U,
+    rho = ρ)
+```
+
+To facilitate the interpretation of state, input, and/or parameters vector entries for more complex models, the [`separate_states`](@ref), [`separate_inputs`](@ref), and/or [`separate_parameters`](@ref) functions may be used.  For example, the following code returns a named tuple where each entry of the input vector has been assigned its own name.
+
+```@example guide
+inputs = separate_inputs(coupled_model, y)
+
 nothing #hide
 ```
 
@@ -142,7 +177,7 @@ using DifferentialEquations
 u0 = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
 
 # simulate for 10 seconds
-tspan = (0.0, 10.0)
+tspan = (0.0, 100.0)
 
 # construct ODE function
 f = get_ode(coupled_model)

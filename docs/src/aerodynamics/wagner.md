@@ -67,10 +67,5 @@ Wagner
 Wagner()
 ```
 
-## Example Initialization
-
-```@example wagner
-using AerostructuralDynamics #hide
-model = Wagner()
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)

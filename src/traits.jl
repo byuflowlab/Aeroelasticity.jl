@@ -42,7 +42,7 @@ inplaceness(::Type{T}) where T<:NoStateModel = OutOfPlace()
 # definition for combinations of models
 function inplaceness(::Type{T}) where T<:NTuple{N,AbstractModel} where N
     model_types = (T.parameters...,)
-    if isinplace(inplaceness(model_types...)) || any(isinplace.(model_types))
+    if isinplace(coupling_inplaceness(model_types...)) || any(isinplace.(model_types))
         return InPlace()
     else
         return OutOfPlace()
@@ -50,14 +50,14 @@ function inplaceness(::Type{T}) where T<:NTuple{N,AbstractModel} where N
 end
 
 """
-    inplaceness(::Type{T1}, ::Type{T2}, ..., ::Type{TN})
+    coupling_inplaceness(::Type{T1}, ::Type{T2}, ..., ::Type{TN})
 
-Return `InPlace()` if the functions associated with the input function
+Return `InPlace()` if the functions associated with the coupling function
 for coupled models `T1`, `T2`, ... `TN` are in-place or `OutOfPlace()`
-if the functions associated with the input function for coupled models `T1`,
+if the functions associated with the coupling function for coupled models `T1`,
 `T2`, ... `TN` are out-of-place.
 """
-inplaceness(::Vararg{Type,N}) where N
+coupling_inplaceness(::Vararg{Type,N}) where N
 
 """
     mass_matrix_type(::Type{T})
@@ -83,16 +83,16 @@ mass_matrix_type(::Type{T}) where T<:NoStateModel = Empty()
 # definition for combinations of models
 function mass_matrix_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
     model_types = (T.parameters...,)
-    if isempty(mass_matrix_type(model_types...)) &&
+    if isempty(coupling_mass_matrix_type(model_types...)) &&
         all(isempty.(mass_matrix_type.(model_types)))
         return Empty()
-    elseif iszero(mass_matrix_type(model_types...)) &&
+    elseif iszero(coupling_mass_matrix_type(model_types...)) &&
         all(iszero.(mass_matrix_type.(model_types)))
         return Zeros()
-    elseif iszero(mass_matrix_type(model_types...)) &&
+    elseif iszero(coupling_mass_matrix_type(model_types...)) &&
         all(isidentity.(mass_matrix_type.(model_types)))
         return Identity()
-    elseif isconstant(mass_matrix_type(model_types...)) &&
+    elseif isconstant(coupling_mass_matrix_type(model_types...)) &&
         all(isconstant.(input_jacobian_type.(model_types))) &&
         all(isconstant.(mass_matrix_type.(model_types)))
         return Constant()
@@ -133,20 +133,22 @@ state_jacobian_type(::Type{T}) where T<:NoStateModel = Empty()
 # definition for combinations of models
 function state_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
     model_types = (T.parameters...,)
-    if isempty(state_jacobian_type(model_types...)) &&
+    if isempty(coupling_state_jacobian_type(model_types...)) &&
         all(isempty.(state_jacobian_type.(model_types)))
         return Empty()
-    elseif iszero(state_jacobian_type(model_types...)) &&
+    elseif iszero(coupling_state_jacobian_type(model_types...)) &&
         all(iszero.(state_jacobian_type.(model_types)))
         return Zeros()
-    elseif iszero(state_jacobian_type(model_types...)) &&
+    elseif iszero(coupling_state_jacobian_type(model_types...)) &&
         all(isidentity.(state_jacobian_type.(model_types)))
         return Identity()
-    elseif isconstant(state_jacobian_type(model_types...)) &&
+    elseif isconstant(coupling_state_jacobian_type(model_types...)) &&
         all(isconstant.(input_jacobian_type.(model_types))) &&
         all(isconstant.(state_jacobian_type.(model_types)))
         return Constant()
-    elseif all(islinear.(state_jacobian_type.(model_types)))
+    elseif islinear(coupling_state_jacobian_type(model_types...)) &&
+        all(islinear.(input_jacobian_type.(model_types))) &&
+        all(islinear.(state_jacobian_type.(model_types)))
         return Linear()
     else
         return Nonlinear()

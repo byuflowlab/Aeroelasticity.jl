@@ -6,68 +6,88 @@ Function which couples multiple models together to form a coupled model.
 couple_models(models...) = models
 
 """
-    number_of_states(models)
+    number_of_states(model)
 
 Return the total number of states corresponding to the model or models.
 """
 number_of_states
 
-number_of_states(model::TM) where TM = number_of_states(TM)
+# by default, dispatch on type
+number_of_states(model::TM) where TM <: AbstractModel = number_of_states(TM)
 
 # models with no states have... no states
-number_of_states(::Type{T}) where T<:NoStateModel = 0
+number_of_states(::Type{TM}) where TM <: NoStateModel = 0
 
-# combined models have concatenated state variables
-function number_of_states(models::NTuple{N,Any}) where N
+# coupled models have concatenated states
+function number_of_states(models::NTuple{N,AbstractModel}) where N
     return sum(number_of_states.(models))
 end
 
-# combined models have concatenated state variables
-function number_of_states(::Type{T}) where T<:NTuple{N,Any} where N
-    return sum(number_of_states.(T.parameters))
+# coupled models have concatenated states
+function number_of_states(::Type{TM}) where TM<:NTuple{N,AbstractModel} where N
+    return sum(number_of_states.(TM.parameters))
 end
 
 """
-    number_of_inputs(models)
+    number_of_inputs(model)
 
 Return the total number of inputs corresponding to the model or models.
 """
 number_of_inputs
 
-# default to returning zero inputs
-number_of_inputs(model::TM) where TM = number_of_inputs(TM)
+# by default, dispatch on type
+number_of_inputs(model::TM) where TM <: AbstractModel = number_of_inputs(TM)
 
 # models with no states have no inputs
-number_of_inputs(::Type{T}) where T<:NoStateModel = 0
+number_of_inputs(::Type{TM}) where TM <: NoStateModel = 0
 
-# combined models have concatenated inputs
-function number_of_inputs(models::NTuple{N,Any}) where N
+# coupled models have concatenated inputs
+function number_of_inputs(models::NTuple{N,AbstractModel}) where N
     sum(number_of_inputs.(models))
 end
 
-# combined models have concatenated inputs
-function number_of_inputs(::Type{T}) where T<:NTuple{N,Any} where N
-    sum(number_of_inputs.(T.parameters))
+# coupled models have concatenated inputs
+function number_of_inputs(::Type{TM}) where TM <: NTuple{N,AbstractModel} where N
+    sum(number_of_inputs.(TM.parameters))
 end
 
 """
-    number_of_parameters(models)
+    number_of_parameters(model)
 
 Return the total number of parameters corresponding to the model or models.
 """
 number_of_parameters
 
-# default to returning zero parameters
-number_of_parameters(models...) = number_of_parameters(typeof.(models)...)
+# by default, dispatch on type
+number_of_parameters(model::TM) where TM <: AbstractModel = number_of_parameters(TM)
 
-# combined models have concatenated parameters
-function number_of_parameters(models::NTuple{N,Any}) where N
-    sum(number_of_parameters.(models)) + number_of_parameters(models...)
+# coupled models have concatenated parameters
+function number_of_parameters(models::NTuple{N,AbstractModel}) where N
+    sum(number_of_parameters.(models)) + number_of_additional_parameters(models...)
 end
 
-# combined models have concatenated parameters
-function number_of_parameters(::Type{T}) where T<:NTuple{N,Any} where N
-    sum(number_of_parameters.(T.parameters)) + number_of_parameters(T.parameters...)
+# coupled models have concatenated parameters
+function number_of_parameters(::Type{TM}) where TM <: NTuple{N,AbstractModel} where N
+    return sum(number_of_parameters.(TM.parameters)) + number_of_additional_parameters(TM.parameters...)
+end
+
+"""
+    number_of_additional_parameters(models...)
+
+Return the total number of additional parameters corresponding to the model coupling.
+"""
+number_of_additional_parameters
+
+function number_of_additional_parameters(models::Vararg{AbstractModel,N}) where N
+    return number_of_additional_parameters(typeof.(models)...)
+end
+
+function number_of_additional_parameters(models::Type{TM}) where TM <: NTuple{N,AbstractModel} where N
+    return number_of_parameters(TM.parameters...)
+end
+
+function number_of_additional_parameters(models::NTuple{N,AbstractModel}) where N
+    return number_of_parameters(models...)
 end
 
 """
@@ -75,7 +95,7 @@ end
 
 Return the indices corresponding to the state variables for each model in `models`
 """
-function state_indices(models)
+function state_indices(models::NTuple{N,AbstractModel}) where N
     # input indices
     Nu = number_of_states.(models)
     iu2 = cumsum(Nu)
@@ -88,7 +108,7 @@ end
 
 Return the indices corresponding to the input variables for each model in `models`
 """
-function input_indices(models)
+function input_indices(models::NTuple{N,AbstractModel}) where N
     # input indices
     Ny = number_of_inputs.(models)
     iy2 = cumsum(Ny)
@@ -101,7 +121,7 @@ end
 
 Return the indices corresponding to the parameters for each model in `models`
 """
-function parameter_indices(models)
+function parameter_indices(models::NTuple{N,AbstractModel}) where N
     # parameter indices
     Np = number_of_parameters.(models)
     ip2 = cumsum(Np)
@@ -110,37 +130,190 @@ function parameter_indices(models)
 end
 
 """
-    separate_states(models, u)
+    additional_parameter_indices(models)
 
-Return views containing the state variables corresponding to each model in `models`
+Return the indices of the additional parameters for the coupling function
+corresponding to the models in `models`
 """
-separate_states(models, u) = view.(u, state_indices.(models))
-
-"""
-    separate_inputs(models)
-
-Return views containing the inputs corresponding to each model in `models`
-"""
-separate_inputs(models, y) = view.(y, input_indices.(models))
-
-"""
-    separate_parameters(models)
-
-Return views containing the parameters corresponding to each model in `models`.
-"""
-separate_parameters(models, p) = view.(p, parameter_indices.(models))
+function additional_parameter_indices(models)
+    Npi = number_of_parameters.(models)
+    Np = number_of_parameters(models)
+    ip1 = sum(Npi) + 1
+    ip2 = Np
+    return UnitRange(ip1, ip2)
+end
 
 """
-    separate_parameters(models)
+    get_states(model; kwargs...)
 
-Return views containing the parameters corresponding to each model in `models`,
-followed by a view containing any additional parameters.
+Return the state variable vector corresponding to `model` using the state
+variable values in `kwargs`.
 """
-function separate_additional_parameters(models, p)
-    np = length(p)
-    npadd = number_of_parameters(models)
-    ipadd = np - npadd + 1 : np
-    return view(p, ipadd)
+function get_states(model::AbstractModel; kwargs...)
+    x = zeros(number_of_states(model))
+    set_states!(x, model; kwargs...)
+    return x
+end
+
+"""
+    set_states!(x, model; kwargs...)
+
+In-place version of [`get_states`](@ref)
+"""
+set_states!
+
+set_states!(x, model::NoStateModel) = x
+
+"""
+    set_states!(x, model, i; kwargs...)
+
+Set the elements of the state variable vector `x` corresponding to the `i`th
+model of coupled model `model` to the values specified in `kwargs`
+"""
+function set_states!(x, model::NTuple{N,AbstractModel}, i; kwargs...) where N
+
+    return set_states!(view(x, state_indices(model)[i]), model[i]; kwargs...)
+end
+
+"""
+    get_inputs(model; kwargs...)
+
+Return the input vector corresponding to `model` using the input values in `kwargs`.
+"""
+function get_inputs(model::AbstractModel; kwargs...)
+    y = zeros(number_of_inputs(model))
+    set_inputs!(y, model; kwargs...)
+    return y
+end
+
+"""
+    set_inputs!(y, model; kwargs...)
+
+In-place version of [`get_inputs`](@ref)
+"""
+set_inputs!
+
+set_inputs!(y, model::NoStateModel) = y
+
+"""
+    set_inputs!(y, model, i; kwargs...)
+
+Set the elements of the input vector `y` corresponding to the `i`th
+model of coupled model `model` to the values specified in `kwargs`
+"""
+function set_inputs!(y, model::NTuple{N,AbstractModel}, i; kwargs...) where N
+
+    return set_inputs!(view(y, input_indices(model)[i]), model[i]; kwargs...)
+end
+
+"""
+    get_parameters(model; kwargs...)
+
+Return the parameter vector corresponding to `model` using the parameter values
+in `kwargs`.
+"""
+function get_parameters(model::AbstractModel; kwargs...)
+    p = zeros(number_of_parameters(model))
+    set_parameters!(p, model; kwargs...)
+    return p
+end
+
+"""
+    set_parameters!(p, model; kwargs...)
+
+In-place version of [`get_parameters`](@ref)
+"""
+set_parameters!
+
+"""
+    set_parameters!(p, model, i; kwargs...)
+
+Set the elements of the parameter vector `p` corresponding to the `i`th
+model of coupled model `model` to the values specified in `kwargs`
+"""
+function set_parameters!(p, model::NTuple{N,AbstractModel}, i; kwargs...) where N
+
+    return set_parameters!(view(p, parameter_indices(model)[i]), model[i]; kwargs...)
+end
+
+"""
+    get_additional_parameters(model; kwargs...)
+
+Return the elements of the parameter vector corresponding to the additional
+parameters of coupled model `model` using the parameters specified in `kwargs`
+"""
+function get_additional_parameters(models::NTuple{N,AbstractModel};
+    kwargs...) where N
+
+    padd = zeros(number_of_additional_parameters(models...))
+
+    set_additional_parameters!(padd, models...; kwargs...)
+
+    return padd
+end
+
+"""
+    set_additional_parameters!(p, model; kwargs...)
+
+Set the elements of the parameter vector `p` corresponding to the additional
+parameters of coupled model `model` to the values specified in `kwargs`
+"""
+function set_additional_parameters!(p, models::NTuple{N,AbstractModel};
+    kwargs...) where N
+
+    return set_additional_parameters!(view(p, additional_parameter_indices(models)),
+        models...; kwargs...)
+end
+
+"""
+    separate_states(model, x)
+
+Separate the state vector entries in `x` corresponding to each model in `model`
+"""
+separate_states
+
+separate_states(model::NoStateModel, x) = ()
+
+function separate_states(models::NTuple{N,AbstractModel}, x) where N
+
+    xs = view.(x, state_indices.(models))
+
+    return ntuple(i->separate_states(xs[i], models[i]), N)
+end
+
+"""
+    separate_inputs(model, y)
+
+Separate the input vector entries in `y` corresponding to each model in `model`
+"""
+separate_inputs
+
+separate_inputs(model::NoStateModel, y) = ()
+
+function separate_inputs(models::NTuple{N,AbstractModel}, y) where N
+
+    ys = view.(y, input_indices.(models))
+
+    return ntuple(i->separate_inputs(ys[i], models[i]), N)
+end
+
+"""
+    separate_parameters(model, p)
+
+Separate the parameter vector entries in `p` corresponding to each model in `model`
+and the additional parameters corresponding to the model coupling, if applicable.
+"""
+separate_parameters
+
+function separate_parameters(models::NTuple{N,AbstractModel}, p) where N
+
+    pmodels = view.(p, parameter_indices.(models))
+    pmodels_sep = ntuple(i->separate_parameters(models[i], pmodels[i]), N)
+
+    padd = view(p, additional_parameter_indices(models))
+    padd_sep = separate_additional_parameters(models..., padd)
+
+    return (pmodels_sep..., padd_sep)
 end
 
 """
@@ -206,7 +379,7 @@ function _get_mass_matrix(::Constant, ::OutOfPlace, models::NTuple{N, AbstractMo
     D = input_jacobian(models)
 
     # calculate input mass matrix
-    My = get_input_mass_matrix(models)
+    My = get_coupling_mass_matrix(models)
 
     return M + D*My
 end
@@ -222,7 +395,7 @@ function _get_mass_matrix(::Linear, ::OutOfPlace, models::NTuple{N, AbstractMode
     D = get_input_jacobian(models, u, y, p, t)
 
     # calculate input mass matrix
-    My = get_input_mass_matrix(models, u, p, t)
+    My = get_coupling_mass_matrix(models, u, p, t)
 
     return M + D*My
 end
@@ -358,7 +531,7 @@ function _get_mass_matrix!(M, ::Constant, ::InPlace, models::NTuple{N, AbstractM
     iy = input_indices(models)
 
     # calculate input mass matrix
-    get_input_mass_matrix!(My, models)
+    get_coupling_mass_matrix!(My, models)
 
     # calculate mass matrix
     for i = 1:length(models)
@@ -389,7 +562,7 @@ function _get_mass_matrix!(M, ::Linear, ::InPlace,
     ip = parameter_indices(models)
 
     # calculate input mass matrix
-    get_input_mass_matrix!(My, models, u, p, t)
+    get_coupling_mass_matrix!(My, models, u, p, t)
 
     # calculate mass matrix
     for i = 1:N
@@ -583,7 +756,7 @@ function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
     D = input_jacobian(models)
 
     # calculate input jacobian
-    Jy = get_input_state_jacobian(models)
+    Jy = get_coupling_state_jacobian(models)
 
     return J + D*Jy
 end
@@ -599,7 +772,7 @@ function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
     D = get_input_jacobian(models, u, y, p, t)
 
     # calculate input jacobian
-    Jy = get_input_state_jacobian(models, u, p, t)
+    Jy = get_coupling_state_jacobian(models, u, p, t)
 
     return J + D*Jy
 end
@@ -745,7 +918,7 @@ function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,Abstrac
     iy = UnitRange.(iy1, iy2)
 
     # get input jacobian
-    get_input_state_jacobian!(Jy, models)
+    get_coupling_state_jacobian!(Jy, models)
 
     # calculate jacobian
     for i = 1:length(models)
@@ -800,7 +973,7 @@ function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace,
     ip = UnitRange.(ip1, ip2)
 
     # get input jacobian
-    get_input_state_jacobian!(Jy, models, u, p, t)
+    get_coupling_state_jacobian!(Jy, models, u, p, t)
 
     # calculate jacobian
     for i = 1:length(models)
@@ -956,41 +1129,41 @@ end
 end
 
 """
-    get_input_mass_matrix(models)
-    get_input_mass_matrix(models, u, p, t)
+    get_coupling_mass_matrix(models)
+    get_coupling_mass_matrix(models, u, p, t)
 
 Calculate the input function mass matrix for the specified combination of models.
 """
-get_input_mass_matrix
+get_coupling_mass_matrix
 
-function get_input_mass_matrix(models::TM; kwargs...) where TM
-    return _get_input_mass_matrix(mass_matrix_type(TM.parameters...),
-        inplaceness(TM.parameters...), models; kwargs...)
+function get_coupling_mass_matrix(models::TM; kwargs...) where TM
+    return _get_coupling_mass_matrix(coupling_mass_matrix_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_mass_matrix(models::TM, u, p, t; kwargs...) where TM
-    return _get_input_mass_matrix(mass_matrix_type(TM.parameters...),
-        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_coupling_mass_matrix(models::TM, u, p, t; kwargs...) where TM
+    return _get_coupling_mass_matrix(coupling_mass_matrix_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # dispatch to an in-place function
-function _get_input_mass_matrix(::Any, ::InPlace, models; kwargs...)
+function _get_coupling_mass_matrix(::Any, ::InPlace, models; kwargs...)
     Ny = number_of_inputs(models)
     Nu = number_of_states(models)
     M = zeros(Ny,Nu)
-    return get_input_mass_matrix!(M, models; kwargs...)
+    return get_coupling_mass_matrix!(M, models; kwargs...)
 end
 
 # dispatch to an in-place function
-function _get_input_mass_matrix(::Any, ::InPlace, models, u, p, t; kwargs...)
+function _get_coupling_mass_matrix(::Any, ::InPlace, models, u, p, t; kwargs...)
     Ny = number_of_inputs(models)
     Nu = number_of_states(models)
     M = similar(u, Ny, Nu)
-    return get_input_mass_matrix!(M, models, u, p, t; kwargs...)
+    return get_coupling_mass_matrix!(M, models, u, p, t; kwargs...)
 end
 
 # return an empty matrix
-function _get_input_mass_matrix(::Empty, ::OutOfPlace, models::TM, args...;
+function _get_coupling_mass_matrix(::Empty, ::OutOfPlace, models::TM, args...;
     kwargs...) where TM
 
     Ny = number_of_inputs(TM)
@@ -999,7 +1172,7 @@ function _get_input_mass_matrix(::Empty, ::OutOfPlace, models::TM, args...;
 end
 
 # return a matrix of zeros
-function _get_input_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
+function _get_coupling_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
     kwargs...) where TM
 
     Ny = number_of_inputs(TM)
@@ -1008,89 +1181,89 @@ function _get_input_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
     return zeros(SMatrix{Ny, Nu, Float64})
 end
 
-# dispatch to the `get_input_mass_matrix` function without arguments
-function _get_input_mass_matrix(::Constant, ::OutOfPlace, models, u, p, t; kwargs...)
-    return get_input_mass_matrix(models; kwargs...)
+# dispatch to the `get_coupling_mass_matrix` function without arguments
+function _get_coupling_mass_matrix(::Constant, ::OutOfPlace, models, u, p, t; kwargs...)
+    return get_coupling_mass_matrix(models; kwargs...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_mass_matrix(::Constant, ::OutOfPlace,
+function _get_coupling_mass_matrix(::Constant, ::OutOfPlace,
     models::NTuple{N,AbstractModel}; kwargs...) where N
 
-    return get_input_mass_matrix(models...; kwargs...)
+    return get_coupling_mass_matrix(models...; kwargs...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_mass_matrix(::Linear, ::OutOfPlace,
+function _get_coupling_mass_matrix(::Linear, ::OutOfPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
-    return get_input_mass_matrix(models..., u, p, t; kwargs...)
+    return get_coupling_mass_matrix(models..., u, p, t; kwargs...)
 end
 
 """
-    get_input_mass_matrix!(My, models)
-    get_input_mass_matrix!(My, models, u, p, t)
+    get_coupling_mass_matrix!(My, models)
+    get_coupling_mass_matrix!(My, models, u, p, t)
 
-In-place version of [`get_input_mass_matrix`](@ref).
+In-place version of [`get_coupling_mass_matrix`](@ref).
 """
-get_input_mass_matrix!
+get_coupling_mass_matrix!
 
-function get_input_mass_matrix!(My, models::TM; kwargs...) where TM
-    return _get_input_mass_matrix!(My, mass_matrix_type(TM.parameters...),
-        inplaceness(TM.parameters...), models; kwargs...)
+function get_coupling_mass_matrix!(My, models::TM; kwargs...) where TM
+    return _get_coupling_mass_matrix!(My, coupling_mass_matrix_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_mass_matrix!(My, models::TM, u, p, t; kwargs...) where TM
-    return _get_input_mass_matrix!(My, mass_matrix_type(TM.parameters...),
-        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_coupling_mass_matrix!(My, models::TM, u, p, t; kwargs...) where TM
+    return _get_coupling_mass_matrix!(My, coupling_mass_matrix_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # dispatch to an out-of-place function
-function _get_input_mass_matrix!(My, ::Any, ::OutOfPlace, models, args...; kwargs...)
-    return My .= get_input_mass_matrix(models, args...; kwargs...)
+function _get_coupling_mass_matrix!(My, ::Any, ::OutOfPlace, models, args...; kwargs...)
+    return My .= get_coupling_mass_matrix(models, args...; kwargs...)
 end
 
 # return an empty matrix
-function _get_input_mass_matrix!(My, ::Empty, ::InPlace, models, args...; kwargs...)
+function _get_coupling_mass_matrix!(My, ::Empty, ::InPlace, models, args...; kwargs...)
     return My
 end
 
 # return a matrix of zeros
-function _get_input_mass_matrix!(My, ::Zeros, ::InPlace, models, args...; kwargs...)
+function _get_coupling_mass_matrix!(My, ::Zeros, ::InPlace, models, args...; kwargs...)
     return My .= 0
 end
 
-# dispatch to `get_input_mass_matrix!` without arguments
-function _get_input_mass_matrix!(My, ::Constant, ::InPlace, models, u, p, t; kwargs...)
-    return get_input_mass_matrix!(My, models; kwargs...)
+# dispatch to `get_coupling_mass_matrix!` without arguments
+function _get_coupling_mass_matrix!(My, ::Constant, ::InPlace, models, u, p, t; kwargs...)
+    return get_coupling_mass_matrix!(My, models; kwargs...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_mass_matrix!(My, ::Constant, ::InPlace,
+function _get_coupling_mass_matrix!(My, ::Constant, ::InPlace,
     models::NTuple{N,AbstractModel}; kwargs...) where N
 
-    get_input_mass_matrix!(My, models...; kwargs...)
+    get_coupling_mass_matrix!(My, models...; kwargs...)
 
     return My
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_mass_matrix!(My, ::Linear, ::InPlace,
+function _get_coupling_mass_matrix!(My, ::Linear, ::InPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
-    get_input_mass_matrix!(My, models..., u, p, t; kwargs...)
+    get_coupling_mass_matrix!(My, models..., u, p, t; kwargs...)
 
     return My
 end
 
 """
-    get_inputs_from_state_rates(models, u, p, t)
+    get_inputs_using_state_rates(models, u, p, t)
 
 Calculate the portion of the inputs which are dependent on the state rates.  This
 function is used to test the mass matrices associated with each input mass matrix.
 """
-function get_inputs_from_state_rates(models::NTuple{N,AbstractModel}, du, u, p, t) where N
-    return get_inputs_from_state_rates(models..., du, u, p, t)
+function get_inputs_using_state_rates(models::NTuple{N,AbstractModel}, du, u, p, t) where N
+    return get_inputs_using_state_rates(models..., du, u, p, t)
 end
 
 """
@@ -1099,7 +1272,7 @@ end
 Calculate the inputs to the specified combination of models.
 """
 function get_inputs(models::TM, u, p, t) where TM
-    return _get_inputs(inplaceness(TM.parameters...), models, u, p, t)
+    return _get_inputs(coupling_inplaceness(TM.parameters...), models, u, p, t)
 end
 
 # dispatch to an in-place function
@@ -1121,7 +1294,7 @@ end
 In-place version of [`get_inputs`](@ref)
 """
 function get_inputs!(y, models::T, u, p, t) where T
-    return _get_inputs!(y, inplaceness(T.parameters...), models, u, p, t)
+    return _get_inputs!(y, coupling_inplaceness(T.parameters...), models, u, p, t)
 end
 
 # dispatch to an out-of-place function
@@ -1135,25 +1308,25 @@ function _get_inputs!(y, ::InPlace, models::NTuple{N,AbstractModel}, u, p, t) wh
 end
 
 """
-    get_input_state_jacobian(models::NTuple{N,AbstractModel}, u, p, t) where N
+    get_coupling_state_jacobian(models::NTuple{N,AbstractModel}, u, p, t) where N
 
 Calculate the jacobian of the input function with respect to the state variables
 for the specified combination of models.
 """
-get_input_state_jacobian
+get_coupling_state_jacobian
 
-function get_input_state_jacobian(models::TM; kwargs...) where TM
-    return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),
-        inplaceness(TM.parameters...), models; kwargs...)
+function get_coupling_state_jacobian(models::TM; kwargs...) where TM
+    return _get_coupling_state_jacobian(coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_state_jacobian(models::TM, u, p, t; kwargs...) where TM
-    return _get_input_state_jacobian(state_jacobian_type(TM.parameters...),
-        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_coupling_state_jacobian(models::TM, u, p, t; kwargs...) where TM
+    return _get_coupling_state_jacobian(coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # use automatic differentiation if jacobian is not defined
-function get_input_state_jacobian(args...)
+function get_coupling_state_jacobian(args...)
 
     models = args[1:end-3]
     u = args[end-2]
@@ -1166,23 +1339,23 @@ function get_input_state_jacobian(args...)
 end
 
 # dispatch to an in-place function
-function _get_input_state_jacobian(::Any, ::InPlace, models; kwargs...)
+function _get_coupling_state_jacobian(::Any, ::InPlace, models; kwargs...)
     Ny = number_of_inputs(models)
     Nu = number_of_states(models)
     M = zeros(Ny,Nu)
-    return get_input_state_jacobian!(M, models; kwargs...)
+    return get_coupling_state_jacobian!(M, models; kwargs...)
 end
 
 # dispatch to an in-place function
-function _get_input_state_jacobian(::Any, ::InPlace, models, u, p, t; kwargs...)
+function _get_coupling_state_jacobian(::Any, ::InPlace, models, u, p, t; kwargs...)
     Ny = number_of_inputs(models)
     Nu = number_of_states(models)
     M = similar(u, Ny, Nu)
-    return get_input_state_jacobian!(M, models, u, p, t; kwargs...)
+    return get_coupling_state_jacobian!(M, models, u, p, t; kwargs...)
 end
 
 # return an empty matrix
-function _get_input_state_jacobian(::Empty, ::OutOfPlace, models::TM, args...;
+function _get_coupling_state_jacobian(::Empty, ::OutOfPlace, models::TM, args...;
     kwargs...) where TM
 
     Ny = number_of_inputs(TM)
@@ -1191,7 +1364,7 @@ function _get_input_state_jacobian(::Empty, ::OutOfPlace, models::TM, args...;
 end
 
 # return a matrix of zeros
-function _get_input_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...;
+function _get_coupling_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...;
     kwargs...) where TM
 
     Ny = number_of_inputs(TM)
@@ -1200,44 +1373,44 @@ function _get_input_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...;
     return zeros(SMatrix{Ny, Nu, Float64})
 end
 
-# dispatch to the `get_input_state_jacobian` function without arguments
-function _get_input_state_jacobian(::Constant, ::OutOfPlace, models, u, p, t; kwargs...)
-    return get_input_state_jacobian(models; kwargs...)
+# dispatch to the `get_coupling_state_jacobian` function without arguments
+function _get_coupling_state_jacobian(::Constant, ::OutOfPlace, models, u, p, t; kwargs...)
+    return get_coupling_state_jacobian(models; kwargs...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_state_jacobian(::Constant, ::OutOfPlace,
+function _get_coupling_state_jacobian(::Constant, ::OutOfPlace,
     models::NTuple{N,AbstractModel}; kwargs...) where N
 
-    return get_input_state_jacobian(models...; kwargs...)
+    return get_coupling_state_jacobian(models...; kwargs...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
+function _get_coupling_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
-    return get_input_state_jacobian(models..., u, p, t; kwargs...)
+    return get_coupling_state_jacobian(models..., u, p, t; kwargs...)
 end
 
 """
-    get_input_state_jacobian!(J, models, u, p, t)
+    get_coupling_state_jacobian!(J, models, u, p, t)
 
-In-place version of [`get_input_state_jacobian`](@ref)
+In-place version of [`get_coupling_state_jacobian`](@ref)
 """
-get_input_state_jacobian!
+get_coupling_state_jacobian!
 
-function get_input_state_jacobian!(Jy, models::TM; kwargs...) where TM
-    return _get_input_state_jacobian!(Jy, state_jacobian_type(TM.parameters...),
-        inplaceness(TM.parameters...), models; kwargs...)
+function get_coupling_state_jacobian!(Jy, models::TM; kwargs...) where TM
+    return _get_coupling_state_jacobian!(Jy, coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models; kwargs...)
 end
 
-function get_input_state_jacobian!(Jy, models::TM, u, p, t; kwargs...) where TM
-    return _get_input_state_jacobian!(Jy, state_jacobian_type(TM.parameters...),
-        inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_coupling_state_jacobian!(Jy, models::TM, u, p, t; kwargs...) where TM
+    return _get_coupling_state_jacobian!(Jy, coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
 end
 
 # use automatic differentiation if jacobian is not defined
-function get_input_state_jacobian!(Jy, args...)
+function get_coupling_state_jacobian!(Jy, args...)
 
     models = args[1:end-3]
     u = args[end-2]
@@ -1250,39 +1423,39 @@ function get_input_state_jacobian!(Jy, args...)
 end
 
 # dispatch to an out-of-place function
-function _get_input_state_jacobian!(Jy, ::Any, ::OutOfPlace, models, args...; kwargs...)
-    return Jy .= get_input_state_jacobian(models, args...; kwargs...)
+function _get_coupling_state_jacobian!(Jy, ::Any, ::OutOfPlace, models, args...; kwargs...)
+    return Jy .= get_coupling_state_jacobian(models, args...; kwargs...)
 end
 
 # return an empty matrix
-function _get_input_state_jacobian!(Jy, ::Empty, ::InPlace, models, args...; kwargs...)
+function _get_coupling_state_jacobian!(Jy, ::Empty, ::InPlace, models, args...; kwargs...)
     return Jy
 end
 
 # return a matrix of zeros
-function _get_input_state_jacobian!(Jy, ::Zeros, ::InPlace, models, args...; kwargs...)
+function _get_coupling_state_jacobian!(Jy, ::Zeros, ::InPlace, models, args...; kwargs...)
     return Jy .= 0
 end
 
-# dispatch to `get_input_state_jacobian!` without arguments
-function _get_input_state_jacobian!(Jy, ::Constant, ::InPlace, models, u, p, t; kwargs...)
-    return get_input_state_jacobian!(Jy, models; kwargs...)
+# dispatch to `get_coupling_state_jacobian!` without arguments
+function _get_coupling_state_jacobian!(Jy, ::Constant, ::InPlace, models, u, p, t; kwargs...)
+    return get_coupling_state_jacobian!(Jy, models; kwargs...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_state_jacobian!(Jy, ::Constant, ::InPlace,
+function _get_coupling_state_jacobian!(Jy, ::Constant, ::InPlace,
     models::NTuple{N,AbstractModel}; kwargs...) where N
 
-    get_input_state_jacobian!(Jy, models...; kwargs...)
+    get_coupling_state_jacobian!(Jy, models...; kwargs...)
 
     return Jy
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_input_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
+function _get_coupling_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
     models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
 
-    get_input_state_jacobian!(Jy, models..., u, p, t; kwargs...)
+    get_coupling_state_jacobian!(Jy, models..., u, p, t; kwargs...)
 
     return Jy
 end
@@ -1713,4 +1886,46 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
 
     # construct and return an ODEFunction
     return ODEFunction{true}(f; mass_matrix, jac)
+end
+
+# plotting recipes
+@recipe function f(models::AbstractModel, x, p, t) where N
+
+    Np = number_of_parameters(models)
+    Ny = number_of_inputs(models)
+
+    ip = 1:Np
+    iy = Np+1:Np+Ny
+
+    return models..., x, p[iy], p[ip], t
+end
+
+@recipe function f(models::NTuple{N,AbstractModel}, x, p, t) where N
+
+    y = get_inputs(models, x, p, t)
+
+    return models..., x, y, p, t
+end
+
+@recipe function f(models::NTuple{N,AbstractModel}, sol) where N
+
+    it = sol.tslocation
+
+    x = sol.u[it]
+    p = sol.prob.p
+    t = sol.t[it]
+
+    y = get_inputs(models, x, p, t)
+
+    return models..., x, y, p, t
+end
+
+@recipe function f(models::NTuple{N,AbstractModel}, sol, t) where N
+
+    x = sol(t)
+    p = sol.prob.p
+
+    y = get_inputs(models, x, p, t)
+
+    return models..., x, y, p, t
 end

@@ -1,19 +1,17 @@
 """
-    Trim{N,TI} <: AbstractModel
+    Trim{N} <: AbstractModel
 
-Trimmed aircraft controller model with up to six state variables and inputs.
-State variables for this model correspond to the control inputs which are used
-to trim the aircraft.  Inputs for this model correspond to the subset of the
-total forces and moments ``F_x, F_y, F_z, M_x, M_y, M_z`` which are trimmed by
-this model.
+Trimmed aircraft controller model with state variables corresponding to control
+inputs which are used to trim the aircraft and inputs corresponding to the total
+forces and moments on the aircraft ``F_x, F_y, F_z, M_x, M_y, M_z``.
 """
-struct Trim{N,TI} <: AbstractModel
-    state_indices::NTuple{N,TI}
-    force_indices::NTuple{N,TI}
+struct Trim{N} <: AbstractModel
+    state_indices::NTuple{N,Int}
+    force_indices::NTuple{N,Int}
 end
 
 """
-    Trim(state_indices::NTuple{N,TI}, force_indices::NTuple{N,TI})
+    Trim(state_indices::NTuple{N}, force_indices::NTuple{N})
 
 Initialize an object of type [`Trim`](@ref). Use the state variables
 corresponding to `state_indices` to trim the forces/moments corresponding to
@@ -25,8 +23,8 @@ Trim() = Trim((1,2,3,4,5,6), (1,2,3,4,5,6))
 
 # --- Traits --- #
 
-number_of_states(::Type{Trim{N,TI}}) where {N,TI} = N
-number_of_inputs(::Type{Trim{N,TI}}) where {N,TI} = N
+number_of_states(::Type{Trim{N}}) where N = N
+number_of_inputs(::Type{Trim{N}}) where N = N
 number_of_parameters(::Type{<:Trim}) = 0
 inplaceness(::Type{<:Trim}) = OutOfPlace()
 mass_matrix_type(::Type{<:Trim}) = Zeros()
@@ -40,3 +38,32 @@ get_rates(::Trim, x, y, p, t) = y
 # --- Unit Testing Methods --- #
 
 get_lhs(::Trim, dx, x, y, p, t) = zero(y)
+
+# --- Convenience Methods --- #
+
+# --- Convenience Methods --- #
+
+set_states!(x, model::Trim; delta) = x .= delta
+
+function set_inputs!(y, model::Trim; Fx, Fy, Fz, Mx, My, Mz)
+
+    y[1] = Fx
+    y[2] = Fy
+    y[3] = Fz
+    y[4] = Mx
+    y[5] = My
+    y[6] = Mz
+
+    return y
+end
+
+set_parameters!(p, model::Trim) = p
+
+separate_states(model::Trim, x) = (delta = x,)
+
+function separate_inputs(model::Trim, y)
+
+    return (Fx = y[1], Fy = y[2], Fz = y[3], Mx = y[4], My = y[5], Mz = y[6])
+end
+
+separate_parameters(model::Trim, p) = ()

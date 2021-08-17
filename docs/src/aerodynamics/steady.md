@@ -27,10 +27,5 @@ Steady
 Steady()
 ```
 
-## Example Initialization
-
-```@example steady
-using AerostructuralDynamics #hide
-model = Steady()
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)

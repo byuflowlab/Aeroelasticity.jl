@@ -10,10 +10,10 @@ couple_models(aero::Wagner, stru::TypicalSection) = (aero, stru)
 
 # --- traits --- #
 
-inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Linear()
-state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
-number_of_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 2
+number_of_additional_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 2
+coupling_inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Linear()
+coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
 
 # --- methods --- #
 
@@ -35,7 +35,7 @@ function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     return SVector(u, v, ω, L, M)
 end
 
-function get_input_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
+function get_coupling_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # calculate loads
@@ -52,7 +52,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
+function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
@@ -79,7 +79,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
+function get_inputs_using_state_rates(aero::Wagner, stru::TypicalSection,
     ds, s, p, t)
     # extract state rates
     dλ1, dλ2, dh, dθ, dhdot, dθdot = ds
@@ -93,4 +93,41 @@ function get_inputs_from_state_rates(aero::Wagner, stru::TypicalSection,
     L, M = wagner_rate_loads(a, b, ρ, vdot, ωdot)
     # return inputs
     return SVector(0, 0, 0, L, M)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::Wagner, stru::TypicalSection; U, rho)
+
+    padd[1] = U
+    padd[2] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::Wagner, stru::TypicalSection, padd)
+
+    return (U = padd[1], rho = padd[2])
+end
+
+# --- Plotting --- #
+
+@recipe function f(aero::Wagner, stru::TypicalSection, x, y, p, t)
+
+    framestyle --> :origin
+    grid --> false
+    xlims --> (-1.0, 1.0)
+    ylims --> (-1.5, 1.5)
+    label --> @sprintf("t = %6.3f", t)
+
+    # extract state variables
+    λ1, λ2, h, θ, hdot, θdot = x
+
+    # extract parameters
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+
+    xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
+    yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]
+
+    return xplot, yplot
 end

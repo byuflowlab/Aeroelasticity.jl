@@ -234,6 +234,87 @@ function get_lhs(model::LiftingLineFlaps, du, u, y, p, t)
     return vcat(get_lhs.(models, dus, us, ys, ps, t)...)
 end
 
+
+# --- Convenience Methods --- #
+
+function set_states!(x, model::LiftingLineFlaps; section_states)
+
+    section_models = model.models
+
+    section_indices = state_indices(section_models)
+
+    vxs = view.(Ref(x), section_indices)
+
+    bfn! = (x, model, states) -> set_states!(x, model; states...)
+
+    bfn!.(vxs, section_models, section_states)
+
+    return x
+end
+
+function set_inputs!(y, model::LiftingLineFlaps; section_inputs)
+
+    section_models = model.models
+
+    section_indices = input_indices(section_models)
+
+    vys = view.(Ref(y), section_indices)
+
+    bfn! = (y, model, inputs) -> set_inputs!(y, model; inputs...)
+
+    bfn!.(vys, section_models, section_inputs)
+
+    return y
+end
+
+function set_parameters!(p, model::LiftingLineFlaps; section_parameters)
+
+    section_models = model.models
+
+    section_indices = parameter_indices(section_models)
+
+    vps = view.(Ref(p), section_indices)
+
+    bfn! = (p, model, parameters) -> set_parameters!(p, model; parameters...)
+
+    bfn!.(vps, section_models, section_parameters)
+
+    return p
+end
+
+function separate_states(model::LiftingLineFlaps, x)
+
+    section_models = model.models
+
+    section_indices = state_indices(section_models)
+
+    vxs = view.(Ref(x), section_indices)
+
+    return (section_states = separate_states.(section_models, vxs),)
+end
+
+function separate_inputs(model::LiftingLineFlaps, y)
+
+    section_models = model.models
+
+    section_indices = input_indices(section_models)
+
+    vys = view.(Ref(y), section_indices)
+
+    return (section_inputs = separate_inputs.(section_models, vys),)
+end
+
+function separate_parameters(model::LiftingLineFlaps, p)
+
+    section_models = model.models
+
+    section_indices = parameter_indices(section_models)
+
+    vps = view.(Ref(p), section_indices)
+
+    return (section_parameters = separate_parameters.(section_models, vps),)
+end
+
 # --- Internal Methods --- #
 
 function input_jacobian_product!(y, x, model::LiftingLineFlaps)

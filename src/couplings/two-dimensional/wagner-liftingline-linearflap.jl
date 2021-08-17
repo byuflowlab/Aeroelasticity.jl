@@ -17,28 +17,28 @@ end
 
 # --- traits --- #
 
-function inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection},
+function number_of_additional_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection},
+    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
+
+    return 1
+end
+
+function coupling_inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return OutOfPlace()
 end
 
-function mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
+function coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Linear()
 end
 
-function state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
+function coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
 
     return Nonlinear()
-end
-
-function number_of_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
-
-    return 1
 end
 
 # --- methods --- #
@@ -69,7 +69,7 @@ function get_inputs(aero::Wagner, stru::LiftingLineSection,
     return SVector(u, v, ω, f..., m...)
 end
 
-function get_input_mass_matrix(aero::Wagner, stru::LiftingLineSection,
+function get_coupling_mass_matrix(aero::Wagner, stru::LiftingLineSection,
     flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
@@ -95,7 +95,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection,
+function get_coupling_state_jacobian(aero::Wagner, stru::LiftingLineSection,
     flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
@@ -141,7 +141,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Wagner, stru::LiftingLineSection,
+function get_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
     flap::LinearFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
     # extract state rates
     dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx
@@ -157,4 +157,20 @@ function get_inputs_from_state_rates(aero::Wagner, stru::LiftingLineSection,
     m = SVector(0, M, 0)
     # return inputs
     return SVector(0, 0, 0, f..., m...)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::Wagner, stru::LiftingLineSection,
+    flap::LinearFlap, ctrl::LiftingLineSectionControl; rho)
+
+    padd[1] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::Wagner, stru::LiftingLineSection,
+    flap::LinearFlap, ctrl::LiftingLineSectionControl, padd)
+
+    return (rho = padd[1],)
 end

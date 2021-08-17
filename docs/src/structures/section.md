@@ -26,10 +26,5 @@ TypicalSection
 TypicalSection()
 ```
 
-## Example Initialization
-
-```@example section
-using AerostructuralDynamics #hide
-model = TypicalSection()
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)

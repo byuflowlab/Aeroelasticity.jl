@@ -27,10 +27,5 @@ QuasiSteady
 QuasiSteady()
 ```
 
-## Example Initialization
-
-```@example steady
-using AerostructuralDynamics #hide
-model = QuasiSteady()
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)

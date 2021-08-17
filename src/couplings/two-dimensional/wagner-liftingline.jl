@@ -10,10 +10,10 @@ couple_models(aero::Wagner, stru::LiftingLineSection) = (aero, stru)
 
 # --- traits --- #
 
-inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Linear()
-state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Nonlinear()
-number_of_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection}) = 1
+number_of_additional_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection}) = 1
+coupling_inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Linear()
+coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Nonlinear()
 
 # --- methods --- #
 
@@ -38,7 +38,7 @@ function get_inputs(aero::Wagner, stru::LiftingLineSection, s, p, t)
     return vcat(u, v, ω, f, m)
 end
 
-function get_input_mass_matrix(aero::Wagner, stru::LiftingLineSection, s, p, t)
+function get_coupling_mass_matrix(aero::Wagner, stru::LiftingLineSection, s, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
     # extract parameters
@@ -59,7 +59,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Wagner, stru::LiftingLineSection, s, p, t)
+function get_coupling_state_jacobian(aero::Wagner, stru::LiftingLineSection, s, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
     # extract parameters
@@ -92,7 +92,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Wagner, stru::LiftingLineSection,
+function get_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
     ds, s, p, t)
     # extract state rates
     dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz = ds
@@ -108,4 +108,18 @@ function get_inputs_from_state_rates(aero::Wagner, stru::LiftingLineSection,
     m = SVector(0, M, 0)
     # return inputs
     return vcat(0, 0, 0, f, m)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::Wagner, stru::LiftingLineSection; rho)
+
+    padd[1] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::Wagner, stru::LiftingLineSection, padd)
+
+    return (rho = padd[1],)
 end

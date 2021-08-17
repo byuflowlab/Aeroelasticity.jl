@@ -10,10 +10,10 @@ couple_models(aero::Peters, stru::LiftingLineSection) = (aero, stru)
 
 # --- traits --- #
 
-inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection}) = OutOfPlace()
-mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Linear()
-state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Nonlinear()
-number_of_parameters(::Type{<:Peters}, ::Type{LiftingLineSection}) = 1
+number_of_additional_parameters(::Type{<:Peters}, ::Type{LiftingLineSection}) = 1
+coupling_inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Linear()
+coupling_state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Nonlinear()
 
 # --- methods --- #
 
@@ -39,7 +39,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     return vcat(u, ω, 0, 0, f, m)
 end
 
-function get_input_mass_matrix(aero::Peters{N,TF,SV,SA},
+function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA},
     stru::LiftingLineSection, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, ρ = p
@@ -63,7 +63,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::Peters{N,TF,SV,SA},
+function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
     stru::LiftingLineSection, s, p, t) where {N,TF,SV,SA}
     # extract state variables
     λ = s[SVector{N}(1:N)]
@@ -96,7 +96,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA},
+function get_inputs_using_state_rates(aero::Peters{N,TF,SV,SA},
     stru::LiftingLineSection, ds, s, p, t) where {N,TF,SV,SA}
     # extract state rates
     dλ = ds[SVector{N}(1:N)]
@@ -113,4 +113,18 @@ function get_inputs_from_state_rates(aero::Peters{N,TF,SV,SA},
     m = SVector(0, M, 0)
     # return inputs
     return vcat(0, 0, vdot, ωdot, f, m)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::Peters, stru::LiftingLineSection; rho)
+
+    padd[1] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::Peters, stru::LiftingLineSection, padd)
+
+    return (rho = padd[1],)
 end

@@ -34,6 +34,23 @@ QuasiSteady() = QuasiSteady{2}()
 
 number_of_parameters(::Type{<:QuasiSteady}) = 4
 
+# --- Convenience Methods --- #
+
+function set_parameters!(p, model::QuasiSteady; a, b, a0, alpha0)
+
+    p[1] = a
+    p[2] = b
+    p[3] = a0
+    p[4] = alpha0
+
+    return p
+end
+
+function separate_parameters(model::QuasiSteady, p)
+
+    return (a=p[1], b=p[2], a0=p[3], alpha0=p[4])
+end
+
 # --- Internal Methods --- #
 
 # steady state loads

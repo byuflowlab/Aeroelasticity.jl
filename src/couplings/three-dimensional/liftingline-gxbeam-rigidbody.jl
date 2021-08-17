@@ -18,44 +18,44 @@ couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody) = (aero, stru, dyn)
 
 # --- traits --- #
 
-inplaceness(::Type{<:LiftingLine}, ::Type{<:GEBT}, ::Type{<:RigidBody}) = InPlace()
+function number_of_additional_parameters(aero::LiftingLine, stru::GEBT, dyn::RigidBody)
+    return 1 + 6*length(stru.icol_point) + 6*length(stru.icol_elem)
+end
 
-function mass_matrix_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}, ::Type{<:RigidBody}) where {NA,TA}
+coupling_inplaceness(::Type{<:LiftingLine}, ::Type{<:GEBT}, ::Type{<:RigidBody}) = InPlace()
+
+function coupling_mass_matrix_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}, ::Type{<:RigidBody}) where {NA,TA}
     model_types = TA.parameters
-    if all(isempty.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+    if all(isempty.(coupling_mass_matrix_type.(model_types, Ref(LiftingLineSection))))
         return Empty()
-    elseif all(iszero.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(iszero.(coupling_mass_matrix_type.(model_types, Ref(LiftingLineSection))))
         return Zeros()
-    elseif all(isidentity.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(isidentity.(coupling_mass_matrix_type.(model_types, Ref(LiftingLineSection))))
         return Identity()
-    elseif all(isconstant.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(isconstant.(coupling_mass_matrix_type.(model_types, Ref(LiftingLineSection))))
         return Constant()
-    elseif all(islinear.(mass_matrix_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(islinear.(coupling_mass_matrix_type.(model_types, Ref(LiftingLineSection))))
         return Linear()
     else
         return Nonlinear()
     end
 end
 
-function state_jacobian_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}, ::Type{<:RigidBody}) where {NA,TA}
+function coupling_state_jacobian_type(::Type{LiftingLine{NA,TA}}, ::Type{<:GEBT}, ::Type{<:RigidBody}) where {NA,TA}
     model_types = TA.parameters
-    if all(isempty.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+    if all(isempty.(coupling_state_jacobian_type.(model_types, Ref(LiftingLineSection))))
         return Empty()
-    elseif all(iszero.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(iszero.(coupling_state_jacobian_type.(model_types, Ref(LiftingLineSection))))
         return Zeros()
-    elseif all(isidentity.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(isidentity.(coupling_state_jacobian_type.(model_types, Ref(LiftingLineSection))))
         return Identity()
-    elseif all(isconstant.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(isconstant.(coupling_state_jacobian_type.(model_types, Ref(LiftingLineSection))))
         return Constant()
-    elseif all(islinear.(state_jacobian_type.(model_types, Ref(LiftingLineSection))))
+    elseif all(islinear.(coupling_state_jacobian_type.(model_types, Ref(LiftingLineSection))))
         return Linear()
     else
         return Nonlinear()
     end
-end
-
-function number_of_parameters(aero::LiftingLine, stru::GEBT, dyn::RigidBody)
-    return 1 + 6*length(stru.icol_pt) + 6*length(stru.icol_beam)
 end
 
 # --- methods --- #
@@ -72,7 +72,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, dyn::RigidBody, u,
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     nps = number_of_parameters(stru) # number of structural parameters
     npd = number_of_parameters(dyn) # number of rigid body parameters
-    npadd = number_of_parameters(aero, stru, dyn) # number of additional parameters
+    npadd = number_of_additional_parameters(aero, stru, dyn) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -105,8 +105,8 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, dyn::RigidBody, u,
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
     # number of points and elements
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
+    npoint = length(stru.icol_point)
+    nelem = length(stru.icol_elem)
 
     # rigid body states
     xr, yr, zr, ϕr, θr, ψr, ur, vr, wr, pr, qr, rr = ud
@@ -146,15 +146,15 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, dyn::RigidBody, u,
         # point location
         point = assembly.points[ip]
         # is prescribed condition a force?
-        isforce = stru.isforce[ip]
+        prescribed_forces = SVector{6}(view(stru.displacement, :, ip)) .== false
         # point loads
         poff = 1 + 6*(ip-1)
-        F1 = ifelse(isforce[1], padd[poff+1], zero(padd[poff+1]))
-        F2 = ifelse(isforce[2], padd[poff+2], zero(padd[poff+2]))
-        F3 = ifelse(isforce[3], padd[poff+3], zero(padd[poff+3]))
-        M1 = ifelse(isforce[4], padd[poff+4], zero(padd[poff+4]))
-        M2 = ifelse(isforce[5], padd[poff+5], zero(padd[poff+5]))
-        M3 = ifelse(isforce[6], padd[poff+6], zero(padd[poff+6]))
+        F1 = ifelse(prescribed_forces[1], padd[poff+1], zero(padd[poff+1]))
+        F2 = ifelse(prescribed_forces[2], padd[poff+2], zero(padd[poff+2]))
+        F3 = ifelse(prescribed_forces[3], padd[poff+3], zero(padd[poff+3]))
+        M1 = ifelse(prescribed_forces[4], padd[poff+4], zero(padd[poff+4]))
+        M2 = ifelse(prescribed_forces[5], padd[poff+5], zero(padd[poff+5]))
+        M3 = ifelse(prescribed_forces[6], padd[poff+6], zero(padd[poff+6]))
         Fp = SVector(F1, F2, F3)
         Mp = SVector(M1, M2, M3)
         Ftot += Fp
@@ -177,7 +177,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, dyn::RigidBody, u,
         Npsi = number_of_parameters(section_stru)
 
         # section properties
-        icol = stru.icol_beam[i]
+        icol = stru.icol_elem[i]
         element = assembly.elements[i]
 
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement
@@ -282,7 +282,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, dyn::RigidBody, u,
     return y
 end
 
-function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
+function get_coupling_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
     dyn::RigidBody, u, p, t) where {NA,TA}
 
     # start with zero valued mass matrix
@@ -298,7 +298,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     nps = number_of_parameters(stru) # number of structural parameters
     npd = number_of_parameters(dyn) # number of rigid body parameters
-    npadd = number_of_parameters(aero, stru, dyn) # number of additional parameters
+    npadd = number_of_additional_parameters(aero, stru, dyn) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -327,8 +327,8 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
     # number of points and elements
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
+    npoint = length(stru.icol_point)
+    nelem = length(stru.icol_elem)
 
     # rigid body states
     xr, yr, zr, ϕr, θr, ψr, ur, vr, wr, pr, qr, rr = ud
@@ -365,7 +365,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
         Npsi = number_of_parameters(section_stru)
 
         # structural state variables
-        icol = stru.icol_beam[i]
+        icol = stru.icol_elem[i]
         element = assembly.elements[i]
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement
         θ_elem = SVector(us[icol+3], us[icol+4], us[icol+5]) # angular displacement
@@ -426,7 +426,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
         pi = vcat(pai, psi)
 
         # section input mass matrix
-        Myi = get_input_mass_matrix(section_models, ui, pi, t)
+        Myi = get_coupling_mass_matrix(section_models, ui, pi, t)
 
         # separate into component mass matrices
         yai_duai = SMatrix{Nyai,Nuai}(view(Myi, 1:Nyai, 1:Nuai))
@@ -454,7 +454,7 @@ function get_input_mass_matrix!(My, aero::LiftingLine{NA,TA}, stru::GEBT,
         m_dHi = m_dvi * dvi_dHi + m_dωi * dωi_dHi
 
         # save aerodynamic input mass matrix entries
-        icol = stru.icol_beam[i]
+        icol = stru.icol_elem[i]
         My[iya[iyas[i]], iua[iuas[i]]] = yai_duai
         My[iya[iyas[i]], ius[icol+12:icol+14]] = yai_dPi
         My[iya[iyas[i]], ius[icol+15:icol+17]] = yai_dHi
@@ -519,7 +519,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
+function get_inputs_using_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
     dyn::RigidBody, du, u, p, t) where {NA,TA}
 
     # initialize input vector
@@ -538,7 +538,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
     npa = number_of_parameters(aero) # number of aerodynamic parameters
     nps = number_of_parameters(stru) # number of structural parameters
     npd = number_of_parameters(dyn) # number of rigid body parameters
-    npadd = number_of_parameters(aero, stru, dyn) # number of additional parameters
+    npadd = number_of_additional_parameters(aero, stru, dyn) # number of additional parameters
 
     # get indices for state variables, inputs, and parameters
     iua = 1:nua # indices of aerodynamic states
@@ -575,8 +575,8 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
     pas = view.(Ref(pa), ipas) # aerodynamic parameters for each section
 
     # number of points and elements
-    npoint = length(stru.icol_pt)
-    nelem = length(stru.icol_beam)
+    npoint = length(stru.icol_point)
+    nelem = length(stru.icol_elem)
 
     # rigid body states
     xr, yr, zr, ϕr, θr, ψr, ur, vr, wr, pr, qr, rr = ud
@@ -618,7 +618,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
         Npsi = number_of_parameters(section_stru)
 
         # structural state variables
-        icol = stru.icol_beam[i]
+        icol = stru.icol_elem[i]
         element = assembly.elements[i]
         u_elem = SVector(us[icol], us[icol+1], us[icol+2]) # linear displacement
         θ_elem = SVector(us[icol+3], us[icol+4], us[icol+5]) # angular displacement
@@ -682,7 +682,7 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
         psi = SVector(ρ) # structural parameters
         pi = vcat(pai, psi)
 
-        yi = get_inputs_from_state_rates(section_models, dui, ui, pi, t)
+        yi = get_inputs_using_state_rates(section_models, dui, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)
@@ -730,4 +730,50 @@ function get_inputs_from_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
     y[iyd[11:13]] = Mtot
 
     return y
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, model::LiftingLine, stru::GEBT,
+    dyn::RigidBody; rho, point_conditions, element_loads)
+
+    np = length(stru.icol_point)
+    ne = length(stru.icol_elem)
+
+    padd[1] = rho
+
+    for ip = 1:np
+        padd[1+6*(ip-1)+1] = point_conditions[6*(ip-1)+1]
+        padd[1+6*(ip-1)+2] = point_conditions[6*(ip-1)+2]
+        padd[1+6*(ip-1)+3] = point_conditions[6*(ip-1)+3]
+        padd[1+6*(ip-1)+4] = point_conditions[6*(ip-1)+4]
+        padd[1+6*(ip-1)+5] = point_conditions[6*(ip-1)+5]
+        padd[1+6*(ip-1)+6] = point_conditions[6*(ip-1)+6]
+    end
+
+    for ie = 1:ne
+        padd[1+6*np+6*(ie-1)+1] = element_loads[6*(ie-1)+1]
+        padd[1+6*np+6*(ie-1)+2] = element_loads[6*(ie-1)+2]
+        padd[1+6*np+6*(ie-1)+3] = element_loads[6*(ie-1)+3]
+        padd[1+6*np+6*(ie-1)+4] = element_loads[6*(ie-1)+4]
+        padd[1+6*np+6*(ie-1)+5] = element_loads[6*(ie-1)+5]
+        padd[1+6*np+6*(ie-1)+6] = element_loads[6*(ie-1)+6]
+    end
+
+    return padd
+end
+
+function separate_additional_parameters(model::LiftingLine, stru::GEBT,
+    dyn::RigidBody, padd)
+
+    np = length(stru.icol_point)
+    ne = length(stru.icol_elem)
+
+    rho = padd[1]
+
+    point_conditions = reshape(view(padd, 1 + 1 : 1 + 6*np), 6, np)
+
+    element_loads = reshape(view(padd, 1 + 6*np + 1 : 1 + 6*np + 6*ne), 6, ne)
+
+    return (rho = rho, point_conditions = point_conditions, element_loads = element_loads)
 end

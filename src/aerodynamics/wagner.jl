@@ -84,6 +84,44 @@ end
 
 get_lhs(::Wagner, dλ, λ, d, p, t) = dλ
 
+# --- Convenience Methods --- #
+
+set_states!(y, model::Wagner; lambda) = y .= lambda
+
+function set_inputs!(y, model::Wagner; u, v, omega)
+
+    y[1] = u
+    y[2] = v
+    y[3] = omega
+
+    return y
+end
+
+function set_parameters!(p, model::Wagner; a, b, a0, alpha0)
+
+    p[1] = a
+    p[2] = b
+    p[3] = a0
+    p[4] = alpha0
+
+    return p
+end
+
+function separate_states(model::Wagner, x)
+
+    return (lambda = x,)
+end
+
+function separate_inputs(model::Wagner, y)
+
+    return (u=y[1], v=y[2], omega=y[3])
+end
+
+function separate_parameters(model::Wagner, p)
+
+    return (a=p[1], b=p[2], a0=p[3], alpha0=p[4])
+end
+
 # --- Internal Methods --- #
 
 function wagner_rates(a, b, α0, C1, C2, ε1, ε2, u, v, ω, λ1, λ2)

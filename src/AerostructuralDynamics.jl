@@ -7,6 +7,8 @@ using LinearAlgebra
 using LinearMaps
 using StaticArrays
 using DiffEqBase
+using RecipesBase
+using Printf
 
 # Models
 export Steady
@@ -29,15 +31,20 @@ export number_of_parameters
 export state_indices
 export input_indices
 export parameter_indices
-export set_states
-export set_inputs
-export set_parameters
+export get_states, set_states!
+export get_inputs, set_inputs!
+export get_parameters, set_parameters!
+export get_additional_parameters, set_additional_parameters!
+export separate_states
+export separate_inputs
+export separate_parameters
 export get_inputs, get_inputs!
 export get_rates, get_rates!
 export get_mass_matrix, get_mass_matrix!
 export get_state_jacobian, get_state_jacobian!
 export get_eigen
 export get_ode
+export correlate_eigenmodes
 
 # needed for traits
 import Base.isempty
@@ -46,6 +53,7 @@ import Base.iszero
 # Interface Functions
 include("traits.jl")
 include("interface.jl")
+include("mode-tracking.jl")
 
 # Two-Dimensional Models
 

@@ -10,20 +10,20 @@ couple_models(aero::QuasiSteady, stru::LiftingLineSection) = (aero, stru)
 
 # --- traits --- #
 
-inplaceness(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = OutOfPlace()
-mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Zeros()
-state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Nonlinear()
-number_of_parameters(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = 1
+number_of_additional_parameters(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = 1
+coupling_inplaceness(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Zeros()
+coupling_state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Nonlinear()
 
-inplaceness(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = OutOfPlace()
-mass_matrix_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Zeros()
-state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Nonlinear()
-number_of_parameters(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = 1
+number_of_additional_parameters(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = 1
+coupling_inplaceness(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Zeros()
+coupling_state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Nonlinear()
 
-inplaceness(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = OutOfPlace()
-mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Linear()
-state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Nonlinear()
-number_of_parameters(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = 1
+number_of_additional_parameters(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = 1
+coupling_inplaceness(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Linear()
+coupling_state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Nonlinear()
 
 # --- methods --- #
 
@@ -80,7 +80,7 @@ function get_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection, s, p, t)
     return vcat(f, m)
 end
 
-function get_input_mass_matrix(aero::QuasiSteady{2}, stru::LiftingLineSection,
+function get_coupling_mass_matrix(aero::QuasiSteady{2}, stru::LiftingLineSection,
     s, p, t)
     # extract parameters
     a, b, a0, α0, ρ = p
@@ -95,7 +95,7 @@ end
 
 # --- performance overloads --- #
 
-function get_input_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection, s, p, t)
+function get_coupling_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection, s, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz = s
     # extract parameters
@@ -111,7 +111,7 @@ function get_input_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection
         M_u 0 M_v 0 0 0; 0 0 0 0 0 0]
 end
 
-function get_input_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection,
+function get_coupling_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection,
     s, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz = s
@@ -130,7 +130,7 @@ function get_input_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection
         0 0 0 0 0 0; M_u 0 M_v 0 M_ω 0; 0 0 0 0 0 0]
 end
 
-function get_input_state_jacobian(aero::QuasiSteady{2}, stru::LiftingLineSection,
+function get_coupling_state_jacobian(aero::QuasiSteady{2}, stru::LiftingLineSection,
     s, p, t)
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz = s
@@ -151,19 +151,19 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_from_state_rates(aero::QuasiSteady{0}, stru::LiftingLineSection,
+function get_inputs_using_state_rates(aero::QuasiSteady{0}, stru::LiftingLineSection,
     ds, s, p, t)
 
     return @SVector zeros(6)
 end
 
-function get_inputs_from_state_rates(aero::QuasiSteady{1}, stru::LiftingLineSection,
+function get_inputs_using_state_rates(aero::QuasiSteady{1}, stru::LiftingLineSection,
     ds, s, p, t)
 
     return @SVector zeros(6)
 end
 
-function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSection,
+function get_inputs_using_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSection,
     ds, s, p, t)
     # extract state rates
     dvx, dvy, dvz, dωx, dωy, dωz = ds
@@ -180,4 +180,18 @@ function get_inputs_from_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSect
     m = SVector(0, M, 0)
     # return inputs
     return vcat(f, m)
+end
+
+# --- convenience methods --- #
+
+function set_additional_parameters!(padd, aero::QuasiSteady, stru::LiftingLineSection; rho)
+
+    padd[1] = rho
+
+    return padd
+end
+
+function separate_additional_parameters(aero::QuasiSteady, stru::LiftingLineSection, padd)
+
+    return (rho = padd[1],)
 end

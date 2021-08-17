@@ -13,31 +13,32 @@ function has_mass_matrix(model)
     return !(empty_matrix || identity_matrix)
 end
 
-function has_input_mass_matrix(models...)
-    input_matrix_type = AerostructuralDynamics.mass_matrix_type(typeof.(models)...)
-    zero_matrix = AerostructuralDynamics.iszero(input_matrix_type)
+function has_coupling_mass_matrix(models...)
+    coupling_matrix_type = AerostructuralDynamics.coupling_mass_matrix_type(typeof.(models)...)
+    zero_matrix = AerostructuralDynamics.iszero(coupling_matrix_type)
     return !zero_matrix
 end
 
 function run_model_tests(model;
-    du = rand(number_of_states(model)),
-    u = rand(number_of_states(model)),
+    dx = rand(number_of_states(model)),
+    x = rand(number_of_states(model)),
     y = rand(number_of_inputs(model)),
     p = rand(number_of_parameters(model)),
     t = rand(),
     atol = sqrt(eps()),
     norm = (x)->norm(x, Inf),
-    test_mass_matrix = has_mass_matrix(model))
+    test_mass_matrix = has_mass_matrix(model),
+    test_convenience_functions = true)
 
     # state jacobian test
-    fu = (u) -> get_rates(model, u, y, p, t)
-    J = get_state_jacobian(model, u, y, p, t)
-    J_fd = ForwardDiff.jacobian(fu, u)
+    fu = (x) -> get_rates(model, x, y, p, t)
+    J = get_state_jacobian(model, x, y, p, t)
+    J_fd = ForwardDiff.jacobian(fu, x)
     @test isapprox(J, J_fd; atol, norm)
 
     # input jacobian test
-    fy = (y) -> get_rates(model, u, y, p, t)
-    Jy = AD.get_input_jacobian(model, u, y, p, t)
+    fy = (y) -> get_rates(model, x, y, p, t)
+    Jy = AD.get_input_jacobian(model, x, y, p, t)
     Jy_fd = ForwardDiff.jacobian(fy, y)
     @test isapprox(Array(Jy), Jy_fd; atol, norm)
 
@@ -45,166 +46,183 @@ function run_model_tests(model;
     if test_mass_matrix
 
         # mass matrix test
-        fdu = (du) -> AD.get_lhs(model, du, u, y, p, t)
-        M = get_mass_matrix(model, u, y, p, t)
-        M_fd = ForwardDiff.jacobian(fdu, similar(u))
+        fdu = (dx) -> AD.get_lhs(model, dx, x, y, p, t)
+        M = get_mass_matrix(model, x, y, p, t)
+        M_fd = ForwardDiff.jacobian(fdu, similar(x))
         @test isapprox(M, M_fd; atol, norm)
 
         # compatability test
-        du = qr(collect(M), Val(true))\get_rates(model, u, y, p, t)
-        lhs = AD.get_lhs(model, du, u, y, p, t)
-        @test isapprox(M*du, lhs; atol, norm)
+        dx = qr(collect(M), Val(true))\get_rates(model, x, y, p, t)
+        lhs = AD.get_lhs(model, dx, x, y, p, t)
+        @test isapprox(M*dx, lhs; atol, norm)
 
+    end
+
+    # convenience function tests
+    if test_convenience_functions
+        states = separate_states(model, x)
+        inputs = separate_inputs(model, y)
+        parameters = separate_parameters(model, p)
+        new_x = get_states(model; states...)
+        new_y = get_inputs(model; inputs...)
+        new_p = get_parameters(model; parameters...)
+        @test isapprox(new_x, x)
+        @test isapprox(new_y, y)
+        @test isapprox(new_p, p)
     end
 
     return nothing
 end
 
 function run_coupling_tests(models...;
-    du = rand(number_of_states(models)),
-    u = rand(number_of_states(models)),
+    dx = rand(number_of_states(models)),
+    x = rand(number_of_states(models)),
     p = rand(number_of_parameters(models)),
     t = rand(),
     atol = sqrt(eps()),
     norm = (x)->norm(x, Inf),
-    test_mass_matrix = has_input_mass_matrix(models...))
+    test_mass_matrix = has_coupling_mass_matrix(models...),
+    test_convenience_functions = true)
 
     # jacobian test
-    fu = (u) -> get_inputs(models, u, p, t)
-    Jy = AD.get_input_state_jacobian(models, u, p, t)
-    Jy_fd = ForwardDiff.jacobian(fu, u)
+    fu = (x) -> get_inputs(models, x, p, t)
+    Jy = AD.get_coupling_state_jacobian(models, x, p, t)
+    Jy_fd = ForwardDiff.jacobian(fu, x)
     @test isapprox(Jy, Jy_fd; atol, norm)
 
     # additional test if state rate contribution is defined
     if test_mass_matrix
-
-        # mass matrix test
-        fdu = (du) -> -AD.get_inputs_from_state_rates(models..., du, u, p, t)
-        My = AD.get_input_mass_matrix(models, u, p, t)
-        My_fd = ForwardDiff.jacobian(fdu, du)
+        fdu = (dx) -> -AD.get_inputs_using_state_rates(models..., dx, x, p, t)
+        My = AD.get_coupling_mass_matrix(models, x, p, t)
+        My_fd = ForwardDiff.jacobian(fdu, dx)
         @test isapprox(My, My_fd; atol, norm)
+    end
 
+    if test_convenience_functions
+        padd = rand(AD.number_of_additional_parameters(models...))
+        parameters = AD.separate_additional_parameters(models..., padd)
+        new_padd = get_additional_parameters(models; parameters...)
+        @test isapprox(new_padd, padd)
     end
 
     return nothing
 end
 
-# --- Two-Dimensional Models --- #
-
-# Aerodynamic Models (2D)
-
-@testset "QuasiSteady" begin
-    # test on its own
-    run_model_tests(QuasiSteady{0}())
-    run_model_tests(QuasiSteady{1}())
-    run_model_tests(QuasiSteady{2}())
-end
-
-@testset "Wagner" begin
-    # test on its own
-    run_model_tests(Wagner())
-end
-
-@testset "Peters' Finite State" begin
-    # test on its own
-    run_model_tests(Peters{4}())
-end
-
-# Structural Models (2D)
-
-@testset "Typical Section" begin
-    # test on its own
-    run_model_tests(TypicalSection())
-end
-
-# Control Surface Models (2D)
-
-@testset "LinearFlap" begin
-    run_model_tests(LinearFlap())
-end
-
-# Controller Models (2D)
-
-# Coupled Models (2D)
-@testset "QuasiSteady + TypicalSection" begin
-    # test coupling with TypicalSection()
-    run_coupling_tests(QuasiSteady{0}(), TypicalSection())
-    run_coupling_tests(QuasiSteady{1}(), TypicalSection())
-    run_coupling_tests(QuasiSteady{2}(), TypicalSection())
-end
-
-@testset "Wagner + TypicalSection" begin
-    # test coupling with TypicalSection()
-    run_coupling_tests(Wagner(), TypicalSection())
-end
-
-@testset "Peters' Finite State + TypicalSection" begin
-    # test coupling with TypicalSection()
-    run_coupling_tests(Peters{4}(), TypicalSection())
-end
-
-@testset "QuasiSteady + TypicalSection + LinearFlap" begin
-    run_coupling_tests(QuasiSteady{0}(), TypicalSection(), LinearFlap())
-    run_coupling_tests(QuasiSteady{1}(), TypicalSection(), LinearFlap())
-    run_coupling_tests(QuasiSteady{2}(), TypicalSection(), LinearFlap())
-end
-
-@testset "Wagner + TypicalSection + LinearFlap" begin
-    run_coupling_tests(Wagner(), TypicalSection(), LinearFlap())
-end
-
-@testset "Peters + TypicalSection + LinearFlap" begin
-    run_coupling_tests(Peters{4}(), TypicalSection(), LinearFlap())
-end
-
-
-@testset "QuasiSteady + LiftingLineSection" begin
-    # test coupling with LiftingLineSection()
-    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection())
-    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection())
-    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection())
-end
-
-@testset "Wagner + LiftingLineSection" begin
-    # test coupling with LiftingLineSection()
-    run_coupling_tests(Wagner(), AD.LiftingLineSection())
-end
-
-@testset "Peters' Finite State + LiftingLineSection" begin
-    # test coupling with LiftingLineSection()
-    run_coupling_tests(Peters{4}(), AD.LiftingLineSection())
-end
-
-@testset "QuasiSteady + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
-    run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-    run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-    run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-end
-
-@testset "Wagner + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
-    run_coupling_tests(Wagner(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-end
-
-@testset "Peters + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
-    run_coupling_tests(Peters{4}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-end
-
-# --- Three Dimensional Models --- #
-
-# Aerodynamic Models (3D)
-
-@testset "Lifting Line" begin
-
-    # number of lifting line sections
-    N = 2
-
-    # test on its own
-    run_model_tests(LiftingLine{N}(QuasiSteady{0}()))
-    run_model_tests(LiftingLine{N}(QuasiSteady{1}()))
-    run_model_tests(LiftingLine{N}(QuasiSteady{2}()))
-    run_model_tests(LiftingLine{N}(Wagner()))
-    run_model_tests(LiftingLine{N}(Peters{4}()))
-end
+# # --- Two-Dimensional Models --- #
+#
+# # Aerodynamic Models (2D)
+#
+# @testset "QuasiSteady" begin
+#     # test on its own
+#     run_model_tests(QuasiSteady{0}())
+#     run_model_tests(QuasiSteady{1}())
+#     run_model_tests(QuasiSteady{2}())
+# end
+#
+# @testset "Wagner" begin
+#     # test on its own
+#     run_model_tests(Wagner())
+# end
+#
+# @testset "Peters' Finite State" begin
+#     # test on its own
+#     run_model_tests(Peters{4}())
+# end
+#
+# # Structural Models (2D)
+#
+# @testset "Typical Section" begin
+#     # test on its own
+#     run_model_tests(TypicalSection())
+# end
+#
+# # Control Surface Models (2D)
+#
+# @testset "LinearFlap" begin
+#     run_model_tests(LinearFlap())
+# end
+#
+# # Controller Models (2D)
+#
+# # Coupled Models (2D)
+# @testset "QuasiSteady + TypicalSection" begin
+#     # test coupling with TypicalSection()
+#     run_coupling_tests(QuasiSteady{0}(), TypicalSection())
+#     run_coupling_tests(QuasiSteady{1}(), TypicalSection())
+#     run_coupling_tests(QuasiSteady{2}(), TypicalSection())
+# end
+#
+# @testset "Wagner + TypicalSection" begin
+#     # test coupling with TypicalSection()
+#     run_coupling_tests(Wagner(), TypicalSection())
+# end
+#
+# @testset "Peters' Finite State + TypicalSection" begin
+#     # test coupling with TypicalSection()
+#     run_coupling_tests(Peters{4}(), TypicalSection())
+# end
+#
+# @testset "QuasiSteady + TypicalSection + LinearFlap" begin
+#     run_coupling_tests(QuasiSteady{0}(), TypicalSection(), LinearFlap())
+#     run_coupling_tests(QuasiSteady{1}(), TypicalSection(), LinearFlap())
+#     run_coupling_tests(QuasiSteady{2}(), TypicalSection(), LinearFlap())
+# end
+#
+# @testset "Wagner + TypicalSection + LinearFlap" begin
+#     run_coupling_tests(Wagner(), TypicalSection(), LinearFlap())
+# end
+#
+# @testset "Peters + TypicalSection + LinearFlap" begin
+#     run_coupling_tests(Peters{4}(), TypicalSection(), LinearFlap())
+# end
+#
+# @testset "QuasiSteady + LiftingLineSection" begin
+#     # test coupling with LiftingLineSection()
+#     run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection())
+#     run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection())
+#     run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection())
+# end
+#
+# @testset "Wagner + LiftingLineSection" begin
+#     # test coupling with LiftingLineSection()
+#     run_coupling_tests(Wagner(), AD.LiftingLineSection())
+# end
+#
+# @testset "Peters' Finite State + LiftingLineSection" begin
+#     # test coupling with LiftingLineSection()
+#     run_coupling_tests(Peters{4}(), AD.LiftingLineSection())
+# end
+#
+# @testset "QuasiSteady + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
+#     run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+#     run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+#     run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+# end
+#
+# @testset "Wagner + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
+#     run_coupling_tests(Wagner(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+# end
+#
+# @testset "Peters + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
+#     run_coupling_tests(Peters{4}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+# end
+#
+# # --- Three Dimensional Models --- #
+#
+# # Aerodynamic Models (3D)
+#
+# @testset "Lifting Line" begin
+#
+#     # number of lifting line sections
+#     N = 2
+#
+#     # test on its own
+#     run_model_tests(LiftingLine{N}(QuasiSteady{0}()))
+#     run_model_tests(LiftingLine{N}(QuasiSteady{1}()))
+#     run_model_tests(LiftingLine{N}(QuasiSteady{2}()))
+#     run_model_tests(LiftingLine{N}(Wagner()))
+#     run_model_tests(LiftingLine{N}(Peters{4}()))
+# end
 
 # Structural Models (3D)
 
@@ -295,7 +313,6 @@ end
 
     # test on its own
     run_model_tests(LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
-
 end
 
 # Controller Models (3D)

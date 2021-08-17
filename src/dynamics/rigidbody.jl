@@ -94,6 +94,67 @@ function get_lhs(model::RigidBody, dstates, states, inputs, parameters, t)
     return dstates
 end
 
+# --- Convenience Methods --- #
+
+function set_states!(states, model::RigidBody; x, y, z, ϕ, θ, ψ, u, v, w, p, q, r)
+
+    states[1] = x
+    states[2] = y
+    states[3] = z
+    states[4] = ϕ
+    states[5] = θ
+    states[6] = ψ
+    states[7] = u
+    states[8] = v
+    states[9] = w
+    states[10] = p
+    states[11] = q
+    states[12] = r
+
+    return states
+end
+
+function set_inputs!(inputs, model::RigidBody; m, Ixx, Iyy, Izz, Ixz, Ixy, Iyz,
+    Fx, Fy, Fz, Mx, My, Mz)
+
+    inputs[1] = m
+    inputs[2] = Ixx
+    inputs[3] = Iyy
+    inputs[4] = Izz
+    inputs[5] = Ixz
+    inputs[6] = Ixy
+    inputs[7] = Iyz
+    inputs[8] = Fx
+    inputs[9] = Fy
+    inputs[10] = Fz
+    inputs[11] = Mx
+    inputs[12] = My
+    inputs[13] = Mz
+
+    return inputs
+end
+
+set_parameters!(p, model::RigidBody) = p
+
+function separate_states(model::RigidBody, states)
+
+    return (x = states[1], y = states[2], z = states[3],
+        ϕ = states[4], θ = states[5], ψ = states[6],
+        u = states[7], v = states[8], w = states[9],
+        p = states[10], q = states[11], r = states[12])
+end
+
+function separate_inputs(model::RigidBody, inputs)
+
+    return (m = inputs[1],
+        Ixx = inputs[2], Iyy = inputs[3], Izz = inputs[4],
+        Ixz = inputs[5], Ixy = inputs[6], Iyz = inputs[7],
+        Fx = inputs[8], Fy = inputs[9], Fz = inputs[10],
+        Mx = inputs[11], My = inputs[12], Mz = inputs[13])
+end
+
+separate_parameters(model::RigidBody, parameters) = ()
+
 # --- Internal Methods --- #
 
 function rigid_body_kinematics(x, y, z, ϕ, θ, ψ, u, v, w, p, q, r)

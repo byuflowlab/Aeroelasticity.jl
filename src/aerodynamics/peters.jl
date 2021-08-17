@@ -109,6 +109,48 @@ end
 
 get_lhs(model::Peters, dλ, λ, d, p, t) = model.A*dλ
 
+# --- Convenience Functions --- #
+
+function set_states!(y, model::Peters; lambda)
+
+    y .= lambda
+
+    return y
+end
+
+function set_inputs!(y, model::Peters; u, omega, vdot, omegadot)
+
+    y[1] = u
+    y[2] = omega
+    y[3] = vdot
+    y[4] = omegadot
+
+    return y
+end
+
+function set_parameters!(p, model::Peters; a, b, a0, alpha0)
+
+    p[1] = a
+    p[2] = b
+    p[3] = a0
+    p[4] = alpha0
+
+    return p
+end
+
+separate_states(model::Peters, x) = (lambda = x,)
+
+function separate_inputs(model::Peters, y)
+
+    return (u = y[1], omega = y[2], vdot = y[3], omegadot = y[4])
+end
+
+function separate_parameters(model::Peters, p)
+
+    return (a = p[1], b = p[2], a0 = p[3], alpha0 = p[4])
+end
+
+
 # --- Internal Methods --- #
 
 peters_lhs(Abar, dλ) = Abar*dλ
