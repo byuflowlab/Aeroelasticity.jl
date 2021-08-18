@@ -1,5 +1,5 @@
 """
-    couple_models(aero::Peters, stru::TypicalSection, flap::LinearFlap)
+    couple_models(aero::Peters, stru::TypicalSection, flap::SimpleFlap)
 
 Create an aerostructural model using the unsteady aerodynamic model defined by
 Peters et al., a two-degree of freedom typical section model, and a linear
@@ -7,19 +7,19 @@ steady-state control surface model.  This model introduces the freestream
 velocity ``U_\\infty``, air density ``\\rho_\\infty``, and flap deflection
 ``\\delta`` as additional parameters.
 """
-couple_models(aero::Peters, stru::TypicalSection, flap::LinearFlap) = (aero, stru, flap)
+couple_models(aero::Peters, stru::TypicalSection, flap::SimpleFlap) = (aero, stru, flap)
 
 # --- traits --- #
 
-number_of_additional_parameters(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = 3
-coupling_inplaceness(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Linear()
-coupling_state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Nonlinear()
+number_of_additional_parameters(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = 3
+coupling_inplaceness(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = Linear()
+coupling_state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = Nonlinear()
 
 # --- methods --- #
 
-function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    flap::LinearFlap, s, p, t) where {N,TF,SV,SA}
+function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
+    flap::SimpleFlap, s, p, t) where {N,TF,SV,SA}
     # extract state variables
     λ = s[SVector{N}(1:N)]
     h, θ, hdot, θdot = s[SVector{4}(N+1:N+4)]
@@ -41,7 +41,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
 end
 
 function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, flap::LinearFlap, s, p, t) where {N,TF,SV,SA}
+    stru::TypicalSection, flap::SimpleFlap, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
     # local freestream velocity components
@@ -62,7 +62,7 @@ end
 # --- performance overloads --- #
 
 function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, flap::LinearFlap, s, p, t) where {N,TF,SV,SA}
+    stru::TypicalSection, flap::SimpleFlap, s, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
     # extract model constants
@@ -85,8 +85,8 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    flap::LinearFlap, ds, s, p, t) where {N,TF,SV,SA}
+function get_coupling_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
+    flap::SimpleFlap, ds, s, p, t) where {N,TF,SV,SA}
     # extract state rates
     dλ = ds[SVector{N}(1:N)]
     dh, dθ, dhdot, dθdot = ds[SVector{4}(N+1:N+4)]
@@ -104,7 +104,7 @@ end
 # --- convenience methods --- #
 
 function set_additional_parameters!(padd, aero::Peters, stru::TypicalSection,
-    flap::LinearFlap; U, rho, delta)
+    flap::SimpleFlap; U, rho, delta)
 
     padd[1] = U
     padd[2] = rho
@@ -114,14 +114,14 @@ function set_additional_parameters!(padd, aero::Peters, stru::TypicalSection,
 end
 
 function separate_additional_parameters(aero::Peters, stru::TypicalSection,
-    flap::LinearFlap, padd)
+    flap::SimpleFlap, padd)
 
     return (U = padd[1], rho = padd[2], delta = padd[3])
 end
 
 # --- plotting --- #
 
-@recipe function f(aero::Peters{N,TF,SV,SA}, stru::TypicalSection, flap::LinearFlap,
+@recipe function f(aero::Peters{N,TF,SV,SA}, stru::TypicalSection, flap::SimpleFlap,
     x, y, p, t) where {N,TF,SV,SA}
 
     framestyle --> :origin

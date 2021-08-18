@@ -1,15 +1,15 @@
 """
-    couple_models(aero::Peters, stru::LiftingLineSection, flap::LinearFlap,
+    couple_models(aero::Peters, stru::LiftingLineSection, flap::SimpleFlap,
         ctrl::LiftingLineSectionControl)
 
 Create an aerostructural model using a using the unsteady aerodynamic model
 defined by Peters et al, a lifting line aerodynamic model, and a linear steady-state
 control surface model.  The existence of this coupling allows [`Peters`](@ref)
-and [`LinearFlap`](@ref) to be used with [`LiftingLine`](@ref) and
+and [`SimpleFlap`](@ref) to be used with [`LiftingLine`](@ref) and
 [`LiftingLineFlaps`](@ref).  This model introduces the freestream air density
 ``\\rho`` as an additional parameter.
 """
-function couple_models(aero::Peters, stru::LiftingLineSection, flap::LinearFlap,
+function couple_models(aero::Peters, stru::LiftingLineSection, flap::SimpleFlap,
     ctrl::LiftingLineSectionControl)
 
     return (aero, stru, flap, ctrl)
@@ -18,33 +18,33 @@ end
 # --- traits --- #
 
 function number_of_additional_parameters(::Type{<:Peters}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
 
     return 1
 end
 
 function coupling_inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
 
     return OutOfPlace()
 end
 
 function coupling_mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
 
     return Linear()
 end
 
 function coupling_state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection},
-    ::Type{LinearFlap}, ::Type{LiftingLineSectionControl})
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
 
     return Nonlinear()
 end
 
 # --- methods --- #
 
-function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
+function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
     # extract model constants
     bbar = aero.b
     # extract state variables
@@ -71,7 +71,7 @@ function get_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
 end
 
 function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
 
     # extract parameters
     a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
@@ -111,7 +111,7 @@ end
 # --- performance overloads --- #
 
 function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
 
     # extract model constants
     bbar = aero.b
@@ -162,8 +162,8 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineSectionControl, dx, x, p, t) where {N,TF,SV,SA}
+function get_coupling_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, dx, x, p, t) where {N,TF,SV,SA}
     # extract state variables
     dλ = dx[SVector{N}(1:N)]
     dvx, dvy, dvz, dωx, dωy, dωz = dx[SVector{6}(N+1:N+6)]
@@ -185,7 +185,7 @@ end
 # --- convenience methods --- #
 
 function set_additional_parameters!(padd, aero::Peters, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineSectionControl; rho)
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl; rho)
 
     padd[1] = rho
 
@@ -193,7 +193,7 @@ function set_additional_parameters!(padd, aero::Peters, stru::LiftingLineSection
 end
 
 function separate_additional_parameters(aero::Peters, stru::LiftingLineSection,
-    flap::LinearFlap, ctrl::LiftingLineSectionControl, padd)
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, padd)
 
     return (rho = padd[1],)
 end

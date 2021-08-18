@@ -21,7 +21,7 @@ a = -1/5 \quad e = -1/10  \\
 r^2 = \frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
 \mu = \frac{m}{\rho_\infty \pi b^2} \quad V = \frac{U}{b \omega_\theta}
 ```
-where ``a`` is the normalized distance from the semichord to the reference point, ``e`` is the normalized distance from the semichord to the center of mass, and ``\omega_h`` and ``\omega_\theta`` are the uncoupled natural frequencies.
+where ``a`` is the normalized distance from the semichord to the reference point, ``e`` is the normalized distance from the semichord to the center of mass, and ``\omega_h`` and ``\omega_\theta`` are the uncoupled natural frequencies, defined as follows.
 ```math
 \omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}
 ```
@@ -103,7 +103,7 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
         t = 0.0
 
         # calculate inputs
-        y = get_inputs(model, u, p, t)
+        y = get_coupling_inputs(model, u, p, t)
 
         # perform linear stability analysis
         λi, Uλi, Vλi = get_eigen(model, u, y, p, t)
@@ -223,11 +223,9 @@ nothing #hide
 
 ![](typical-section-stability.svg)
 
-Using the Wagner and/or Peters aerodynamic models yields a flutter reduced velocity of 2.2, while the steady and/or quasi-steady aerodynamic models predict significantly lower flutter velocities.  The lift and moment calculated by the steady-state and quasi-steady models are fully determined by the typical section's structural states, while the lift and moment calculated by the Wagner and Peters models are dependent on aerodynamic state variables as well.  The aerodynamic state variables of the Wagner and Peters models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the steady-state and quasi-steady models.
+Using the Wagner and/or Peters aerodynamic models yields a flutter reduced velocity around 2.2, while the steady and/or quasi-steady aerodynamic models predict significantly lower flutter velocities.  The aerodynamic state variables of the Wagner and Peters models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the steady-state and quasi-steady models.
 
-The non-dimensional parameters match those used by Hodges in Pierce in "Introduction to Structural Dynamics and Aeroelasticity".  We can therefore verify that our models are implemented correctly by comparing our results with those presented by Hodges and Pierce.
-
-The results presented here for the steady-state and Peters' finite state models match the results presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity", which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters' models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.
+The non-dimensional parameters we use for this example match those used by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity".  Hodges and Pierce performed the analysis using a steady state model and Peter's finite state model with six state variables.   The results presented here for the steady-state and Peters' finite state models match the results presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity", which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters' models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.
 
 For this example, all of our aeroelastic systems were linear, so we used a linear stability analysis to assess their stability. Alternatively, we perform time domain simulations in order to determine the system's stability.  To perform these time domain simulations, we first create objects of type `DifferentialEquations.ODEFunction` using [`get_ode`](@ref), then use the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package to solve the ordinary differential equation corresponding to the model.
 
@@ -300,7 +298,7 @@ plot(sol,
     vars = [7,8,9,10],
     xlabel = "t",
     ylabel = permutedims([
-        "\$\h\$",
+        "\$h\$",
         "\$\\theta\$",
         "\$\\dot{h}\$",
         "\$\\dot{\\theta}\$",
@@ -338,48 +336,6 @@ nothing #hide
 
 ![](typical-section-simulation.gif)
 
-The ability to visualize and/or create animations of the solution geometry is also helpful for visualizing eigenmodes.
-
-```julia
-
-# states
-u = u0
-
-# time
-t = 0
-
-# inputs
-y = get_inputs(model, u, p, t)
-
-# perform linear stability analysis
-λ, Uλ, Vλ = get_eigen(coupled_model, u, y, p, t)
-
-# use first eigenmode
-λi = λ[1]
-vλ = Vλ[:,1]
-
-# create animation
-damping = real(λi)
-period = 2*pi/imag(λi)
-cycles = 5
-
-anim = @animate for t in range(-period*cycles, 0.0, length=200)
-    plot(coupled_model, sol, t)
-end
-
-# save animation
-gif(anim, "typical-section-simulation.gif")
-
-
-function write_vtk(name, assembly, state, λ, eigenstate;
-    sections = nothing,
-    scaling=1.0,
-    mode_scaling=1.0,
-    cycles = 1,
-    steps = 100)
-```
-
-
 ## Aeroelastic Analysis of the Goland Wing
 
 ![](goland-wing.png)
@@ -399,10 +355,10 @@ The deflections of Goland wing are relatively small, so linear structural models
 For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is likely inappropriate for this wing due to the wing's low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.
 
 ```@example goland-stability
-using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
+using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
 
 # discretization
-N = 8 # number of elements
+N = 4 # number of elements
 
 # geometric properties
 span = 6.096 # m (20 ft span)
@@ -419,7 +375,7 @@ i22 = 0.1*i11 # moment of inertia about beam y-axis
 i33 = 0.9*i11 # moment of inertia about beam z-axis
 
 # freestream properties
-Vinf = 0:5:200 # m/s (velocity)
+Vinf = vcat(1, 5:5:200) # m/s (velocity)
 α = 0 # angle of attack
 
 # aerodynamic section properties
@@ -449,12 +405,17 @@ mass = fill([
     -μ*xm2 0 0 0 0 i33], N) # mass matrix
 assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
 
-# boundary condition initialization
 prescribed = Dict(
     # fixed left edge
     1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
         theta_z=0),
 )
+
+# prescribed point conditions
+point_conditions = zeros(6, length(assembly.points))
+
+# additional distributed loads
+element_loads = zeros(6, length(assembly.elements))
 
 # construct aerodynamic model
 aerodynamic_model = LiftingLine{N}(Peters{6}())
@@ -465,39 +426,77 @@ structural_model = GEBT(assembly, prescribed)
 # define coupled model
 model = couple_models(aerodynamic_model, structural_model)
 
+# construct ODE function
+f = get_ode(model)
+
+# current time
+t = 0.0
+
 # eigenvalue storage
 λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
 
 # initial guess for state variables
 u0 = zeros(number_of_states(model))
 
+# previous left eigenvector matrix
+local Uλpi
+
 # loop through each velocity
 for i = 1:length(Vinf)
 
-    # set state variables, parameters, and current time
-    p_aero = vcat(fill([a, b, a0, α0], N)...)
-    p_stru = set_parameters(structural_model, assembly)
-    p_additional = vcat(-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ,
-        set_inputs(structural_model, assembly; prescribed=prescribed))
+    println(Vinf[i])
+
+    # set parameters
+    p_aero = get_parameters(aerodynamic_model; section_parameters =
+        fill((a = a, b = b, a0 = a0, alpha0 = α0), N))
+
+    p_stru = get_parameters(structural_model; assembly = assembly)
+
+    p_additional = get_additional_parameters(model;
+        rho = ρ,
+        point_conditions = point_conditions,
+        element_loads = element_loads,
+        u = Vinf[i],
+        v = 0,
+        w = 0,
+        p = 0,
+        q = 0,
+        r = 0,
+        )
+
     p = vcat(p_aero, p_stru, p_additional)
-    t = 0
 
     # find state variables corresponding to steady state operating conditions
-    fresid = u -> get_rates(model, u, get_inputs(model, u, p, t), p, t)
-    sol = nlsolve(fresid, u0)
-    u = sol.zero
+    sol = solve(SteadyStateProblem(f, u0, p), SSRootfind())
 
-    # calculate the inputs corresponding to steady state operating conditions
-    y = get_inputs(model, u, p, t)
+    # use state variables from steady state operating conditions
+    u = sol.u
 
-    # calculate the mass matrix corresponding to steady state operating conditions
-    M = get_mass_matrix(model, u, y, p, t)
+    # calculate inputs corresponding to steady state operating conditions
+    y = get_coupling_inputs(model, u, p, t)
 
-    # calculate the jacobian corresponding to steady state operating conditions
-    J = get_state_jacobian(model, u, y, p, t)
+    # perform linear stability analysis
+    λi, Uλi, Vλi = get_eigen(model, u, y, p, t; nev = number_of_states(model))
 
-    # solve the generalized eigenvalue problem
-    λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
+    # correlate eigenvalues
+    if i > 1
+        # calculate mass matrix
+        Mi = get_mass_matrix(model, u, y, p, t)
+
+        # use correlation matrix to correlate eigenmodes
+        perm, corruption = AerostructuralDynamics.correlate_eigenmodes(Uλpi, Mi, Vλi)
+
+        # re-arrange eigenmodes
+        λi = λi[perm]
+        Uλi = Uλi[perm,:]
+        Vλi = Vλi[:,perm]
+    end
+
+    # save eigenvalues
+    λ[:,i] = λi
+
+    # save previous left eigenvector matrix
+    Uλpi = Uλi
 
     # update initial guess for the state variables
     u0 .= u
@@ -521,20 +520,20 @@ default(
     framestyle = :zerolines)
 
 sp1 = plot(
-    xlim = (0, 200),
-    xtick = 0:40:200,
+    xlim = (138,142),#(0, 200),
+    #xtick = 0:40:200,
     xlabel = "Velocity (m/s)",
-    ylim = (0, 1000),
-    ytick = 0:100:1000,
+    ylim = (69,70),#(0, 800),
+    #ytick = 0:100:800,
     ylabel = "Frequency (rad/s)",
     legend = :topright
     )
 
 sp2 = plot(
-    xlim = (0, 200),
-    xtick = 0:40:200,
+    xlim = (138,142),#(0, 200),
+    #xtick = 0:40:200,
     xlabel = "Velocity (m/s)",
-    ylim = (-80, 20),
+    ylim = (-1,1),#(-80, 20),
     ytick = -80:20:20,
     ylabel = "Damping (1/s)",
     legend = :topleft
@@ -545,12 +544,15 @@ for i = 1:size(λ, 1)
     Vi = Vinf[:]
     λi = λ[i,:]
 
-    scatter!(sp1, Vi, imag.(λi),
-        label = "",
-        color = 1,
-        markersize = 3,
-        markerstrokewidth = 0,
-        )
+    if any(-80 .<= real.(λi) .<= 20)
+        plot!(sp1, Vi, imag.(λi),
+            label = "",
+            color = i,
+            markersize = 3,
+            markerstrokewidth = 0,
+            )
+    end
+
 end
 
 for i = 1:size(λ, 1)
@@ -558,18 +560,21 @@ for i = 1:size(λ, 1)
     Vi = Vinf[:]
     λi = λ[i,:]
 
-    scatter!(sp2, Vi,
-        real.(λi),
-        label = "",
-        color = 1,
-        markersize = 3,
-        markerstrokewidth = 0,
-        )
+    if any(-80 .<= real.(λi) .<= 20)
+        plot!(sp2, Vi,
+            real.(λi),
+            label = "",
+            color = i,
+            markersize = 3,
+            markerstrokewidth = 0,
+            )
+    end
 end
 
 p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)
-
 ```
+
+As predicted by this analysis, the flutter speed is 140 m/s and the flutter frequency is 69.7 rad/s.  These results are nearly identical to results by Palacios and Epureanu in "An Intrinsic Description of the Nonlinear Aeroelasticity of Very Flexible Wings" for a similar model.  We can therefore be reasonably confident that the models used for this example are implemented correctly.
 
 ## TODO: Aeroelastic Analysis of a Blended-Wing-Body Aircraft
 
@@ -689,12 +694,12 @@ for i = 1:length(Vinf)
     t = 0
 
     # find state variables corresponding to steady state operating conditions
-    fresid = u -> get_rates(model, u, get_inputs(model, u, p, t), p, t)
+    fresid = u -> get_rates(model, u, get_coupling_inputs(model, u, p, t), p, t)
     sol = nlsolve(fresid, u0)
     u = sol.zero
 
     # calculate the inputs corresponding to steady state operating conditions
-    y = get_inputs(model, u, p, t)
+    y = get_coupling_inputs(model, u, p, t)
 
     # calculate the mass matrix corresponding to steady state operating conditions
     M = get_mass_matrix(model, u, y, p, t)

@@ -12,8 +12,8 @@ Author: Taylor McDonnell
 
 ## Package Features
  - Provides a framework for coupling multiple models together for analysis and/or simulation.
- - Defines a variety of aerodynamic, structural, and dynamics models
-   - Aerodynamic Models:
+ - Defines a variety of aerodynamic, structural, dynamics, control surface, and control system models
+   - Aerodynamics Models:
      - Steady and/or Quasi-Steady Thin Airfoil Theory (2D)
      - Wagner's Function (2D)
      - Peters' Finite State (2D)
@@ -23,7 +23,14 @@ Author: Taylor McDonnell
      - Geometrically Exact Beam Theory (As implemented by [GXBeam](https://github.com/byuflowlab/GXBeam.jl)) (3D)
    - Dynamics Models:
      - Rigid Body (3D)
+   - Control Surface Models:
+     - Steady State Linear Flap (2D)
+     - Lifting Line Flaps (3D)
+   - Control System Models:
+     - Trim (3D)
+ - Interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
  - Verified and/or validated against theoretical, computational, and/or experimental results (see the [examples](@ref Examples))
+ - May be easily extended to include additional models and/or model couplings.  (See the [developer guide](@ref Developer's Guide))
 
 ## Installation
 
@@ -35,4 +42,4 @@ pkg> add https://flow.byu.edu/AerostructuralDynamics.jl
 
 ## Usage
 
-See the [examples](@ref Examples)
+See the [Getting Started](@ref Getting Started) section of the documentation.

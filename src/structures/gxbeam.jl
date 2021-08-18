@@ -103,7 +103,7 @@ function GEBT(assembly, prescribed;
     # set displacement constraint indices and degree of freedom
     displacement = zeros(Bool, 6, npoint)
     for key in keys(prescribed)
-        displacement[:,key] .= prescribed[key].force
+        displacement[:,key] .= prescribed[key].force .== false
     end
 
     return GEBT(assembly.start, assembly.stop, displacement, force_scaling,

@@ -85,14 +85,14 @@ function run_coupling_tests(models...;
     test_convenience_functions = true)
 
     # jacobian test
-    fu = (x) -> get_inputs(models, x, p, t)
+    fu = (x) -> get_coupling_inputs(models, x, p, t)
     Jy = AD.get_coupling_state_jacobian(models, x, p, t)
     Jy_fd = ForwardDiff.jacobian(fu, x)
     @test isapprox(Jy, Jy_fd; atol, norm)
 
     # additional test if state rate contribution is defined
     if test_mass_matrix
-        fdu = (dx) -> -AD.get_inputs_using_state_rates(models..., dx, x, p, t)
+        fdu = (dx) -> -AD.get_coupling_inputs_using_state_rates(models..., dx, x, p, t)
         My = AD.get_coupling_mass_matrix(models, x, p, t)
         My_fd = ForwardDiff.jacobian(fdu, dx)
         @test isapprox(My, My_fd; atol, norm)
@@ -138,8 +138,8 @@ end
 #
 # # Control Surface Models (2D)
 #
-# @testset "LinearFlap" begin
-#     run_model_tests(LinearFlap())
+# @testset "SimpleFlap" begin
+#     run_model_tests(SimpleFlap())
 # end
 #
 # # Controller Models (2D)
@@ -162,18 +162,18 @@ end
 #     run_coupling_tests(Peters{4}(), TypicalSection())
 # end
 #
-# @testset "QuasiSteady + TypicalSection + LinearFlap" begin
-#     run_coupling_tests(QuasiSteady{0}(), TypicalSection(), LinearFlap())
-#     run_coupling_tests(QuasiSteady{1}(), TypicalSection(), LinearFlap())
-#     run_coupling_tests(QuasiSteady{2}(), TypicalSection(), LinearFlap())
+# @testset "QuasiSteady + TypicalSection + SimpleFlap" begin
+#     run_coupling_tests(QuasiSteady{0}(), TypicalSection(), SimpleFlap())
+#     run_coupling_tests(QuasiSteady{1}(), TypicalSection(), SimpleFlap())
+#     run_coupling_tests(QuasiSteady{2}(), TypicalSection(), SimpleFlap())
 # end
 #
-# @testset "Wagner + TypicalSection + LinearFlap" begin
-#     run_coupling_tests(Wagner(), TypicalSection(), LinearFlap())
+# @testset "Wagner + TypicalSection + SimpleFlap" begin
+#     run_coupling_tests(Wagner(), TypicalSection(), SimpleFlap())
 # end
 #
-# @testset "Peters + TypicalSection + LinearFlap" begin
-#     run_coupling_tests(Peters{4}(), TypicalSection(), LinearFlap())
+# @testset "Peters + TypicalSection + SimpleFlap" begin
+#     run_coupling_tests(Peters{4}(), TypicalSection(), SimpleFlap())
 # end
 #
 # @testset "QuasiSteady + LiftingLineSection" begin
@@ -193,18 +193,18 @@ end
 #     run_coupling_tests(Peters{4}(), AD.LiftingLineSection())
 # end
 #
-# @testset "QuasiSteady + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
-#     run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-#     run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
-#     run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+# @testset "QuasiSteady + LiftingLineSection + SimpleFlap + LiftingLineSectionControl" begin
+#     run_coupling_tests(QuasiSteady{0}(), AD.LiftingLineSection(), SimpleFlap(), AD.LiftingLineSectionControl())
+#     run_coupling_tests(QuasiSteady{1}(), AD.LiftingLineSection(), SimpleFlap(), AD.LiftingLineSectionControl())
+#     run_coupling_tests(QuasiSteady{2}(), AD.LiftingLineSection(), SimpleFlap(), AD.LiftingLineSectionControl())
 # end
 #
-# @testset "Wagner + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
-#     run_coupling_tests(Wagner(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+# @testset "Wagner + LiftingLineSection + SimpleFlap + LiftingLineSectionControl" begin
+#     run_coupling_tests(Wagner(), AD.LiftingLineSection(), SimpleFlap(), AD.LiftingLineSectionControl())
 # end
 #
-# @testset "Peters + LiftingLineSection + LinearFlap + LiftingLineSectionControl" begin
-#     run_coupling_tests(Peters{4}(), AD.LiftingLineSection(), LinearFlap(), AD.LiftingLineSectionControl())
+# @testset "Peters + LiftingLineSection + SimpleFlap + LiftingLineSectionControl" begin
+#     run_coupling_tests(Peters{4}(), AD.LiftingLineSection(), SimpleFlap(), AD.LiftingLineSectionControl())
 # end
 #
 # # --- Three Dimensional Models --- #
@@ -312,7 +312,7 @@ end
     NG = 1
 
     # test on its own
-    run_model_tests(LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+    run_model_tests(LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 end
 
 # Controller Models (3D)
@@ -481,27 +481,27 @@ end
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{0}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{1}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{2}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(Wagner()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(Peters{4}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 end
 
 @testset "Lifting Line + GXBeam + Lifting Line Flaps" begin
@@ -567,27 +567,27 @@ end
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{0}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{1}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{2}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(Wagner()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(Peters{4}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 end
 
 @testset "Lifting Line + GXBeam + RigidBody + Lifting Line Flaps" begin
@@ -654,31 +654,31 @@ end
         LiftingLine{N}(QuasiSteady{0}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{1}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{2}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(Wagner()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 
     run_coupling_tests(
         LiftingLine{N}(Peters{4}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)))
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)))
 end
 
 @testset "Lifting Line + RigidBody + Lifting Line Flaps + Trim" begin
@@ -692,31 +692,31 @@ end
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{0}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{1}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{2}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(Wagner()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(Peters{4}()),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 end
 
@@ -783,31 +783,31 @@ end
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{0}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{1}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{2}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(Wagner()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(Peters{4}()),
         GEBT(assembly, prescribed),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 end
 
@@ -875,34 +875,34 @@ end
         LiftingLine{N}(QuasiSteady{0}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{1}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(QuasiSteady{2}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(Wagner()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 
     run_coupling_tests(
         LiftingLine{N}(Peters{4}()),
         GEBT(assembly, prescribed),
         RigidBody(),
-        LiftingLineFlaps{N}(LinearFlap(), ntuple(i->ones(N), NG)),
+        LiftingLineFlaps{N}(SimpleFlap(), ntuple(i->ones(N), NG)),
         Trim())
 end

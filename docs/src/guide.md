@@ -14,7 +14,7 @@ Pages = ["library.md"]
 Depth = 3
 ```
 
-If you haven't yet, now would be a good time to install AerostructuralDynamics.  AerostructuralDynamics can be installed from the Julia REPL by typing `]` (to enter the package manager) and then running the following command.
+If you haven't yet, now would be a good time to install AerostructuralDynamics.  It can be installed from the Julia REPL by typing `]` (to enter the package manager) and then running the following command.
 ```julia
 pkg> add https://flow.byu.edu/AerostructuralDynamics.jl
 ```
@@ -34,7 +34,7 @@ Our goal is to create an 2D aeroelastic model which we can use to simulate the b
 
 ## Initializing the Aeroelastic Model
 
-For the aerodynamic model, we will be using Peters' finite state model with four aerodynamic state variables.  For the structural model, we will be using the typical section model.  To couple these models together, we use the [`couple_models`](@ref) function.  
+For the aerodynamic model, we will be using Peters' finite state model with four aerodynamic state variables (see [`Peters`](@ref)).  For the structural model, we will be using the typical section model (see [`TypicalSection`](@ref)).  To couple these models together, we use the [`couple_models`](@ref) function.  
 
 ```@example guide
 aerodynamic_model = Peters{4}() # we use four aerodynamic state variables
@@ -51,7 +51,7 @@ M(x,y,p,t)\dot{x} = f(x,y,p,t)
 ```
 where ``M(x,y,p,t)`` is a function which defines the mass matrix corresponding to the differential equation, ``f(x, y, p, t)`` is a function which defines the mass matrix multiplied state rates, ``x`` is a vector of states, ``y`` is a vector of inputs/coupling variables, ``p`` is a vector of parameters, and ``t`` is the current time.
 
-As described in the documentation for [`Peters`](@ref), the state, input, and parameter vectors for the aerodynamic model are
+As described in the documentation for the [`Peters`](@ref) model, its state, input, and parameter vectors are defined as
 ```math
 x_\text{aero} = \begin{bmatrix} \lambda_1 \\ \lambda_2 \\ \vdots \\ \lambda_N \end{bmatrix} \quad
 y_\text{aero} = \begin{bmatrix} u \\ v \\ \omega \end{bmatrix} \quad
@@ -62,21 +62,20 @@ where ``\lambda_1, \lambda_2, \dots, \lambda_N`` are the aerodynamic states,
 
 ![](airfoil.svg)
 
-As described in the documentation for [`TypicalSection`](@ref), the state, input, and parameter vectors for the typical section model are defined as
+As described in the documentation for the [`TypicalSection`](@ref) model, the state, input, and parameter vectors for the typical section model are defined as
 ```math
 x_\text{stru} = \begin{bmatrix} h \\ \theta \\ \dot{h} \\ \dot{\theta} \end{bmatrix} \quad y_\text{stru} = \begin{bmatrix} \mathcal{L} \\ \mathcal{M} \end{bmatrix} \quad p_\text{stru} = \begin{bmatrix} k_h \\ k_\theta \\ m \\ S_\theta \\ I_\theta \end{bmatrix}
 ```
 where ``h`` is plunge, ``\theta`` is pitch, ``\mathcal{L}`` is the lift per unit span, ``\mathcal{M}`` is the moment per unit span about the reference point, ``k_h`` is the linear spring constant, and ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``S_\theta`` is the structural imbalance, and ``I_θ`` is the mass moment of inertia about the reference point.
 
-The state variables and inputs of a coupled model correspond to the state variables and inputs of its component models concatenated.  The parameters of a coupled model correspond to the parameters of its component models concatenated, followed by additional parameters which are specific to the coupled model.  As noted in the coupled model's documentation, the additional parameters introduced by the coupled model is the freestream velocity ``U_\infty`` and air density ``\\rho``.  The state, input, and parameter vectors for the coupled model are therefore
+The state variables and inputs of a coupled model correspond to the state variables and inputs of its component models concatenated.  The parameters of a coupled model correspond to the parameters of its component models concatenated, followed by additional parameters which are specific to the coupled model.  As noted in the coupled model's documentation, the additional parameters introduced by the coupled model are the freestream velocity ``U_\infty`` and air density ``\rho``.  The state, input, and parameter vectors for the coupled model are therefore
 ```math
 x_\text{coupled} = \begin{bmatrix} \lambda_1 \\ \lambda_2 \\ \vdots \\ \lambda_N \\ h \\ \theta \\ \dot{h} \\ \dot{\theta} \end{bmatrix} \quad y_\text{coupled} = \begin{bmatrix} u \\ v \\ \omega \\ \mathcal{L} \\ \mathcal{M} \end{bmatrix} \quad p_\text{coupled} = \begin{bmatrix} a \\ b \\ a_0 \\ \alpha_0 \\ k_h \\ k_\theta \\ m \\ S_\theta \\ I_\theta \\ U_\infty \\ \rho \end{bmatrix}
 ```
 
-```@example guide
-# state variables
-x_coupled = zeros(number_of_states(coupled_model))
+State, input, and parameter vectors may either be constructed directly or initialized using the [`get_states`](@ref), [`get_inputs`](@ref), and/or [`get_parameters`](@ref) convenience functions.  For coupled models only the state and parameter vectors must be defined since the inputs for coupled models are defined as a function of the coupled model's state variables, parameters, and current time.  
 
+```@example guide
 # non-dimensional parameters
 a = -1/5 # reference point normalized location
 e = -1/10 # center of mass normalized location
@@ -102,62 +101,43 @@ kh = m*ωh^2
 kθ = Iθ*ωθ^2
 U = V*b*ωθ
 
+# state vector
+x_coupled = zeros(number_of_states(coupled_model))
+
 # parameter vector
 p_aero = [a, b, a0, α0]
 p_stru = [kh, kθ, m, Sθ, Iθ]
 p_additional = [U, ρ]
 p_coupled = vcat(p_aero, p_stru, p_additional)
 
+# current time
+t = 0
+
 nothing #hide
 ```
 
-For coupled models, inputs are calculated as a function of the model states, model parameters, and current time using the [`get_inputs`](@ref) function.  For uncoupled models, inputs must be provided.
+To calculate the inputs corresponding to a given set of state variables and parameters for a coupled model the [`get_coupled_inputs`](@ref) function may be used.
 
 ```@example guide
-t = 0 # time
+# calculate input vector
+y_coupled = get_coupled_inputs(coupled_model, x_coupled, p_coupled, t) # inputs
 
-y_coupled = get_inputs(coupled_model, x_coupled, p_coupled, t) # inputs
 nothing #hide
 ```
 
-To facilitate the setting of state, input, and/or parameter vector entries for more complex models, the [`set_states`](@ref), [`set_inputs`](@ref), and/or [`set_parameters`](@ref) functions (or their in-place counterparts) may be used.  For example, we could have initialized the state variable and parameter vectors for our coupled model using the following block of code.
+In order to more easily interpret the elements of the state, input, and/or parameter vectors, the [`separate_states`](@ref), [`separate_inputs`](@ref), and/or [`separate_parameters`](@ref) functions may be used.  These functions separate and assign names to the elements of the state, input and/or parameter vectors so that the identity of each element in these vectors may be more easily understood.
 
 ```@example guide
-# create state vector
-x_coupled = set_states(coupled_model;
-    lambda = zeros(4)
-    h = 0.0
-    theta = 0.0
-    hdot = 0.0
-    thetadot = 0.0
-    )
-
-# create parameter vector
-p_coupled = set_parameters(coupled_model;
-    a = a,
-    b = b,
-    a0 = a0,
-    alpha0 = alpha0,
-    kh = kh,
-    ktheta = ktheta,
-    m = m,
-    Stheta = Sθ,
-    Itheta = Iθ,
-    U = U,
-    rho = ρ)
-```
-
-To facilitate the interpretation of state, input, and/or parameters vector entries for more complex models, the [`separate_states`](@ref), [`separate_inputs`](@ref), and/or [`separate_parameters`](@ref) functions may be used.  For example, the following code returns a named tuple where each entry of the input vector has been assigned its own name.
-
-```@example guide
-inputs = separate_inputs(coupled_model, y)
+states = separate_states(coupled_model, x_coupled)
+inputs = separate_inputs(coupled_model, y_coupled)
+parameters = separate_parameters(coupled_model, p_coupled)
 
 nothing #hide
 ```
 
 ## Performing a Stability Analysis
 
-The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the [`get_eigen`](@ref) function, which returns eigenvalues, left eigenvectors, and right eigenvectors.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear, so all sets of state variables yield the same result.
+The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the [`get_eigen`](@ref) function, which returns eigenvalues, left eigenvectors, and right eigenvectors.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear with respect to the state variables, so any set of state variables will yield the same result.
 
 ```@example guide
 λ, U, V = get_eigen(coupled_model, x_coupled, y_coupled, p_coupled, t)
@@ -189,3 +169,53 @@ prob = DifferentialEquations.ODEProblem(f, u0, tspan, p_coupled)
 sol = DifferentialEquations.solve(prob)
 
 ```
+
+# Visualizing Simulation Results
+
+We can use DifferentialEquations' built-in interface with the [Plots](https://github.com/JuliaPlots/Plots.jl) package to plot the simulation results.
+
+```@example guide
+using Plots
+pyplot()
+
+plot(sol,
+    vars = [5,6,7,8],
+    xlabel = "t",
+    ylabel = permutedims([
+        "\$\h\$",
+        "\$\\theta\$",
+        "\$\\dot{h}\$",
+        "\$\\dot{\\theta}\$",
+        ]),
+    label = "",
+    layout = (4, 1),
+    size = (600,1200)
+    )
+
+savefig("guide-solution.svg") #hide
+
+nothing #hide
+```
+
+![](guide-solution.svg)
+
+For some models, we can also visualize the solution geometry and/or create animations with the help of custom plot recipes provided by this package.
+
+```@example typical-section-stability
+# Plot Recipes:
+# - plot(model, x, p, t)
+# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
+# - plot(model, sol, t) # plots the solution geometry at time `t`
+
+# create animation
+anim = @animate for t in range(tspan[1], tspan[2], length=200)
+    plot(coupled_model, sol, t)
+end
+
+# save animation
+gif(anim, "guide-simulation.gif")
+
+nothing #hide
+```
+
+![](guide-simulation.gif)

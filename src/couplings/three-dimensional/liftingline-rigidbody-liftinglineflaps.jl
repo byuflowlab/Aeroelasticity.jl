@@ -82,7 +82,7 @@ end
 
 # --- methods --- #
 
-function get_inputs!(y, aero::LiftingLine{NA,TA}, dyn::RigidBody,
+function get_coupling_inputs!(y, aero::LiftingLine{NA,TA}, dyn::RigidBody,
     flap::LiftingLineFlaps{NF,NG,TF,TG}, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # extract number of state variables, inputs, and parameters
@@ -209,7 +209,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, dyn::RigidBody,
         pi = vcat(pai, psi, pfi, pci)
 
         # section inputs
-        yi = get_inputs(section_models, ui, pi, t)
+        yi = get_coupling_inputs(section_models, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)
@@ -471,7 +471,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
+function get_coupling_inputs_using_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
     flap::LiftingLineFlaps{NF,NG,TF,TG}, du, u, p, t) where {NA,NF,NG,TA,TF,TG}
 
     # initialize input vector
@@ -624,7 +624,7 @@ function get_inputs_using_state_rates(aero::LiftingLine{NA,TA}, dyn::RigidBody,
         pi = vcat(pai, psi, pfi, pci)
 
         # section inputs
-        yi = get_inputs_using_state_rates(section_models, dui, ui, pi, t)
+        yi = get_coupling_inputs_using_state_rates(section_models, dui, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)

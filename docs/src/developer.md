@@ -328,12 +328,12 @@ coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonline
 
 ### Defining Coupling Function Methods
 
-Once the properties of a coupled model have been defined, methods must be provided which define the values of the model's inputs. The portion of the inputs which is independent of the state rates is calculated using the [`get_inputs`](@ref) function for out-of-place coupling functions or the [`get_inputs!`](@ref) function for in-place coupling functions. For models with inputs that are also linearly dependent on the state rates, a new method must also be defined for the [`get_coupling_mass_matrix`](@ref AerostructuralDynamics.get_coupling_mass_matrix) function (or [`get_coupling_mass_matrix!`](@ref AerostructuralDynamics.get_coupling_mass_matrix!) function if the inputs are defined in-place). For constant mass matrices (coupling_mass_matrix_type(typeof.(models)...) == Constant()), this function should be defined without the x, p, and t arguments.
+Once the properties of a coupled model have been defined, methods must be provided which define the values of the model's inputs. The portion of the inputs which is independent of the state rates is calculated using the [`get_coupling_inputs`](@ref) function for out-of-place coupling functions or the [`get_coupling_inputs!`](@ref) function for in-place coupling functions. For models with inputs that are also linearly dependent on the state rates, a new method must also be defined for the [`get_coupling_mass_matrix`](@ref AerostructuralDynamics.get_coupling_mass_matrix) function (or [`get_coupling_mass_matrix!`](@ref AerostructuralDynamics.get_coupling_mass_matrix!) function if the inputs are defined in-place). For constant mass matrices (coupling_mass_matrix_type(typeof.(models)...) == Constant()), this function should be defined without the x, p, and t arguments.
 
 As an example, the expressions defining the inputs for the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model may be defined using the following block of code.
 
 ```julia
-function get_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
+function get_coupling_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = s
     # extract parameters
@@ -460,7 +460,7 @@ end
 
 ### Defining Methods for Unit Testing
 
-In order to test whether the provided mass matrices are correct for a given coupled model, a new method for [`get_inputs_using_state_rates`](@ref AerostructuralDynamics.get_inputs_using_state_rates) (which defines the portion of the inputs that are dependent on the state rates) must be provided.  Since this function is used for testing, there is no in-place version of this function.
+In order to test whether the provided mass matrices are correct for a given coupled model, a new method for [`get_coupling_inputs_using_state_rates`](@ref AerostructuralDynamics.get_inputs_using_state_rates) (which defines the portion of the inputs that are dependent on the state rates) must be provided.  Since this function is used for testing, there is no in-place version of this function.
 
 For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, this function could be defined as follows
 

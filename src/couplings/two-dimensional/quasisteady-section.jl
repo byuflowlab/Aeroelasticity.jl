@@ -35,7 +35,7 @@ coupling_state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = N
 
 # --- methods --- #
 
-function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, q, p, t)
+function get_coupling_inputs(aero::QuasiSteady{0}, stru::TypicalSection, q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
     # extract aerodynamic, structural, and aerostructural parameters
@@ -49,7 +49,7 @@ function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, q, p, t)
     return SVector(L, M)
 end
 
-function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, q, p, t)
+function get_coupling_inputs(aero::QuasiSteady{1}, stru::TypicalSection, q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
     # extract aerodynamic, structural, and aerostructural parameters
@@ -64,7 +64,7 @@ function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, q, p, t)
     return SVector(L, M)
 end
 
-function get_inputs(aero::QuasiSteady{2}, stru::TypicalSection, q, p, t)
+function get_coupling_inputs(aero::QuasiSteady{2}, stru::TypicalSection, q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
     # extract aerodynamic, structural, and aerostructural parameters

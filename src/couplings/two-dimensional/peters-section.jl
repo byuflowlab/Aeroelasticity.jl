@@ -17,7 +17,7 @@ coupling_state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Nonline
 
 # --- methods --- #
 
-function get_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
+function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     s, p, t) where {N,TF,SV,SA}
     # extract state variables
     λ = s[SVector{N}(1:N)]
@@ -81,7 +81,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     ds, s, p, t) where {N,TF,SV,SA}
     # extract state rates
     dλ = ds[SVector{N}(1:N)]

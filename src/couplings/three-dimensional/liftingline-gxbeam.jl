@@ -63,7 +63,7 @@ end
 
 # --- methods --- #
 
-function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, u, p, t) where {NA,TA}
+function get_coupling_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, u, p, t) where {NA,TA}
 
     # extract number of state variables, inputs, and parameters
     nua = number_of_states(aero) # number of aerodynamic states
@@ -178,7 +178,7 @@ function get_inputs!(y, aero::LiftingLine{NA,TA}, stru::GEBT, u, p, t) where {NA
         pi = vcat(pai, psi)
 
         # section inputs
-        yi = get_inputs(section_models, ui, pi, t)
+        yi = get_coupling_inputs(section_models, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)
@@ -370,7 +370,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
+function get_coupling_inputs_using_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
     du, u, p, t) where {NA,TA}
 
     # initialize input vector
@@ -504,7 +504,7 @@ function get_inputs_using_state_rates(aero::LiftingLine{NA,TA}, stru::GEBT,
         pi = vcat(pai, psi)
 
         # section inputs (from state rates)
-        yi = get_inputs_using_state_rates(section_models, dui, ui, pi, t)
+        yi = get_coupling_inputs_using_state_rates(section_models, dui, ui, pi, t)
 
         # separate inputs
         yai = view(yi, 1:Nyai)
@@ -529,7 +529,7 @@ end
 
 # --- convenience methods --- #
 
-function set_additional_parameters!(padd, model::LiftingLine, stru::GEBT;
+function set_additional_parameters!(padd, aero::LiftingLine, stru::GEBT;
     rho, point_conditions, element_loads, u, v, w, p, q, r) where {NA,TA}
 
     np = length(stru.icol_point)
@@ -538,21 +538,21 @@ function set_additional_parameters!(padd, model::LiftingLine, stru::GEBT;
     padd[1] = rho
 
     for ip = 1:np
-        padd[1+6*(ip-1)+1] = point_conditions[6*(ip-1)+1]
-        padd[1+6*(ip-1)+2] = point_conditions[6*(ip-1)+2]
-        padd[1+6*(ip-1)+3] = point_conditions[6*(ip-1)+3]
-        padd[1+6*(ip-1)+4] = point_conditions[6*(ip-1)+4]
-        padd[1+6*(ip-1)+5] = point_conditions[6*(ip-1)+5]
-        padd[1+6*(ip-1)+6] = point_conditions[6*(ip-1)+6]
+        padd[1+6*(ip-1)+1] = point_conditions[1,ip]
+        padd[1+6*(ip-1)+2] = point_conditions[2,ip]
+        padd[1+6*(ip-1)+3] = point_conditions[3,ip]
+        padd[1+6*(ip-1)+4] = point_conditions[4,ip]
+        padd[1+6*(ip-1)+5] = point_conditions[5,ip]
+        padd[1+6*(ip-1)+6] = point_conditions[6,ip]
     end
 
     for ie = 1:ne
-        padd[1+6*np+6*(ie-1)+1] = element_loads[6*(ie-1)+1]
-        padd[1+6*np+6*(ie-1)+2] = element_loads[6*(ie-1)+2]
-        padd[1+6*np+6*(ie-1)+3] = element_loads[6*(ie-1)+3]
-        padd[1+6*np+6*(ie-1)+4] = element_loads[6*(ie-1)+4]
-        padd[1+6*np+6*(ie-1)+5] = element_loads[6*(ie-1)+5]
-        padd[1+6*np+6*(ie-1)+6] = element_loads[6*(ie-1)+6]
+        padd[1+6*np+6*(ie-1)+1] = element_loads[1,ie]
+        padd[1+6*np+6*(ie-1)+2] = element_loads[2,ie]
+        padd[1+6*np+6*(ie-1)+3] = element_loads[3,ie]
+        padd[1+6*np+6*(ie-1)+4] = element_loads[4,ie]
+        padd[1+6*np+6*(ie-1)+5] = element_loads[5,ie]
+        padd[1+6*np+6*(ie-1)+6] = element_loads[6,ie]
     end
 
     padd[1+6*np+6*ne+1] = u
@@ -565,7 +565,7 @@ function set_additional_parameters!(padd, model::LiftingLine, stru::GEBT;
     return padd
 end
 
-function separate_additional_parameters(model::LiftingLine, stru::GEBT, padd)
+function separate_additional_parameters(aero::LiftingLine, stru::GEBT, padd)
 
     np = length(stru.icol_point)
     ne = length(stru.icol_elem)

@@ -1,5 +1,5 @@
 """
-    couple_models(aero::Wagner, stru::TypicalSection, flap::LinearFlap)
+    couple_models(aero::Wagner, stru::TypicalSection, flap::SimpleFlap)
 
 Create an aerostructural model using an unsteady aerodynamic model based on
 Wagner's function, a two-degree of freedom typical section model, and a linear
@@ -7,18 +7,18 @@ steady-state control surface model.  This model introduces the freestream
 velocity ``U_\\infty``, air density ``\\rho_\\infty``, and flap deflection
 ``\\delta`` as additional parameters.
 """
-couple_models(aero::Wagner, stru::TypicalSection, flap::LinearFlap) = (aero, stru, flap)
+couple_models(aero::Wagner, stru::TypicalSection, flap::SimpleFlap) = (aero, stru, flap)
 
 # --- traits --- #
 
-number_of_additional_parameters(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{LinearFlap}) = 3
-coupling_inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{LinearFlap}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Linear()
-coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{LinearFlap}) = Nonlinear()
+number_of_additional_parameters(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = 3
+coupling_inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = OutOfPlace()
+coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = Linear()
+coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}, ::Type{SimpleFlap}) = Nonlinear()
 
 # --- methods --- #
 
-function get_inputs(aero::Wagner, stru::TypicalSection, flap::LinearFlap, s, p, t)
+function get_coupling_inputs(aero::Wagner, stru::TypicalSection, flap::SimpleFlap, s, p, t)
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = s
     # extract parameters
@@ -40,7 +40,7 @@ function get_inputs(aero::Wagner, stru::TypicalSection, flap::LinearFlap, s, p, 
 end
 
 function get_coupling_mass_matrix(aero::Wagner, stru::TypicalSection,
-    flap::LinearFlap, s, p, t)
+    flap::SimpleFlap, s, p, t)
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
     # calculate loads
@@ -58,7 +58,7 @@ end
 # --- performance overloads --- #
 
 function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection,
-    flap::LinearFlap, u, p, t) where {N,TF,SV,SA}
+    flap::SimpleFlap, u, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
     # extract model constants
@@ -85,8 +85,8 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::Wagner, stru::TypicalSection,
-    flap::LinearFlap, ds, s, p, t)
+function get_coupling_inputs_using_state_rates(aero::Wagner, stru::TypicalSection,
+    flap::SimpleFlap, ds, s, p, t)
     # extract state rates
     dλ1, dλ2, dh, dθ, dhdot, dθdot = ds
     # extract parameters
@@ -104,7 +104,7 @@ end
 # --- convenience methods --- #
 
 function set_additional_parameters!(padd, aero::Wagner, stru::TypicalSection,
-    flap::LinearFlap; U, rho, delta)
+    flap::SimpleFlap; U, rho, delta)
 
     padd[1] = U
     padd[2] = rho
@@ -114,14 +114,14 @@ function set_additional_parameters!(padd, aero::Wagner, stru::TypicalSection,
 end
 
 function separate_additional_parameters(aero::Wagner, stru::TypicalSection,
-    flap::LinearFlap, padd)
+    flap::SimpleFlap, padd)
 
     return (U = padd[1], rho = padd[2], delta = padd[3])
 end
 
 # --- Plotting --- #
 
-@recipe function f(aero::Wagner, stru::TypicalSection, flap::LinearFlap, x, y, p, t)
+@recipe function f(aero::Wagner, stru::TypicalSection, flap::SimpleFlap, x, y, p, t)
 
     framestyle --> :origin
     grid --> false

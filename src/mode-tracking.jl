@@ -37,16 +37,22 @@ function correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, ato
             count(x -> isapprox(x, cval[i]; rtol, atol), cval)
         )
 
-        # determine n+1 best unassigned fit, where n is the approximate multiplicity
-        if j1 in ranked_modes[1:multiplicity]
-            j2 = ranked_modes[multiplicity+1]
-        else
-            j2 = ranked_modes[1]
-        end
+        if multiplicity < nev
+            # determine n+1 best unassigned fit, where n is the approximate multiplicity
+            if j1 in ranked_modes[1:multiplicity]
+                j2 = ranked_modes[multiplicity+1]
+            else
+                j2 = ranked_modes[1]
+            end
 
-        # assign best eigenmode fit, create corruption index
-        perm[i] = j1
-        corruption[i] = rval[j2]/rval[j1]
+            # assign best eigenmode fit, create corruption index
+            perm[i] = j1
+            corruption[i] = rval[j2]/rval[j1]
+        else
+            # assign best eigenmode fit, create corruption index
+            perm[i] = j1
+            corruption[i] = 0.0
+        end
     end
 
     # remaining modes

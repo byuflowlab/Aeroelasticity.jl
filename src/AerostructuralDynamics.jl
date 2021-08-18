@@ -19,7 +19,7 @@ export LiftingLine
 export TypicalSection
 export RigidBody
 export GEBT
-export LinearFlap
+export SimpleFlap
 export LiftingLineFlaps
 export Trim
 
@@ -38,10 +38,10 @@ export get_additional_parameters, set_additional_parameters!
 export separate_states
 export separate_inputs
 export separate_parameters
-export get_inputs, get_inputs!
 export get_rates, get_rates!
 export get_mass_matrix, get_mass_matrix!
 export get_state_jacobian, get_state_jacobian!
+export get_coupling_inputs, get_coupling_inputs!
 export get_eigen
 export get_ode
 export correlate_eigenmodes
@@ -67,7 +67,7 @@ include(joinpath("structures", "section.jl"))
 include(joinpath("structures", "liftingline-section.jl"))
 
 # Control Surface Models
-include(joinpath("control-surfaces", "linearflap.jl"))
+include(joinpath("control-surfaces", "simpleflap.jl"))
 
 # Controller Models
 include(joinpath("controllers", "liftingline-section-control.jl"))
@@ -77,17 +77,17 @@ include(joinpath("couplings", "two-dimensional", "quasisteady-section.jl"))
 include(joinpath("couplings", "two-dimensional", "wagner-section.jl"))
 include(joinpath("couplings", "two-dimensional", "peters-section.jl"))
 
-include(joinpath("couplings", "two-dimensional", "quasisteady-section-linearflap.jl"))
-include(joinpath("couplings", "two-dimensional", "wagner-section-linearflap.jl"))
-include(joinpath("couplings", "two-dimensional", "peters-section-linearflap.jl"))
+include(joinpath("couplings", "two-dimensional", "quasisteady-section-simpleflap.jl"))
+include(joinpath("couplings", "two-dimensional", "wagner-section-simpleflap.jl"))
+include(joinpath("couplings", "two-dimensional", "peters-section-simpleflap.jl"))
 
 include(joinpath("couplings", "two-dimensional", "quasisteady-liftingline.jl"))
 include(joinpath("couplings", "two-dimensional", "wagner-liftingline.jl"))
 include(joinpath("couplings", "two-dimensional", "peters-liftingline.jl"))
 
-include(joinpath("couplings", "two-dimensional", "quasisteady-liftingline-linearflap.jl"))
-include(joinpath("couplings", "two-dimensional", "wagner-liftingline-linearflap.jl"))
-include(joinpath("couplings", "two-dimensional", "peters-liftingline-linearflap.jl"))
+include(joinpath("couplings", "two-dimensional", "quasisteady-liftingline-simpleflap.jl"))
+include(joinpath("couplings", "two-dimensional", "wagner-liftingline-simpleflap.jl"))
+include(joinpath("couplings", "two-dimensional", "peters-liftingline-simpleflap.jl"))
 
 # Three-Dimensional Models
 

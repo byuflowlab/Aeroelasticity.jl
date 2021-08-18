@@ -17,7 +17,7 @@ coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Non
 
 # --- methods --- #
 
-function get_inputs(aero::Wagner, stru::LiftingLineSection, s, p, t)
+function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, s, p, t)
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
     # extract parameters
@@ -92,7 +92,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
+function get_coupling_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
     ds, s, p, t)
     # extract state rates
     dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz = ds

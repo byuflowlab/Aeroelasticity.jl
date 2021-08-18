@@ -189,7 +189,7 @@ end
 """
     set_inputs!(y, model; kwargs...)
 
-In-place version of [`get_inputs`](@ref)
+In-place version of [`get_coupling_inputs`](@ref)
 """
 set_inputs!
 
@@ -276,9 +276,9 @@ separate_states(model::NoStateModel, x) = ()
 
 function separate_states(models::NTuple{N,AbstractModel}, x) where N
 
-    xs = view.(x, state_indices.(models))
+    xs = view.(Ref(x), state_indices(models))
 
-    return ntuple(i->separate_states(xs[i], models[i]), N)
+    return ntuple(i->separate_states(models[i], xs[i]), N)
 end
 
 """
@@ -292,9 +292,9 @@ separate_inputs(model::NoStateModel, y) = ()
 
 function separate_inputs(models::NTuple{N,AbstractModel}, y) where N
 
-    ys = view.(y, input_indices.(models))
+    ys = view.(Ref(y), input_indices(models))
 
-    return ntuple(i->separate_inputs(ys[i], models[i]), N)
+    return ntuple(i->separate_inputs(models[i], ys[i]), N)
 end
 
 """
@@ -307,7 +307,7 @@ separate_parameters
 
 function separate_parameters(models::NTuple{N,AbstractModel}, p) where N
 
-    pmodels = view.(p, parameter_indices.(models))
+    pmodels = view.(Ref(p), parameter_indices(models))
     pmodels_sep = ntuple(i->separate_parameters(models[i], pmodels[i]), N)
 
     padd = view(p, additional_parameter_indices(models))
@@ -1257,54 +1257,54 @@ function _get_coupling_mass_matrix!(My, ::Linear, ::InPlace,
 end
 
 """
-    get_inputs_using_state_rates(models, u, p, t)
+    get_coupling_inputs_using_state_rates(models, u, p, t)
 
 Calculate the portion of the inputs which are dependent on the state rates.  This
 function is used to test the mass matrices associated with each input mass matrix.
 """
-function get_inputs_using_state_rates(models::NTuple{N,AbstractModel}, du, u, p, t) where N
-    return get_inputs_using_state_rates(models..., du, u, p, t)
+function get_coupling_inputs_using_state_rates(models::NTuple{N,AbstractModel}, du, u, p, t) where N
+    return get_coupling_inputs_using_state_rates(models..., du, u, p, t)
 end
 
 """
-    get_inputs(models, u, p, t)
+    get_coupling_inputs(models, u, p, t)
 
 Calculate the inputs to the specified combination of models.
 """
-function get_inputs(models::TM, u, p, t) where TM
-    return _get_inputs(coupling_inplaceness(TM.parameters...), models, u, p, t)
+function get_coupling_inputs(models::TM, u, p, t) where TM
+    return _get_coupling_inputs(coupling_inplaceness(TM.parameters...), models, u, p, t)
 end
 
 # dispatch to an in-place function
-function _get_inputs(::InPlace, models, u, p, t)
+function _get_coupling_inputs(::InPlace, models, u, p, t)
     Ny = number_of_inputs(models)
     y = similar(u, Ny)
-    get_inputs!(y, models, u, p, t)
+    get_coupling_inputs!(y, models, u, p, t)
     return y
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_inputs(::OutOfPlace, models::NTuple{N,AbstractModel}, u, p, t) where N
-    return get_inputs(models..., u, p, t)
+function _get_coupling_inputs(::OutOfPlace, models::NTuple{N,AbstractModel}, u, p, t) where N
+    return get_coupling_inputs(models..., u, p, t)
 end
 
 """
-    get_inputs!(y, models::NTuple{N,AbstractModel}, u, p, t) where N
+    get_coupling_inputs!(y, models::NTuple{N,AbstractModel}, u, p, t) where N
 
-In-place version of [`get_inputs`](@ref)
+In-place version of [`get_coupling_inputs`](@ref)
 """
-function get_inputs!(y, models::T, u, p, t) where T
-    return _get_inputs!(y, coupling_inplaceness(T.parameters...), models, u, p, t)
+function get_coupling_inputs!(y, models::T, u, p, t) where T
+    return _get_coupling_inputs!(y, coupling_inplaceness(T.parameters...), models, u, p, t)
 end
 
 # dispatch to an out-of-place function
-function _get_inputs!(y, ::OutOfPlace, models, u, p, t)
-    return y .= get_inputs(models, u, p, t)
+function _get_coupling_inputs!(y, ::OutOfPlace, models, u, p, t)
+    return y .= get_coupling_inputs(models, u, p, t)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_inputs!(y, ::InPlace, models::NTuple{N,AbstractModel}, u, p, t) where N
-    return get_inputs!(y, models..., u, p, t)
+function _get_coupling_inputs!(y, ::InPlace, models::NTuple{N,AbstractModel}, u, p, t) where N
+    return get_coupling_inputs!(y, models..., u, p, t)
 end
 
 """
@@ -1333,7 +1333,7 @@ function get_coupling_state_jacobian(args...)
     p = args[end-1]
     t = args[end]
 
-    f = u -> get_inputs(models, u, p, t)
+    f = u -> get_coupling_inputs(models, u, p, t)
 
     return ForwardDiff.jacobian(f, u)
 end
@@ -1417,7 +1417,7 @@ function get_coupling_state_jacobian!(Jy, args...)
     p = args[end-1]
     t = args[end]
 
-    f = u -> get_inputs(models, u, p, t)
+    f = u -> get_coupling_inputs(models, u, p, t)
 
     return copyto!(Jy, ForwardDiff.jacobian(f, u))
 end
@@ -1484,7 +1484,7 @@ function _get_eigen(::OutOfPlace, model, x, y, p, t)
     return λ, U, V
 end
 
-function _get_eigen(::InPlace, model, x, y, p, t; nev=20)
+function _get_eigen(::InPlace, model, x, y, p, t; nev=min(20, number_of_states(model)))
 
     # calculate the mass matrix corresponding to steady state operating conditions
     M = get_mass_matrix(model, x, y, p, t)
@@ -1648,7 +1648,7 @@ end
 
 function _get_ode(::Identity, ::OutOfPlace, model::Tuple)
 
-    fy = (u, p, t) -> get_inputs(models, u, p, t)
+    fy = (u, p, t) -> get_coupling_inputs(models, u, p, t)
 
     f = (u, p, t) -> get_rates(models, u, fy(u, p, t), p, t)
 
@@ -1659,7 +1659,7 @@ end
 
 function _get_ode(::Constant, ::OutOfPlace, model::Tuple)
 
-    fy = (u, p, t) -> get_inputs(models, u, p, t)
+    fy = (u, p, t) -> get_coupling_inputs(models, u, p, t)
 
     f = (u, p, t) -> get_rates(models, u, fy(u, p, t), p, t)
 
@@ -1674,9 +1674,9 @@ function _get_ode(::Linear, ::OutOfPlace, model::Tuple)
 
     Nu = number_of_states(model)
 
-    fy = (u, p, t) -> get_inputs(model, u, p, t)
+    fy = (u, p, t) -> get_coupling_inputs(model, u, p, t)
 
-    f = (du, u, p, t) -> get_rates!(du, model, u, fy(u, p, t), p, t)
+    f = (u, p, t) -> get_rates!(du, model, u, fy(u, p, t), p, t)
 
     M = zeros(Nu, Nu)
     update_func = (M, u, p, t) -> get_mass_matrix!(M, model, u, fy(u, p, t), p, t)
@@ -1705,7 +1705,7 @@ function _get_ode(::Identity, ::InPlace, model::Tuple)
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1713,7 +1713,7 @@ function _get_ode(::Identity, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # calculate state rates
         get_rates!(du, model, u, y, p, t)
@@ -1726,7 +1726,7 @@ function _get_ode(::Identity, ::InPlace, model::Tuple)
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1734,7 +1734,7 @@ function _get_ode(::Identity, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # calculate jacobian
         get_state_jacobian!(J, model, u, y, p, t)
@@ -1762,7 +1762,7 @@ function _get_ode(::Constant, ::InPlace, model::Tuple)
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1770,7 +1770,7 @@ function _get_ode(::Constant, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # calculate state rates
         get_rates!(du, model, u, y, p, t)
@@ -1786,7 +1786,7 @@ function _get_ode(::Constant, ::InPlace, model::Tuple)
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1794,7 +1794,7 @@ function _get_ode(::Constant, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # calculate jacobian
         get_state_jacobian!(J, model, u, y, p, t)
@@ -1822,7 +1822,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1830,7 +1830,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # calculate state rates
         get_rates!(du, model, u, y, p, t)
@@ -1846,7 +1846,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 # store current input arguments
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1854,7 +1854,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # update type of `My`
         My = convert(typeof(M), My_cache)
@@ -1870,7 +1870,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u
-                get_inputs!(ycache, model, u, p, t)
+                get_coupling_inputs!(ycache, model, u, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1878,7 +1878,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, u, p, t)
         end
         # calculate jacobian
         get_state_jacobian!(J, model, u, y, p, t)
@@ -1902,7 +1902,7 @@ end
 
 @recipe function f(models::NTuple{N,AbstractModel}, x, p, t) where N
 
-    y = get_inputs(models, x, p, t)
+    y = get_coupling_inputs(models, x, p, t)
 
     return models..., x, y, p, t
 end
@@ -1915,7 +1915,7 @@ end
     p = sol.prob.p
     t = sol.t[it]
 
-    y = get_inputs(models, x, p, t)
+    y = get_coupling_inputs(models, x, p, t)
 
     return models..., x, y, p, t
 end
@@ -1925,7 +1925,7 @@ end
     x = sol(t)
     p = sol.prob.p
 
-    y = get_inputs(models, x, p, t)
+    y = get_coupling_inputs(models, x, p, t)
 
     return models..., x, y, p, t
 end

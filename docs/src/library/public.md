@@ -43,8 +43,8 @@ parameter_indices
 The following methods may be used to calculate the value of the inputs for a coupled model.
 
 ```@docs
-get_inputs
-get_inputs!
+get_coupling_inputs
+get_coupling_inputs!
 ```
 
 ### Getting State Rates

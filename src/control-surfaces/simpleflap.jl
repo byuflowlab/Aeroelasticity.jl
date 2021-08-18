@@ -1,25 +1,25 @@
 """
-    LinearFlap <: NoStateModel
+    SimpleFlap <: NoStateModel
 
 Linear, steady-state, two-dimensional control surface model with parameters
 ``c_{l,\\delta}``, ``c_{d,\\delta}``, and ``c_{m,\\delta}``.
 """
-struct LinearFlap <: NoStateModel end
+struct SimpleFlap <: NoStateModel end
 
 """
-    LinearFlap()
+    SimpleFlap()
 
-Initialize an object of type [`LinearFlap`](@ref)
+Initialize an object of type [`SimpleFlap`](@ref)
 """
-LinearFlap()
+SimpleFlap()
 
 # --- Traits --- #
 
-number_of_parameters(::Type{LinearFlap}) = 3
+number_of_parameters(::Type{SimpleFlap}) = 3
 
 # --- Convenience Methods --- #
 
-function set_parameters!(p, model::LinearFlap; cld, cdd, cmd)
+function set_parameters!(p, model::SimpleFlap; cld, cdd, cmd)
 
     p[1] = cld
     p[2] = cdd
@@ -28,7 +28,7 @@ function set_parameters!(p, model::LinearFlap; cld, cdd, cmd)
     return p
 end
 
-function separate_parameters(model::LinearFlap, p)
+function separate_parameters(model::SimpleFlap, p)
 
     return (cld=p[1], cdd=p[2], cmd=p[3])
 end
