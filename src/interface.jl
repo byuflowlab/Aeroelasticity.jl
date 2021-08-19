@@ -1866,7 +1866,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
     # construct jacobian function
     jac = (J, u, p, t) -> begin
         # check if we can use the cache variables (no custom types)
-        if eltype(du) <: Float64
+        if eltype(J) <: Float64
             # update the cache variables
             if (u != ucache) && (p != pcache) && (t != tcache[])
                 ucache .= u

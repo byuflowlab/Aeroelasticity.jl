@@ -111,19 +111,19 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::QuasiSteady{0}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::QuasiSteady{0}, stru::TypicalSection,
     dq, q, p, t)
 
     return @SVector zeros(2)
 end
 
-function get_inputs_using_state_rates(aero::QuasiSteady{1}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::QuasiSteady{1}, stru::TypicalSection,
     dq, q, p, t)
 
     return @SVector zeros(2)
 end
 
-function get_inputs_using_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
     dq, q, p, t)
     # extract state rates
     dh, dθ, dhdot, dθdot = dq

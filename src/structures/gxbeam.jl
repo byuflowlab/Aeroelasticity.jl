@@ -493,7 +493,8 @@ function set_parameters!(p, model::GEBT; assembly)
     return p
 end
 
-function separate_states(model::GEBT, x)
+function separate_states(model::GEBT, x;
+    point_conditions = fill(NaN, 6, length(model.icol_point)))
 
     TF = eltype(x)
     np = length(model.icol_point)
@@ -518,20 +519,20 @@ function separate_states(model::GEBT, x)
         prescribed_forces = SVector{6}(view(model.displacement, :, ip)) .== false
 
         # get the displacement and rotations of the point
-        u_p[ip] = SVector(ifelse(prescribed_forces[1], x[icol  ], NaN),
-                    ifelse(prescribed_forces[2], x[icol+1], NaN),
-                    ifelse(prescribed_forces[3], x[icol+2], NaN))
-        theta_p[ip] = SVector(ifelse(prescribed_forces[4], x[icol+3], NaN),
-                    ifelse(prescribed_forces[5], x[icol+4], NaN),
-                    ifelse(prescribed_forces[6], x[icol+5], NaN))
+        u_p[ip] = SVector(ifelse(prescribed_forces[1], x[icol  ], point_conditions[1,ip]),
+                    ifelse(prescribed_forces[2], x[icol+1], point_conditions[2,ip]),
+                    ifelse(prescribed_forces[3], x[icol+2], point_conditions[3,ip]))
+        theta_p[ip] = SVector(ifelse(prescribed_forces[4], x[icol+3], point_conditions[4,ip]),
+                    ifelse(prescribed_forces[5], x[icol+4], point_conditions[5,ip]),
+                    ifelse(prescribed_forces[6], x[icol+5], point_conditions[6,ip]))
 
         # overwrite external forces/moments with solved for forces/moments
-        F_p[ip] = SVector(ifelse(prescribed_forces[1], NaN, x[icol  ] * model.force_scaling),
-                    ifelse(prescribed_forces[2], NaN, x[icol+1] * model.force_scaling),
-                    ifelse(prescribed_forces[3], NaN, x[icol+2] * model.force_scaling))
-        M_p[ip] = SVector(ifelse(prescribed_forces[4], NaN, x[icol+3] * model.force_scaling),
-                    ifelse(prescribed_forces[5], NaN, x[icol+4] * model.force_scaling),
-                    ifelse(prescribed_forces[6], NaN, x[icol+5] * model.force_scaling))
+        F_p[ip] = SVector(ifelse(prescribed_forces[1], point_conditions[1,ip], x[icol  ] * model.force_scaling),
+                    ifelse(prescribed_forces[2], point_conditions[2,ip], x[icol+1] * model.force_scaling),
+                    ifelse(prescribed_forces[3], point_conditions[3,ip], x[icol+2] * model.force_scaling))
+        M_p[ip] = SVector(ifelse(prescribed_forces[4], point_conditions[4,ip], x[icol+3] * model.force_scaling),
+                    ifelse(prescribed_forces[5], point_conditions[5,ip], x[icol+4] * model.force_scaling),
+                    ifelse(prescribed_forces[6], point_conditions[6,ip], x[icol+5] * model.force_scaling))
 
         # convert rotation parameter to Wiener-Milenkovic parameters
         scaling = GXBeam.rotation_parameter_scaling(theta_p[ip])

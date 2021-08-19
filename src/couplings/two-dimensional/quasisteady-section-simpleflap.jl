@@ -41,7 +41,7 @@ coupling_state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}, ::T
 
 # --- methods --- #
 
-function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::SimpleFlap,
+function get_coupling_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::SimpleFlap,
     q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
@@ -59,7 +59,7 @@ function get_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::SimpleFlap
     return SVector(L, M)
 end
 
-function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, flap::SimpleFlap,
+function get_coupling_inputs(aero::QuasiSteady{1}, stru::TypicalSection, flap::SimpleFlap,
     q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
@@ -78,7 +78,7 @@ function get_inputs(aero::QuasiSteady{1}, stru::TypicalSection, flap::SimpleFlap
     return SVector(L, M)
 end
 
-function get_inputs(aero::QuasiSteady{2}, stru::TypicalSection, flap::SimpleFlap,
+function get_coupling_inputs(aero::QuasiSteady{2}, stru::TypicalSection, flap::SimpleFlap,
     q, p, t)
     # extract state variables
     h, θ, hdot, θdot = q
@@ -133,19 +133,19 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::QuasiSteady{0}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::QuasiSteady{0}, stru::TypicalSection,
     flap::SimpleFlap, dq, q, p, t)
 
     return @SVector zeros(2)
 end
 
-function get_inputs_using_state_rates(aero::QuasiSteady{1}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::QuasiSteady{1}, stru::TypicalSection,
     flap::SimpleFlap, dq, q, p, t)
 
     return @SVector zeros(2)
 end
 
-function get_inputs_using_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
+function get_coupling_inputs_using_state_rates(aero::QuasiSteady{2}, stru::TypicalSection,
     flap::SimpleFlap, dq, q, p, t)
     # extract state rates
     dh, dθ, dhdot, dθdot = dq
