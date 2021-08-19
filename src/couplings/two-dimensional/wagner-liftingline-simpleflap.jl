@@ -43,7 +43,7 @@ end
 
 # --- methods --- #
 
-function get_inputs(aero::Wagner, stru::LiftingLineSection,
+function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection,
     flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t)
     # extract model constants
     C1 = aero.C1
@@ -141,7 +141,7 @@ end
 
 # --- unit testing methods --- #
 
-function get_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
+function get_coupling_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
     flap::SimpleFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
     # extract state rates
     dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx

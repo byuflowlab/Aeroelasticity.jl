@@ -677,11 +677,11 @@ p_additional = get_additional_parameters(model;
 
 p = vcat(p_aero, p_stru, p_additional)
 
-# simulate from 0 to 100 seconds
-tspan = (0.0, 100.0)
+# simulate from 0 to 10 seconds
+tspan = (0.0, 10.0)
 
 # construct ODE function
-f = get_ode(coupled_model)
+f = get_ode(model)
 
 # construct ODE problem
 prob = DifferentialEquations.ODEProblem(f, u0, tspan, p)
