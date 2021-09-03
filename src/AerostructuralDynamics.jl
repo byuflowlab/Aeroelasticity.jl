@@ -5,7 +5,7 @@ using ForwardDiff
 using GXBeam
 using LinearAlgebra
 using LinearMaps
-using InfiniteArrays
+using FillArrays
 using StaticArrays
 using DiffEqBase
 using RecipesBase
