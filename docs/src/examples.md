@@ -227,7 +227,9 @@ nothing #hide
 
 ![](typical-section-stability.svg)
 
-Using the Wagner and/or Peters aerodynamic models yields a flutter reduced velocity around 2.2, while the steady and/or quasi-steady aerodynamic models predict significantly lower flutter velocities.  We can visualize and/or create animations of the flutter mode with the help of custom plot recipes.
+Using the Wagner and/or Peters aerodynamic models yields a flutter reduced velocity around 2.2, while the steady and/or quasi-steady aerodynamic models predict significantly lower flutter velocities.  The aerodynamic state variables of the Wagner and Peters models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the steady-state and quasi-steady models.
+
+We can visualize and/or create animations of the flutter mode with the help of custom plot recipes.
 
 ```@example typical-section
 
@@ -279,12 +281,9 @@ gif(anim, "typical-section-flutter-mode.gif")
 nothing #hide
 ```
 
-
-  The aerodynamic state variables of the Wagner and Peters models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the steady-state and quasi-steady models.
-
 The non-dimensional parameters we use for this example match those used by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity".  Hodges and Pierce performed the analysis using a steady state model and Peter's finite state model with six state variables.   The results presented here for the steady-state and Peters' finite state models match the results presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity", which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters' models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.
 
-For this example, all of our aeroelastic systems were linear, so we used a linear stability analysis to assess their stability. Alternatively, we perform time domain simulations in order to determine the system's stability.  To perform these time domain simulations, we first create objects of type `DifferentialEquations.ODEFunction` using [`get_ode`](@ref), then use the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package to solve the ordinary differential equation corresponding to the model.
+Time domain simulations may also be used in order to determine a system's stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the [`get_ode`](@ref) function and then solved using the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package.
 
 ```@example typical-section-stability
 using DifferentialEquations
@@ -428,7 +427,7 @@ The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its ai
 
 The deflections of Goland wing are relatively small, so linear structural models are sufficient for modeling the wing's structure.  However, to demonstrate the capabilities of this package, we will use a nonlinear geometrically exact beam theory model.  
 
-For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is likely inappropriate for this wing due to the wing's low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.
+For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is inappropriate for this wing due to the wing's low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.
 
 ```@example goland-stability
 using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
@@ -508,17 +507,19 @@ f = get_ode(model)
 # current time
 t = 0.0
 
-# eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
+# eigenvalue/eigenvector storage
+nev = 12*N
+λ = zeros(ComplexF64, nev, length(Vinf))
+Uλ = zeros(ComplexF64, nev, number_of_states(model), length(Vinf))
+Vλ = zeros(ComplexF64, number_of_states(model), nev, length(Vinf))
 
 # initial guess for state variables
 u0 = zeros(number_of_states(model))
 
-# previous left eigenvector matrix
-local Uλpi
-
 # loop through each velocity
 for i = 1:length(Vinf)
+
+    println(Vinf[i])
 
     # set parameters
     p_aero = get_parameters(aerodynamic_model; section_parameters =
@@ -550,11 +551,14 @@ for i = 1:length(Vinf)
     y = get_coupling_inputs(model, u, p, t)
 
     # perform linear stability analysis
-    λi, Uλi, Vλi = get_eigen(model, u, y, p, t; nev = number_of_states(model))
+    λi, Uλi, Vλi = get_eigen(model, u, y, p, t; nev)
 
     # correlate eigenvalues
     if i > 1
-        # calculate mass matrix
+        # previous left eigenvector matrix
+        Uλpi = Uλ[:,:,i-1]
+
+        # current mass matrix
         Mi = get_mass_matrix(model, u, y, p, t)
 
         # use correlation matrix to correlate eigenmodes
@@ -566,52 +570,55 @@ for i = 1:length(Vinf)
         Vλi = Vλi[:,perm]
     end
 
-    # save eigenvalues
+    # save eigenvalues/eigenvectors
     λ[:,i] = λi
-
-    # save previous left eigenvector matrix
-    Uλpi = Uλi
+    Uλ[:,:,i] = Uλi
+    Vλ[:,:,i] = Vλi
 
     # update initial guess for the state variables
     u0 .= u
 end
 ```
 
-We now plot the results predicted using each aerodynamic model.
+To identify the flutter speed and frequency, we can plot the results.
 
 ```@example goland-stability
 using Plots
 pyplot()
 
-default(
+sp1 = plot(
+    xlim = (0, 200),
+    xtick = 0:40:200,
+    xlabel = "Velocity (m/s)",
+    ylim = (0, 800),
+    ytick = 0:100:800,
+    ylabel = "Frequency (rad/s)",
+    framestyle = :zerolines,
     titlefontsize = 14,
-    legendfontsize = 11,
     guidefontsize = 14,
+    legendfontsize = 11,
     tickfontsize = 11,
+    legend = :topright,
     foreground_color_legend = nothing,
     background_color_legend = nothing,
-    minorgrid=true,
-    framestyle = :zerolines)
-
-sp1 = plot(
-    xlim = (138,142),#(0, 200),
-    #xtick = 0:40:200,
-    xlabel = "Velocity (m/s)",
-    ylim = (69,70),#(0, 800),
-    #ytick = 0:100:800,
-    ylabel = "Frequency (rad/s)",
-    legend = :topright
-    )
+    minorgrid=true)
 
 sp2 = plot(
-    xlim = (138,142),#(0, 200),
-    #xtick = 0:40:200,
+    xlim = (0, 200),
+    xtick = 0:40:200,
     xlabel = "Velocity (m/s)",
-    ylim = (-1,1),#(-80, 20),
+    ylim = (-80, 20),
     ytick = -80:20:20,
     ylabel = "Damping (1/s)",
-    legend = :topleft
-    )
+    framestyle = :zerolines,
+    titlefontsize = 14,
+    guidefontsize = 14,
+    legendfontsize = 11,
+    tickfontsize = 11,
+    legend = :topright,
+    foreground_color_legend = nothing,
+    background_color_legend = nothing,
+    minorgrid=true)
 
 for i = 1:size(λ, 1)
 
@@ -655,7 +662,7 @@ using DifferentialEquations
 
 Vinf = 100.0
 
-u = zeros(number_of_states(model))
+u0 = zeros(number_of_states(model))
 
 # set parameters
 p_aero = get_parameters(aerodynamic_model; section_parameters =
@@ -677,6 +684,9 @@ p_additional = get_additional_parameters(model;
 
 p = vcat(p_aero, p_stru, p_additional)
 
+# update initial state variables with steady state solution
+u0 .= solve(SteadyStateProblem(f, u0, p), SSRootfind())
+
 # simulate from 0 to 10 seconds
 tspan = (0.0, 10.0)
 
@@ -691,7 +701,6 @@ sol = DifferentialEquations.solve(prob)
 
 nothing #hide
 ```
-
 
 ## Aeroelastic Analysis of a Highly Flexible Cantilever Wing
 
@@ -711,7 +720,7 @@ The wing we are considering in this example was created by modifying Daedalus ai
 using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
 
 # discretization
-N = 8 # number of elements
+N = 1 # number of elements
 
 # geometric properties
 span = 16 # m
