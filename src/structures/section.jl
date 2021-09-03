@@ -1,11 +1,11 @@
 """
-    TypicalSection <: AbstractModel
+    TypicalSection <: UnsteadyModel
 
 Typical section structural model with state variables ``h, \\theta, \\dot{h},
 \\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
 k_\\theta, m, S_\\theta, I_\\theta``
 """
-struct TypicalSection <: AbstractModel end
+struct TypicalSection <: UnsteadyModel end
 
 """
     TypicalSection()
@@ -20,76 +20,55 @@ number_of_states(::Type{TypicalSection}) = 4
 number_of_inputs(::Type{TypicalSection}) = 2
 number_of_parameters(::Type{TypicalSection}) = 5
 inplaceness(::Type{TypicalSection}) = OutOfPlace()
-mass_matrix_type(::Type{TypicalSection}) = Linear()
-state_jacobian_type(::Type{TypicalSection}) = Linear()
+rate_jacobian_type(::Type{TypicalSection}) = Identity()
+state_jacobian_type(::Type{TypicalSection}) = Constant()
 input_jacobian_type(::Type{TypicalSection}) = Constant()
+parameter_jacobian_type(::Type{TypicalSection}) = Linear()
 
 # --- Methods --- #
 
-function get_rates(::TypicalSection, q, r, p, t)
+function get_residual(::TypicalSection, dx, x, y, p, t)
+    # extract rates
+    dh, dθ, dhdot, dθdot = dx
+    # extract states
+    h, θ, hdot, θdot = x
+    # extract inputs
+    L, M = y
+    # extract parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # calculate state rates
+    return section_residual(dh, dθ, dhdot, dθdot, h, θ, hdot, θdot, L, M,
+        kh, kθ, m, Sθ, Iθ)
+end
+
+# --- Performance Overloads --- #
+
+function get_state_jacobian(::TypicalSection, p)
+    # extract parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # return jacobian
+    return -section_state_jacobian(kh, kθ, m, Sθ, Iθ)
+end
+
+function get_input_jacobian(::TypicalSection, p)
+    # extract parameters
+    kh, kθ, m, Sθ, Iθ = p
+    # return jacobian
+    return -section_input_jacobian(kh, kθ, m, Sθ, Iθ)
+end
+
+function get_parameter_jacobian(::TypicalSection, q, r, p, t)
     # extract structural states
     h, θ, hdot, θdot = q
     # extract aerodynamic loads
     L, M = r
     # extract structural parameters
     kh, kθ, m, Sθ, Iθ = p
-    # calculate state rates
-    return section_rhs(kh, kθ, h, θ, hdot, θdot, L, M)
-end
-
-function get_mass_matrix(::TypicalSection, q, r, p, t)
-    # extract structural parameters
-    kh, kθ, m, Sθ, Iθ = p
-    # calculate mass matrix
-    return section_mass_matrix(m, Sθ, Iθ)
-end
-
-# --- Performance Overloads --- #
-
-function get_state_jacobian(::TypicalSection, q, r, p, t)
-    # extract parameters
-    kh, kθ, m, Sθ, Iθ = p
     # return jacobian
-    return section_state_jacobian(kh, kθ)
+    return -section_parameter_jacobian(h, θ, hdot, θdot, L, M, kh, kθ, m, Sθ, Iθ)
 end
 
-function get_input_jacobian(::TypicalSection)
-    # return jacobian
-    return section_input_jacobian()
-end
-
-# --- Unit Testing Methods --- #
-
-function get_lhs(::TypicalSection, dq, q, r, p, t)
-    # extract structural parameters
-    kh, kθ, m, Sθ, Iθ = p
-    # extract state rates
-    dh, dθ, dhdot, dθdot = dq
-    # calculate mass matrix product
-    return section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)
-end
-
-# --- Plotting --- #
-
-@recipe function f(model::TypicalSection, x, y, p, t)
-
-    framestyle --> :origin
-    grid --> false
-    xticks --> false
-    xlims --> (-1.0, 1.0)
-    ylims --> (-1.5, 1.5)
-    label --> @sprintf("t = %6.3f", t)
-
-    h = x[1]
-    θ = x[2]
-
-    xplot = [-0.5*cos(θ),  0.5*cos(θ)]
-    yplot = [ 0.5*sin(θ)-h, -0.5*sin(θ)-h]
-
-    xplot, yplot
-end
-
-# --- Convenience Functions --- #
+# --- Convenience Methods --- #
 
 function set_states!(x, model::TypicalSection; h, theta, hdot, thetadot)
 
@@ -135,27 +114,106 @@ function separate_parameters(model::TypicalSection, p)
     return (kh = p[1], ktheta = p[2], m = p[3], Stheta = p[4], Itheta = p[5])
 end
 
+# --- Plotting --- #
+
+@recipe function f(model::TypicalSection, x, y, p, t)
+
+    framestyle --> :origin
+    grid --> false
+    xticks --> false
+    xlims --> (-1.0, 1.0)
+    ylims --> (-1.5, 1.5)
+    label --> @sprintf("t = %6.3f", t)
+
+    h = x[1]
+    θ = x[2]
+
+    xplot = [-0.5*cos(θ),  0.5*cos(θ)]
+    yplot = [ 0.5*sin(θ)-h, -0.5*sin(θ)-h]
+
+    xplot, yplot
+end
+
 # --- Internal Methods --- #
 
-# left side of rate equations
-function section_lhs(m, Sθ, Iθ, dh, dθ, dhdot, dθdot)
-    SVector(dh, dθ, m*dhdot + Sθ*dθdot, Sθ*dhdot + Iθ*dθdot)
+# state rate residual
+function section_residual(dh, dθ, dhdot, dθdot, h, θ, hdot, θdot, L, M, kh, kθ, m, Sθ, Iθ)
+    dx = SVector(dh, dθ, dhdot, dθdot)
+    xdot = section_rates(h, θ, hdot, θdot, L, M, kh, kθ, m, Sθ, Iθ)
+    return dx - xdot
 end
 
-# right side of rate equations
-function section_rhs(kh, kθ, h, θ, hdot, θdot, L, M)
-    SVector(hdot, θdot, -kh*h - L, -kθ*θ + M)
+# state rates
+function section_rates(h, θ, hdot, θdot, L, M, kh, kθ, m, Sθ, Iθ)
+    dh = hdot
+    dθ = θdot
+    dhdot = (-Iθ*kh*h + Sθ*kθ*θ + Iθ*L + Sθ*M) / (m*Iθ - Sθ^2)
+    dθdot = ( Sθ*kh*h - m*kθ*θ + Sθ*L + m*M) / (m*Iθ - Sθ^2)
+    return SVector(dh, dθ, dhdot, dθdot)
 end
 
-# mass matrix (lhs jacobian wrt state rates)
-function section_mass_matrix(m, Sθ, Iθ)
-    @SMatrix [1 0 0 0; 0 1 0 0; 0 0 m Sθ; 0 0 Sθ Iθ]
+# jacobian of state rates wrt states
+function section_state_jacobian(kh, kθ, m, Sθ, Iθ)
+    tmp = m*Iθ - Sθ^2
+    @SMatrix [0 0 1 0; 0 0 0 1; -Iθ*kh/tmp Sθ*kθ/tmp 0 0; Sθ*kh/tmp -m*kθ/tmp 0 0]
 end
 
-# rhs jacobian wrt states
-function section_state_jacobian(kh, kθ)
-    @SMatrix [0 0 1 0; 0 0 0 1; -kh 0 0 0; 0 -kθ 0 0]
+# jacobian of state rates wrt inputs
+function section_input_jacobian(kh, kθ, m, Sθ, Iθ)
+    tmp = m*Iθ - Sθ^2
+    return @SMatrix [0 0; 0 0; Iθ/tmp Sθ/tmp; Sθ/tmp m/tmp]
 end
 
-# rhs jacobian wrt inputs
-section_input_jacobian() = @SMatrix [0 0; 0 0; -1 0; 0 1]
+# jacobian of state rates wrt parameters
+function section_parameter_jacobian(h, θ, hdot, θdot, L, M, kh, kθ, m, Sθ, Iθ)
+
+    tmp = 1/(m*Iθ - Sθ^2)
+    tmp_m = -Iθ/(m*Iθ - Sθ^2)^2
+    tmp_S = 2*Sθ/(m*Iθ - Sθ^2)^2
+    tmp_Iθ = -m/(m*Iθ - Sθ^2)^2
+
+    dhdot = (-Iθ*kh*h + Sθ*kθ*θ + Iθ*L + Sθ*M) * tmp
+    dhdot_kh = -Iθ*h*tmp
+    dhdot_kθ = Sθ*θ*tmp
+    dhdot_m = dhdot*tmp_m
+    dhdot_S = (kθ*θ + M) * tmp + dhdot*tmp_S
+    dhdot_Iθ = (-kh*h + L) * tmp + dhdot*tmp_Iθ
+
+    dθdot = ( Sθ*kh*h - m*kθ*θ + Sθ*L + m*M) * tmp
+    dθdot_kh = Sθ*h*tmp
+    dθdot_kθ = -m*θ*tmp
+    dθdot_m = (-kθ*θ + M)*tmp + dθdot*tmp_m
+    dθdot_S = (kh*h + L) * tmp + dθdot*tmp_S
+    dθdot_Iθ = dθdot*tmp_Iθ
+
+    return @SMatrix [
+        0 0 0 0 0;
+        0 0 0 0 0;
+        dhdot_kh dhdot_kθ dhdot_m dhdot_S dhdot_Iθ;
+        dθdot_kh dθdot_kθ dθdot_m dθdot_S dθdot_Iθ;
+        ]
+end
+
+function section_velocities(U, θ, hdot, θdot)
+
+    u = U
+    v = U*θ + hdot
+    ω = θdot
+
+    return SVector(u, v, ω)
+end
+
+section_velocities_U(U, θ, hdot, θdot) = SVector(1, θ, 0)
+section_velocities_θ(U, θ, hdot, θdot) = SVector(0, U, 0)
+section_velocities_hdot(U, θ, hdot, θdot) = SVector(0, 1, 0)
+section_velocities_θdot() = SVector(0, 0, 1)
+
+function section_accelerations(dhdot, dθdot)
+    udot = 0
+    vdot = dhdot
+    ωdot = dθdot
+    return SVector(udot, vdot, ωdot)
+end
+
+section_accelerations_dhdot() = SVector(0, 1, 0)
+section_accelerations_dθdot() = SVector(0, 0, 1)

@@ -1,7 +1,7 @@
 """
     couple_models(models...)
 
-Function which couples multiple models together to form a coupled model.
+Couples multiple models together to form a coupled model.
 """
 couple_models(models...) = models
 
@@ -12,8 +12,19 @@ Return the total number of states corresponding to the model or models.
 """
 number_of_states
 
+# dispatch on model object
+function number_of_states(model::TM) where TM <: AbstractModel
+    return _number_of_states(unsteadyness(TM), model)
+end
+
+# dispatch on model type
+function number_of_states(::Type{TM}) where TM <: AbstractModel
+    return _number_of_states()
+end
+
 # by default, dispatch on type
 number_of_states(model::TM) where TM <: AbstractModel = number_of_states(TM)
+
 
 # models with no states have... no states
 number_of_states(::Type{TM}) where TM <: NoStateModel = 0
@@ -317,6 +328,264 @@ function separate_parameters(models::NTuple{N,AbstractModel}, p) where N
 end
 
 """
+    get_residual(models, dx, x, y, p, t)
+
+Calculate the residual for the specified model or models.
+"""
+function get_residual(models::T, dx, x, y, p, t) where T
+    return _get_residual(inplaceness(T), models, dx, x, y, p, t)
+end
+
+function get_residual(models::T, args...) where T<:NoStateModel
+    return SVector{0,Float64}()
+end
+
+function get_residual(models::T, args...) where T <: NoStateModel
+    return SVector{0,Float64}()
+end
+
+# dispatch to an in-place function
+function _get_residual(::InPlace, models, dx, x, y, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
+    resid = similar(dx, TF)
+    get_residual!(resid, models, dx, x, y, p, t)
+    return dx
+end
+
+# calculate residual for a combination of models
+function _get_residual(::OutOfPlace, models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    return get_model_residual(models, dx, x, y, p, t)
+end
+
+@generated function get_model_residual(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nu = number_of_states.(models.parameters)
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize residual names
+    resid = [Symbol("resid", i) for i = 1:N]
+
+    expr = :()
+    for i = 1:N
+        expr = quote
+            $expr
+            $(resid[i]) = get_residual(models[$i], dx[$(iu[i])], x[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
+        end
+    end
+
+    expr = quote
+        $expr
+        dx = vcat($(resid...))
+    end
+
+    return expr
+end
+
+"""
+    get_residual!(resid, models, dx, x, y, p, t)
+
+In-place version of [`get_residual`](@ref)
+"""
+function get_residual!(resid, models::T, dx, x, y, p, t) where T
+    return _get_residual!(resid, inplaceness(T), models, dx, x, y, p, t)
+end
+
+# dispatch to an out-of-place function
+function _get_residual!(resid, ::OutOfPlace, models, dx, x, y, p, t)
+    return resid .= get_residual(models, dx, x, y, p, t)
+end
+
+# calculate state residual for a combination of models
+function _get_residual!(resid, ::InPlace, models::NTuple{N,AbstractModel}, dx,
+    x, y, p, t) where N
+
+    iu = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    for i = 1:length(models)
+        vresid = view(resid, iu[i])
+        vdx = view(dx, iu[i])
+        vx = view(x, iu[i])
+        vy = view(y, iy[i])
+        vp = view(p, ip[i])
+        get_residual!(vresid, models[i], vdx, vx, vy, vp, t)
+    end
+
+    return resid
+end
+
+"""
+    get_rates(models, x, y, p, t)
+
+Calculate the (mass-matrix multipled) state rates for the specified model or models.
+"""
+function get_rates(models::T, x, y, p, t) where T
+    return _get_rates(rate_jacobian_type(T), inplaceness(T), models, x, y, p, t)
+end
+
+function get_rates(models::T, args...) where T<:NoStateModel
+    return SVector{0,Float64}()
+end
+
+# dispatch to an in-place function
+function _get_rates(::Any, ::InPlace, models, x, y, p, t)
+    TF = promote_type(eltype(x), eltype(y), eltype(p), typeof(t))
+    du = similar(x, TF)
+    get_rates!(du, models, x, y, p, t)
+    return du
+end
+
+# derive state rates from residual expression
+function _get_rates(::Identity, ::OutOfPlace, models, x, y, p, t)
+    return -get_residual(models, Zeros(x), x, y, p, t)
+end
+
+# derive state rates from residual expression
+function _get_rates(::Invariant, ::OutOfPlace, models, x, y, p, t)
+    return -get_residual(models, Zeros(x), x, y, p, t)
+end
+
+# derive state rates from residual expression
+function _get_rates(::Constant, ::OutOfPlace, models, x, y, p, t)
+    return -get_residual(models, Zeros(x), x, y, p, t)
+end
+
+# derive state rates from residual expression
+function _get_rates(::Linear, ::OutOfPlace, models, x, y, p, t)
+    return -get_residual(models, Zeros(x), x, y, p, t)
+end
+
+# calculate state rates for a combination of models
+function _get_rates(::OutOfPlace, models::NTuple{N,AbstractModel}, x, y, p, t) where N
+    return get_model_rates(models, x, y, p, t)
+end
+
+@generated function get_model_rates(models::NTuple{N,AbstractModel}, x, y, p, t) where N
+    # get indices of state, input, and parameter vectors for each model
+    Nu = number_of_states.(models.parameters)
+    iu2 = cumsum(Nu)
+    iu1 = iu2 .- Nu .+ 1
+    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize state variable names
+    dui = [Symbol("du", i) for i = 1:N]
+
+    expr = :()
+    for i = 1:N
+        expr = quote
+            $expr
+            $(dui[i]) = get_rates(models[$i], u[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
+        end
+    end
+
+    expr = quote
+        $expr
+        du = vcat($(dui...))
+    end
+
+    return expr
+end
+
+"""
+    get_rates!(dx, models, x, y, p, t)
+
+In-place version of [`get_rates`](@ref)
+"""
+function get_rates!(dx, models::T, x, y, p, t) where T
+    return _get_rates!(dx, inplaceness(T), models, x, y, p, t)
+end
+
+# dispatch to an out-of-place function
+function _get_rates!(dx, ::OutOfPlace, models, x, y, p, t)
+    return dx .= get_rates(models, x, y, p, t)
+end
+
+# derive state rates from residual expression
+function _get_rates!(dx, ::Identity, ::OutOfPlace, models, x, y, p, t)
+
+    get_residual!(dx, models, Zeros(x), x, y, p, t)
+
+    dx .*= -1
+
+    return dx
+end
+
+# derive state rates from residual expression
+function _get_rates!(::Invariant, ::OutOfPlace, models, x, y, p, t)
+
+    get_residual!(dx, models, Zeros(x), x, y, p, t)
+
+    dx .*= -1
+
+    return dx
+end
+
+# derive state rates from residual expression
+function _get_rates!(::Constant, ::OutOfPlace, models, x, y, p, t)
+
+    get_residual!(dx, models, Zeros(x), x, y, p, t)
+
+    dx .*= -1
+
+    return dx
+end
+
+# derive state rates from residual expression
+function _get_rates!(::Linear, ::OutOfPlace, models, x, y, p, t)
+
+    get_residual!(dx, models, Zeros(x), x, y, p, t)
+
+    dx .*= -1
+
+    return dx
+end
+
+# calculate state rates for a combination of models
+function _get_rates!(dx, ::InPlace, models::NTuple{N,AbstractModel}, x, y, p, t) where N
+
+    iu = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    for i = 1:length(models)
+        vdx = view(dx, iu[i])
+        vx = view(x, iu[i])
+        vy = view(y, iy[i])
+        vp = view(p, ip[i])
+        get_rates!(vdx, models[i], vx, vy, vp, t)
+    end
+
+    return dx
+end
+
+"""
     get_mass_matrix(models)
     get_mass_matrix(models, u, y, p, t)
 
@@ -583,109 +852,6 @@ function _get_mass_matrix!(M, ::Linear, ::InPlace,
     end
 
     return M
-end
-
-"""
-    get_lhs(model, u, y, p, t)
-
-Return the left hand side of the governing differential equations for the model.
-This method is used for testing the mass matrix associated with each model.
-"""
-get_lhs(models, u, y, p, t)
-
-"""
-    get_rates(models, u, y, p, t)
-
-Calculate the (mass matrix multiplied) state rates for the specified model or
-models.
-"""
-function get_rates(models::T, u, y, p, t) where T
-    return _get_rates(inplaceness(T), models, u, y, p, t)
-end
-
-function get_rates(models::T, args...) where T<:NoStateModel
-    return SVector{0,Float64}()
-end
-
-# dispatch to an in-place function
-function _get_rates(::InPlace, models, u, y, p, t)
-    TF = promote_type(eltype(u), eltype(y), eltype(p), typeof(t))
-    du = similar(u, TF)
-    get_rates!(du, models, u, y, p, t)
-    return du
-end
-
-# calculate state rates for a combination of models
-function _get_rates(::OutOfPlace, models::NTuple{N,AbstractModel}, u, y, p, t) where N
-    return get_model_rates(models, u, y, p, t)
-end
-
-@generated function get_model_rates(models::NTuple{N,AbstractModel}, u, y, p, t) where N
-    # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
-
-    Ny = number_of_inputs.(models.parameters)
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny .+ 1
-    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
-
-    Np = number_of_parameters.(models.parameters)
-    ip2 = cumsum(Np)
-    ip1 = ip2 .- Np .+ 1
-    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
-
-    # initialize state variable names
-    dui = [Symbol("du", i) for i = 1:N]
-
-    expr = :()
-    for i = 1:N
-        expr = quote
-            $expr
-            $(dui[i]) = get_rates(models[$i], u[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
-        end
-    end
-
-    expr = quote
-        $expr
-        du = vcat($(dui...))
-    end
-
-    return expr
-end
-
-"""
-    get_rates!(du, models, u, y, p, t)
-
-In-place version of [`get_rates`](@ref)
-"""
-function get_rates!(du, models::T, u, y, p, t) where T
-    return _get_rates!(du, inplaceness(T), models, u, y, p, t)
-end
-
-# dispatch to an out-of-place function
-function _get_rates!(du, ::OutOfPlace, models, u, y, p, t)
-    return du .= get_rates(models, u, y, p, t)
-end
-
-# calculate state rates for a combination of models
-function _get_rates!(du, ::InPlace, models::NTuple{N,AbstractModel}, u, y, p, t) where N
-
-    iu = state_indices(models)
-    iy = input_indices(models)
-    ip = parameter_indices(models)
-
-    for i = 1:length(models)
-        vdu = view(du, iu[i])
-        vu = view(u, iu[i])
-        vy = view(y, iy[i])
-        vp = view(p, ip[i])
-        get_rates!(vdu, models[i], vu, vy, vp, t)
-    end
-
-    return du
 end
 
 """
@@ -1505,8 +1671,8 @@ function _get_eigen(::InPlace, model, x, y, p, t; nev=min(20, number_of_states(m
 
     # sort eigenvalues by magnitude
     perm = sortperm(λ, by=(λ)->(abs(λ),imag(λ)), rev=true)
-    λ .= λ[perm]
-    V .= V[:,perm]
+    λ = λ[perm[1:nev]]
+    V = V[:,perm[1:nev]]
 
     # eigenvalues are actually 1/λ, no modification necessary for eigenvectors
     λ .= 1 ./ λ
@@ -1539,7 +1705,7 @@ function _get_ode(::Identity, ::OutOfPlace, model::AbstractModel)
 
     jac = (u, p, t) -> get_state_jacobian(models, u, p[iy], p[ip], t)
 
-    return ODEFunction{false}(f; jac)
+    return ODEFunction{false,true}(f; jac)
 end
 
 function _get_ode(::Constant, ::OutOfPlace, model::AbstractModel)
@@ -1556,7 +1722,7 @@ function _get_ode(::Constant, ::OutOfPlace, model::AbstractModel)
 
     jac = (u, p, t) -> get_state_jacobian(models, u, p[iy], p[ip], t)
 
-    return ODEFunction{false}(f; mass_matrix, jac)
+    return ODEFunction{false,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Linear, ::OutOfPlace, model::AbstractModel)
@@ -1575,7 +1741,7 @@ function _get_ode(::Linear, ::OutOfPlace, model::AbstractModel)
 
     jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, p[iy], p[ip], t)
 
-    return ODEFunction{true}(f; mass_matrix, jac)
+    return ODEFunction{false,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Identity, ::InPlace, model::AbstractModel)
@@ -1595,7 +1761,7 @@ function _get_ode(::Identity, ::InPlace, model::AbstractModel)
     jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
 
     # construct and return an ODEFunction
-    return ODEFunction{true}(f; jac)
+    return ODEFunction{true,true}(f; jac)
 end
 
 function _get_ode(::Constant, ::InPlace, model::AbstractModel)
@@ -1618,7 +1784,7 @@ function _get_ode(::Constant, ::InPlace, model::AbstractModel)
     jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
 
     # construct and return an ODEFunction
-    return ODEFunction{true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Linear, ::InPlace, model::AbstractModel)
@@ -1643,31 +1809,31 @@ function _get_ode(::Linear, ::InPlace, model::AbstractModel)
     jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
 
     # construct and return an ODEFunction
-    return ODEFunction{true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Identity, ::OutOfPlace, model::Tuple)
 
     fy = (u, p, t) -> get_coupling_inputs(models, u, p, t)
 
-    f = (u, p, t) -> get_rates(models, u, fy(u, p, t), p, t)
+    f = (du, u, p, t) -> get_rates!(du, models, u, fy(u, p, t), p, t)
 
-    jac = (u, p, t) -> get_state_jacobian(models, u, fy(u, p, t), p, t)
+    jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, fy(u, p, t), p, t)
 
-    return ODEFunction{false}(f; jac)
+    return ODEFunction{true,true}(f; jac)
 end
 
 function _get_ode(::Constant, ::OutOfPlace, model::Tuple)
 
     fy = (u, p, t) -> get_coupling_inputs(models, u, p, t)
 
-    f = (u, p, t) -> get_rates(models, u, fy(u, p, t), p, t)
+    f = (du, u, p, t) -> get_rates!(du, models, u, fy(u, p, t), p, t)
 
     mass_matrix = get_mass_matrix(models)
 
-    jac = (u, p, t) -> get_state_jacobian(models, u, fy(u, p, t), p, t)
+    jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, fy(u, p, t), p, t)
 
-    return ODEFunction{false}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Linear, ::OutOfPlace, model::Tuple)
@@ -1676,7 +1842,7 @@ function _get_ode(::Linear, ::OutOfPlace, model::Tuple)
 
     fy = (u, p, t) -> get_coupling_inputs(model, u, p, t)
 
-    f = (u, p, t) -> get_rates!(du, model, u, fy(u, p, t), p, t)
+    f = (du, u, p, t) -> get_rates!(du, model, u, fy(u, p, t), p, t)
 
     M = zeros(Nu, Nu)
     update_func = (M, u, p, t) -> get_mass_matrix!(M, model, u, fy(u, p, t), p, t)
@@ -1684,7 +1850,7 @@ function _get_ode(::Linear, ::OutOfPlace, model::Tuple)
 
     jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, fy(u, p, t), p, t)
 
-    return ODEFunction{true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Identity, ::InPlace, model::Tuple)
@@ -1741,7 +1907,7 @@ function _get_ode(::Identity, ::InPlace, model::Tuple)
     end
 
     # construct and return an ODEFunction
-    return ODEFunction{true}(f; jac)
+    return ODEFunction{true,true}(f; jac)
 end
 
 function _get_ode(::Constant, ::InPlace, model::Tuple)
@@ -1801,7 +1967,7 @@ function _get_ode(::Constant, ::InPlace, model::Tuple)
     end
 
     # construct and return an ODEFunction
-    return ODEFunction{true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, jac)
 end
 
 function _get_ode(::Linear, ::InPlace, model::Tuple)
@@ -1885,7 +2051,7 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
     end
 
     # construct and return an ODEFunction
-    return ODEFunction{true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, jac)
 end
 
 # plotting recipes

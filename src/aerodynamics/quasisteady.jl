@@ -56,11 +56,72 @@ end
 # steady state loads
 function quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # lift at reference point
-    L = a0*ρ*b*u*v
+    L = a0*ρ*b*u*(v - u*α0)
     # moment at reference point
     M = (b/2 + a*b)*L
 
     return SVector(L, M)
+end
+
+function quasisteady0_loads_a(a, b, ρ, a0, α0, u, v)
+
+    L = a0*ρ*b*u*(v - u*α0)
+
+    L_a = 0
+
+    M_a = b*L
+
+    return SVector(L_a, M_a)
+end
+
+function quasisteady0_loads_b(a, b, ρ, a0, α0, u, v)
+
+    L = a0*ρ*b*u*(v - u*α0)
+
+    L_b = a0*ρ*u*(v - u*α0)
+
+    M_b = (1/2 + a)*L + (b/2 + a*b)*L_b
+
+    return SVector(L_b, M_b)
+end
+
+function quasisteady0_loads_ρ(a, b, ρ, a0, α0, u, v)
+    # lift at reference point
+    L_ρ = a0*b*u*(v - u*α0)
+    # moment at reference point
+    M_ρ = (b/2 + a*b)*L_ρ
+
+    return SVector(L_ρ, M_ρ)
+end
+
+function quasisteady0_loads_a0(a, b, ρ, α0, u, v)
+    # lift at reference point
+    L_a0 = ρ*b*u*(v - u*α0)
+    # moment at reference point
+    M_a0 = (b/2 + a*b)*L_a0
+
+    return SVector(L_a0, M_a0)
+end
+
+function quasisteady0_loads_α0(a, b, ρ, a0, α0, u, v)
+    # lift at reference point
+    L_α0 = -a0*ρ*b*u^2
+    # moment at reference point
+    M_α0 = (b/2 + a*b)*L_α0
+
+    return SVector(L_α0, M_α0)
+end
+
+function quasisteady0_u(a, b, ρ, a0, v)
+    L_u = a0*ρ*b*v
+    M_u = (b/2 + a*b)*L_u
+    return SVector(L_u, M_u)
+end
+
+function quasisteady0_v(a, b, ρ, a0, u)
+    L_v = a0*ρ*b*u
+    M_v = (b/2 + a*b)*L_v
+    return SVector(L_v, M_v)
 end
 
 # circulatory loads + added mass effects, neglecting accelerations
@@ -79,49 +140,77 @@ function quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
     return SVector(L, M)
 end
 
-# quasi-steady loads + added mass effects
-function quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
-    # circulatory load factor
+function quasisteady1_loads_a(a, b, ρ, a0, α0, u, v, ω)
+
     tmp1 = a0*ρ*u*b
-    # non-circulatory load factor
     tmp2 = pi*ρ*b^3
-    # constant based on geometry
+
+    L = tmp1*(v + (b/2 - a*b)*ω - u*α0) + tmp2*u/b*ω
+    L_a = -tmp1*b*ω
+
+    M_a = b*L + (b/2 + a*b)*L_a
+
+    return SVector(L_a, M_a)
+end
+
+
+function quasisteady1_loads_b(a, b, ρ, a0, α0, u, v, ω)
+
+    tmp1 = a0*ρ*u*b
+    tmp1_b = a0*ρ*u
+
+    tmp2 = pi*ρ*b^3
+    tmp2_b = 3*pi*ρ*b^2
+
     d = b/2 - a*b
-    # lift at reference point
-    L = tmp1*(v + d*ω - u*α0) + tmp2*(dv/b + u/b*ω - a*dω)
-    # moment at reference point
-    M = -tmp2*(dv/2 + u*ω + (b/8 - a*b/2)*dω) + (b/2 + a*b)*L
+    d_b = 1/2 - a
 
-    return SVector(L, M)
+    L = tmp1*(v + d*ω - u*α0) + tmp2*u/b*ω
+
+    L_b = tmp1_b*(v + d*ω - u*α0) + tmp1*d_b*ω + tmp2_b*u/b*ω - tmp2*u/b^2*ω
+    M_b = -tmp2_b*u*ω + (1/2 + a)*L + (b/2 + a*b)*L_b
+
+    return SVector(L_b, M_b)
 end
 
-function quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, ω)
+function quasisteady1_loads_ρ(a, b, ρ, a0, α0, u, v, ω)
 
-    return quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
+    tmp1_ρ = a0*u*b
+
+    tmp2_ρ = pi*b^3
+
+    d = b/2 - a*b
+
+    L_ρ = tmp1_ρ*(v + d*ω - u*α0) + tmp2_ρ*u/b*ω
+
+    M_ρ = -tmp2_ρ*u*ω + (b/2 + a*b)*L_ρ
+
+    return SVector(L_ρ, M_ρ)
 end
 
-# quasi-steady loads from acceleration terms
-function quasisteady2_rate_loads(a, b, ρ, vdot, ωdot)
-    # non-circulatory load factor
-    tmp = pi*ρ*b^3
-    # lift at reference point
-    L = tmp*(vdot/b - a*ωdot)
-    # moment at reference point
-    M = -tmp*(vdot/2 + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*L
+function quasisteady1_loads_a0(a, b, ρ, a0, α0, u, v, ω)
 
-    return SVector(L, M)
+    tmp1_a0 = ρ*u*b
+
+    tmp2 = pi*ρ*b^3
+
+    d = b/2 - a*b
+
+    L_a0 = tmp1_a0*(v + d*ω - u*α0)
+    M_a0 = (b/2 + a*b)*L_a0
+
+    return SVector(L_a0, M_a0)
 end
 
-function quasisteady0_u(a, b, ρ, a0, v)
-    L_u = a0*ρ*b*v
-    M_u = (b/2 + a*b)*L_u
-    return SVector(L_u, M_u)
-end
+function quasisteady1_loads_α0(a, b, ρ, a0, u)
 
-function quasisteady0_v(a, b, ρ, a0, u)
-    L_v = a0*ρ*b*u
-    M_v = (b/2 + a*b)*L_v
-    return SVector(L_v, M_v)
+    tmp1 = a0*ρ*u*b
+
+    L_α0 = -tmp1*u
+
+    M_α0 = (b/2 + a*b)*L_α0
+
+    return SVector(L_α0, M_α0)
 end
 
 function quasisteady1_u(a, b, ρ, a0, α0, u, v, ω)
@@ -164,15 +253,82 @@ function quasisteady1_ω(a, b, ρ, a0, u)
     return SVector(L_ω, M_ω)
 end
 
-quasisteady2_u(a, b, ρ, a0, α0, u, v, ω) = quasisteady1_u(a, b, ρ, a0, α0, u, v, ω)
+# quasi-steady loads + added mass effects
+function quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    # circulatory load factor
+    tmp1 = a0*ρ*u*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # lift at reference point
+    L = tmp1*(v + d*ω - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    # moment at reference point
+    M = -tmp2*(vdot/2 + u*ω + (b/8 - a*b/2)*ωdot) + (b/2 + a*b)*L
 
-quasisteady2_v(a, b, ρ, a0, α0, u) = quasisteady1_v(a, b, ρ, a0, α0, u)
+    return SVector(L, M)
+end
 
-quasisteady2_ω(a, b, ρ, a0, u) = quasisteady1_ω(a, b, ρ, a0, u)
+function quasisteady2_loads_a(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
 
-quasisteady2_udot() = SVector(0, 0)
+    tmp1 = a0*ρ*u*b
+    tmp2 = pi*ρ*b^3
 
-function quasisteady2_vdot(a, b, ρ)
+    L = tmp1*(v + (b/2 - a*b)*ω - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    L_a = -tmp1*b*ω - tmp2*ωdot
+
+    M_a = tmp2*b/2*ωdot + b*L + (b/2 + a*b)*L_a
+
+    return SVector(L_a, M_a)
+end
+
+function quasisteady2_loads_b(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+
+    tmp1 = a0*ρ*u*b
+    tmp1_b = a0*ρ*u
+
+    tmp2 = pi*ρ*b^3
+    tmp2_b = 3*pi*ρ*b^2
+
+    d = b/2 - a*b
+    d_b = 1/2 - a
+
+    L = tmp1*(v + d*ω - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+
+    L_b = tmp1_b*(v + d*ω - u*α0) + tmp1*d_b*ω +
+        tmp2_b*(vdot/b + u/b*ω - a*ωdot) + tmp2*(-vdot/b^2 - u/b^2*ω)
+    M_b = -tmp2_b*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) - tmp2*(1/8 - a/2)*ωdot +
+        (1/2 + a)*L + (b/2 + a*b)*L_b
+
+    return SVector(L_b, M_b)
+end
+
+function quasisteady2_loads_ρ(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+
+    tmp1_ρ = a0*u*b
+
+    tmp2_ρ = pi*b^3
+
+    d = b/2 - a*b
+
+    L_ρ = tmp1_ρ*(v + d*ω - u*α0) + tmp2_ρ*(vdot/b + u/b*ω - a*ωdot)
+
+    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + (b/8 - a*b/2)*ωdot) + (b/2 + a*b)*L_ρ
+
+    return SVector(L_ρ, M_ρ)
+end
+
+quasisteady2_loads_a0(args...) = quasisteady1_loads_a0(args...)
+
+quasisteady2_loads_α0(args...) = quasisteady1_loads_α0(args...)
+
+quasisteady2_loads_u(args...) = quasisteady1_u(args...)
+
+quasisteady2_loads_v(args...) = quasisteady1_v(args...)
+
+quasisteady2_loads_ω(args...) = quasisteady1_ω(args...)
+
+function quasisteady2_loads_vdot(a, b, ρ)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
@@ -183,43 +339,26 @@ function quasisteady2_vdot(a, b, ρ)
     return SVector(L_vdot, M_vdot)
 end
 
-function quasisteady2_ωdot(a, b, ρ)
+function quasisteady2_loads_ωdot(a, b, ρ)
     tmp = pi*ρ*b^3
     L_ωdot = -tmp*a
     M_ωdot = -tmp*(b/8 - a*b/2) + (b/2 + a*b)*L_ωdot
     return SVector(L_ωdot, M_ωdot)
 end
 
-function quasisteady0_jacobian(a, b, ρ, a0, U)
-    L_θ = a0*ρ*U^2*b
-    M_θ = (b/2 + a*b)*L_θ
-    return @SMatrix [0 L_θ 0 0; 0 M_θ 0 0]
+function quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, ω)
+
+    return quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
 end
 
-function quasisteady1_jacobian(a, b, ρ, a0, U)
-    tmp1 = a0*ρ*U*b
-    tmp2 = pi*ρ*b^3
-    d1 = b/2 - a*b
-    d2 = b/2 + a*b
-    L_θ = tmp1*U
-    L_hdot = tmp1
-    L_θdot = tmp1*d1 + tmp2*U/b
-    M_θ = d2*L_θ
-    M_hdot = d2*L_hdot
-    M_θdot = -tmp2*U + d2*L_θdot
-    return @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
-end
+# quasi-steady loads from acceleration terms
+function quasisteady2_rate_loads(a, b, ρ, vdot, ωdot)
+    # non-circulatory load factor
+    tmp = pi*ρ*b^3
+    # lift at reference point
+    L = tmp*(vdot/b - a*ωdot)
+    # moment at reference point
+    M = -tmp*(vdot/2 + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*L
 
-quasisteady2_jacobian(a, b, ρ, a0, U) = quasisteady1_jacobian(a, b, ρ, a0, U)
-
-function quasisteady2_mass_matrix(a, b, ρ)
-    # calculate derivatives
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_hddot = -tmp1/b
-    L_θddot = tmp1*a
-    M_hddot = tmp1/2 + tmp2*L_hddot
-    M_θddot = tmp1*(b/8 - a*b/2) + tmp2*L_θddot
-    # return jacobian
-    return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
+    return SVector(L, M)
 end
