@@ -16,27 +16,30 @@ freestream velocity ``U`` and air density ``\\rho`` as additional parameters.
 """
 couple_models(aero::QuasiSteady, stru::TypicalSection) = (aero, stru)
 
-# --- traits --- #
+# --- Traits --- #
 
 number_of_additional_parameters(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = 2
 coupling_inplaceness(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = OutOfPlace()
 coupling_rate_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Zeros()
-coupling_state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Nonlinear()
+coupling_state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Constant()
 coupling_parameter_jacobian_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{QuasiSteady{0}}, ::Type{TypicalSection}) = Zeros()
 
 number_of_additional_parameters(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = 2
 coupling_inplaceness(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = OutOfPlace()
 coupling_rate_jacobian_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = Zeros()
-coupling_state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = Nonlinear()
+coupling_state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = Constant()
 coupling_parameter_jacobian_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{QuasiSteady{1}}, ::Type{TypicalSection}) = Zeros()
 
 number_of_additional_parameters(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = 2
 coupling_inplaceness(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = OutOfPlace()
-coupling_rate_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Linear()
-coupling_state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Nonlinear()
+coupling_rate_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Constant()
+coupling_state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Constant()
 coupling_parameter_jacobian_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{QuasiSteady{2}}, ::Type{TypicalSection}) = Zeros()
 
-# --- methods --- #
+# --- Methods --- #
 
 function get_coupling_inputs(aero::QuasiSteady{0}, stru::TypicalSection, dx, x, p, t)
     # extract state variables
@@ -74,77 +77,113 @@ function get_coupling_inputs(aero::QuasiSteady{2}, stru::TypicalSection, dx, x, 
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     # local freestream accelerations
-    udot, vdot, ωdot = section_accelerations(U, dhdot, dθdot)
+    udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate aerodynamic loads
-    L, M = quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    L, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
     # return inputs
     return SVector(L, M)
 end
 
-# --- performance overloads --- #
+# --- Performance Overloads --- #
 
-function get_coupling_rate_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, dx, x, p, t)
-    # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
-    # return jacobian
-    return quasisteady2_section_rate_jacobian(a, b, ρ)
-end
-
-function get_coupling_state_jacobian(aero::QuasiSteady{0}, stru::TypicalSection, x, p, t)
+function get_coupling_state_jacobian(aero::QuasiSteady{0}, stru::TypicalSection, p)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # return jacobian
     return quasisteady0_section_state_jacobian(a, b, ρ, a0, U)
 end
 
-function get_coupling_state_jacobian(aero::QuasiSteady{1}, stru::TypicalSection, x, p, t)
+function get_coupling_parameter_jacobian(aero::QuasiSteady{0}, stru::TypicalSection, dx, x, p, t)
+
+    # extract state variables
+    h, θ, hdot, θdot = x
+    # extract aerodynamic, structural, and aerostructural parameters
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    # local freestream velocity components
+    u, v = section_steady_velocities(U, θ)
+    u_U, v_U = section_steady_velocities_U(θ)
+    # calculate loads
+    L_a, M_a = quasisteady0_loads_a(a, b, ρ, a0, α0, u, v)
+    L_b, M_b = quasisteady0_loads_b(a, b, ρ, a0, α0, u, v)
+    L_a0, M_a0 = quasisteady0_loads_a0(a, b, ρ, α0, u, v)
+    L_α0, M_α0 = quasisteady0_loads_α0(a, b, ρ, a0, α0, u, v)
+
+    L_kh, M_kh = 0, 0
+    L_kθ, M_kθ = 0, 0
+    L_m, M_m = 0, 0
+    L_Sθ, M_Sθ = 0, 0
+    L_Iθ, M_Iθ = 0, 0
+
+    L_u, M_u = quasisteady0_loads_u(a, b, ρ, a0, α0, u, v)
+    L_v, M_v = quasisteady0_loads_v(a, b, ρ, a0, u)
+    L_U = L_u * u_U + L_v * v_U
+    M_U = M_u * u_U + M_v * v_U
+
+    L_ρ, M_ρ = quasisteady0_loads_ρ(a, b, ρ, a0, α0, u, v)
+
+    # return jacobian
+    return @SMatrix [
+        L_a L_b L_a0 L_α0 L_kh L_kθ L_m L_Sθ L_Iθ L_U L_ρ;
+        M_a M_b M_a0 M_α0 M_kh M_kθ M_m M_Sθ M_Iθ M_U M_ρ
+        ]
+end
+
+function get_coupling_state_jacobian(aero::QuasiSteady{1}, stru::TypicalSection, p)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # return jacobian
     return quasisteady1_section_state_jacobian(a, b, ρ, a0, U)
 end
 
-function get_coupling_state_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, x, p, t)
-    # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
-    # return jacobian
-    return quasisteady2_section_state_jacobian(a, b, ρ, a0, U)
-end
-
-function get_coupling_parameter_jacobian(aero::QuasiSteady{0}, stru::TypicalSection, x, p, t)
-    # extract state variables
-    h, θ, hdot, θdot = x
-    # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
-    # local freestream velocity components
-    u, v, ω = section_steady_velocities(U, θ, hdot, θdot)
-    # calculate loads
-    L_a, M_a = quasisteady0_loads_a(a, b, ρ, a0, α0, u, v, ω)
-    L_b, M_b = quasisteady0_loads_b(a, b, ρ, a0, α0, u, v, ω)
-    L_a0, M_a0 = quasisteady0_loads_a0(a, b, ρ, α0, u, v, ω)
-    L_α0, M_a0 = quasisteady0_loads_α0(a, b, ρ, a0, u)
-    L_U, M_U = quasisteady0_loads_u(a, b, ρ, a0, α0, u, v)
-    L_ρ, M_ρ = quasisteady0_loads_ρ(a, b, a0, α0, u, v, ω)
-    # return jacobian
-    return quasisteady0_section_parameter_jacobian(a, b, ρ, a0, U)
-end
 
 function get_coupling_parameter_jacobian(aero::QuasiSteady{1}, stru::TypicalSection, dx, x, p, t)
+
     # extract state variables
     h, θ, hdot, θdot = x
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
+    u_U, v_U, ω_U = section_velocities_U(θ)
+
     # calculate loads
     L_a, M_a = quasisteady1_loads_a(a, b, ρ, a0, α0, u, v, ω)
     L_b, M_b = quasisteady1_loads_b(a, b, ρ, a0, α0, u, v, ω)
-    L_a0, M_a0 = quasisteady1_loads_a0(a, b, ρ, α0, u, v, ω)
-    L_α0, M_a0 = quasisteady1_loads_α0(a, b, ρ, a0, u)
-    L_U, M_U = quasisteady1_loads_u(a, b, ρ, a0, α0, u, v)
-    L_ρ, M_ρ = quasisteady1_loads_ρ(a, b, a0, α0, u, v, ω)
+    L_a0, M_a0 = quasisteady1_loads_a0(a, b, ρ, a0, α0, u, v, ω)
+    L_α0, M_α0 = quasisteady1_loads_α0(a, b, ρ, a0, u)
+
+    L_kh, M_kh = 0, 0
+    L_kθ, M_kθ = 0, 0
+    L_m, M_m = 0, 0
+    L_Sθ, M_Sθ = 0, 0
+    L_Iθ, M_Iθ = 0, 0
+
+    L_u, M_u = quasisteady1_loads_u(a, b, ρ, a0, α0, u, v, ω)
+    L_v, M_v = quasisteady1_loads_v(a, b, ρ, a0, α0, u)
+    L_U = L_u * u_U + L_v * v_U# + L_ω * ω_U
+    M_U = M_u * u_U + M_v * v_U# + M_ω * ω_U
+
+    L_ρ, M_ρ = quasisteady1_loads_ρ(a, b, ρ, a0, α0, u, v, ω)
+
     # return jacobian
-    return @SMatrix [L_a L_b L_a0 L_α0 L_U L_ρ; M_a M_b M_a0 M_α0 M_U M_ρ]
+    return @SMatrix [
+        L_a L_b L_a0 L_α0 L_kh L_kθ L_m L_Sθ L_Iθ L_U L_ρ;
+        M_a M_b M_a0 M_α0 M_kh M_kθ M_m M_Sθ M_Iθ M_U M_ρ
+        ]
+end
+
+function get_coupling_rate_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, p)
+    # extract aerodynamic, structural, and aerostructural parameters
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    # return jacobian
+    return quasisteady2_section_rate_jacobian(a, b, ρ)
+end
+
+function get_coupling_state_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, p)
+    # extract aerodynamic, structural, and aerostructural parameters
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    # return jacobian
+    return quasisteady2_section_state_jacobian(a, b, ρ, a0, U)
 end
 
 function get_coupling_parameter_jacobian(aero::QuasiSteady{2}, stru::TypicalSection, dx, x, p, t)
@@ -156,17 +195,34 @@ function get_coupling_parameter_jacobian(aero::QuasiSteady{2}, stru::TypicalSect
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
+    u_U, v_U, ω_U = section_velocities_U(θ)
     # local freestream accelerations
-    udot, vdot, ωdot = section_accelerations(U, dhdot, dθdot)
+    udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
+
     # calculate loads
     L_a, M_a = quasisteady2_loads_a(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
     L_b, M_b = quasisteady2_loads_b(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
-    L_a0, M_a0 = quasisteady2_loads_a0(a, b, ρ, α0, u, v, ω)
-    L_α0, M_a0 = quasisteady2_loads_α0(a, b, ρ, a0, u)
-    L_U, M_U = quasisteady2_loads_u(a, b, ρ, a0, α0, u, v, ωdot)
-    L_ρ, M_ρ = quasisteady2_loads_ρ(a, b, a0, α0, u, v, ω, vdot, ωdot)
+    L_a0, M_a0 = quasisteady2_loads_a0(a, b, ρ, a0, α0, u, v, ω)
+    L_α0, M_α0 = quasisteady2_loads_α0(a, b, ρ, a0, u)
+
+    L_kh, M_kh = 0, 0
+    L_kθ, M_kθ = 0, 0
+    L_m, M_m = 0, 0
+    L_Sθ, M_Sθ = 0, 0
+    L_Iθ, M_Iθ = 0, 0
+
+    L_u, M_u = quasisteady2_loads_u(a, b, ρ, a0, α0, u, v, ω)
+    L_v, M_v = quasisteady2_loads_v(a, b, ρ, a0, α0, u)
+    L_U = L_u * u_U + L_v * v_U# + L_ω * ω_U
+    M_U = M_u * u_U + M_v * v_U# + M_ω * ω_U
+
+    L_ρ, M_ρ = quasisteady2_loads_ρ(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+
     # return jacobian
-    return @SMatrix [L_a L_b L_a0 L_α0 L_U L_ρ; M_a M_b M_a0 M_α0 M_U M_ρ]
+    return @SMatrix [
+        L_a L_b L_a0 L_α0 L_kh L_kθ L_m L_Sθ L_Iθ L_U L_ρ;
+        M_a M_b M_a0 M_α0 M_kh M_kθ M_m M_Sθ M_Iθ M_U M_ρ
+        ]
 end
 
 # --- Convenience Methods --- #
@@ -186,7 +242,7 @@ end
 
 # --- Plotting --- #
 
-@recipe function f(aero::QuasiSteady, stru::TypicalSection, x, y, p, t)
+@recipe function f(aero::QuasiSteady, stru::TypicalSection, dx, x, y, p, t)
 
     framestyle --> :origin
     grid --> false
@@ -209,9 +265,29 @@ end
 # --- Internal Methods --- #
 
 function section_steady_velocities(U, θ)
+
     u = U
     v = U*θ
+
+    return SVector(u, v)
 end
+
+function section_steady_velocities_U(θ)
+
+    u_U = 1
+    v_U = θ
+
+    return SVector(u_U, v_U)
+end
+
+function section_steady_velocities_θ(U)
+
+    u_θ = 0
+    v_θ = U
+
+    return SVector(u_θ, v_θ)
+end
+
 
 function quasisteady0_section_state_jacobian(a, b, ρ, a0, U)
     L_θ = a0*ρ*U^2*b
@@ -233,16 +309,10 @@ function quasisteady1_section_state_jacobian(a, b, ρ, a0, U)
     return @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
 end
 
-quasisteady2_section_state_jacobian(a, b, ρ, a0, U) = quasisteady1_jacobian(a, b, ρ, a0, U)
+quasisteady2_section_state_jacobian(a, b, ρ, a0, U) = quasisteady1_section_state_jacobian(a, b, ρ, a0, U)
 
 function quasisteady2_section_rate_jacobian(a, b, ρ)
-    # calculate derivatives
-    tmp1 = pi*ρ*b^3
-    tmp2 = b/2 + a*b
-    L_hddot = tmp1/b
-    L_θddot = -tmp1*a
-    M_hddot = tmp1/2 + tmp2*L_hddot
-    M_θddot = tmp1*(b/8 - a*b/2) + tmp2*L_θddot
-    # return jacobian
+    L_hddot, M_hddot = quasisteady2_loads_vdot(a, b, ρ)
+    L_θddot, M_θddot = quasisteady2_loads_ωdot(a, b, ρ)
     return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
 end

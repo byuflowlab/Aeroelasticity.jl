@@ -7,17 +7,28 @@ Pages = ["library.md"]
 Depth = 3
 ```
 
+## Theory
+
+This package assumes that the governing equations for the state variables corresponding to all models satisfy the implicit ordinary differential equation
+```math
+0 = f(\dot{x},x,y,p,t)
+```
+where ``f(\dot{x}, x, y, p, t)`` is a residual function, ``x`` is a vector of state variables, ``y`` is a vector of inputs, ``p`` is a vector of parameters, and ``t`` is the current time.  In the context of this package, we define inputs as variables which may vary over time and parameters as variables which do not vary over time.  Typically, inputs are defined as any model parameter which could correspond to the output or outputs from other models.  We call t
+
+
+The primary type of model encountered in this package is a model with state variables which are governed by  the following implicit ordinary differential equation.  
+
 ## Creating a New Model
 
 In this section, we describe in detail how to construct a new independent model.  To demonstrate this process, we also show how one might implement the [`TypicalSection`](@ref) model.
 
 ### Manipulating a Model's Governing Equations
 
-Before a model can be used with this package, its governing equations must be manipulated so that it satisfies the ordinary differential equation (or differential algebraic equation in mass matrix form)
+Before a model can be used with this package, its governing equations must be manipulated so that it satisfies the implicit ordinary differential equation
 ```math
-M(x,y,p,t)\dot{x} = f(x,y,p,t)
+0 = f(\dot{x},x,y,p,t)
 ```
-where ``M(x, y, p, t)`` is a function which defines the mass matrix corresponding to the differential equation, ``f(x, y, p, t)`` is a function which defines the mass matrix multiplied state rates, ``x`` is a vector of state variables, ``y`` is a vector of inputs, ``p`` is a vector of parameters, and ``t`` is the current time.  State variables are variables which have rate equations associated with them.  Inputs are variables which may be defined in time, possibly using other models.  Parameters are variables which are user-specified and constant in time.
+where ``f(\dot{x}, x, y, p, t)`` is a residual function, ``x`` is a vector of state variables, ``y`` is a vector of inputs, ``p`` is a vector of parameters, and ``t`` is the current time.  State variables are variables which have rate equations associated with them.  Inputs are variables which may vary over time, possibly as defined by other models.  Parameters are variables which are user-specified and constant in time.
 
 For example, the governing differential equation for the [`TypicalSection`](@ref) model is often expressed as the second order ordinary differential equation
 ```math
@@ -29,7 +40,7 @@ For example, the governing differential equation for the [`TypicalSection`](@ref
 ```
 where ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``S_\theta`` is the structural imbalance, ``I_\theta`` is the mass moment of inertia, ``\mathcal{L}`` is the lift per unit span, and ``\mathcal{M}`` is the moment per unit span.  Expressed in the form expected by this package, the governing differential equation for this model is
 ```math
-M \dot{x} = K x + D y
+0 = M \dot{x} + K x + D y
 ```
 where
 ```math
@@ -47,18 +58,18 @@ M =
 \quad
 K =
 \begin{bmatrix}
-0 & 0 & 1 & 0 \\
-0 & 0 & 0 & 1 \\
--k_h & 0 & 0 & 0 \\
-0 & -k_\theta & 0 & 0
+0 & 0 & -1 & 0 \\
+0 & 0 & 0 & -1 \\
+k_h & 0 & 0 & 0 \\
+0 & k_\theta & 0 & 0
 \end{bmatrix}
 \quad
 D =
 \begin{bmatrix}
 0 & 0 \\
 0 & 0 \\
--1 & 0 \\
-0 & 1
+1 & 0 \\
+0 & -1
 \end{bmatrix}
 ```
 

@@ -11,10 +11,13 @@ couple_models(aero::Wagner, stru::TypicalSection) = (aero, stru)
 # --- Traits --- #
 
 number_of_additional_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 2
+
 coupling_inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
+
 coupling_rate_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Constant()
-coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
+coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Constant()
 coupling_parameter_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Zeros()
 
 # --- Methods --- #
 
@@ -39,7 +42,7 @@ end
 
 # --- Performance Overloads --- #
 
-function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection, dx, x, p, t)
+function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection, p)
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # calculate loads
@@ -54,7 +57,7 @@ function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection, dx, x, p
     return [Jyaa Jyas; Jysa Jyss]
 end
 
-function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, dx, x, p, t)
+function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, p)
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
@@ -89,13 +92,20 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     C1 = aero.C1
     C2 = aero.C2
     # local freestream velocity components
-    u_U, v_U, ω_U = section_velocities_U(U)
+    u, v, ω = section_velocities(U, θ, hdot, θdot)
+    udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
+    u_U, v_U, ω_U = section_velocities_U(θ)
     # calculate loads
     L_a, M_a = wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     L_b, M_b = wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     L_a0, M_a0 = wagner_loads_a0(a, b, ρ, α0, C1, C2, u, v, ω, λ1, λ2)
-    L_α0, M_a0 = wagner_loads_α0(a, b, ρ, a0, C1, C2, u)
-    L_U, M_U = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ωdot, λ1, λ2)
+    L_α0, M_α0 = wagner_loads_α0(a, b, ρ, a0, C1, C2, u)
+
+    L_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    L_v, M_v = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
+    L_U = L_u * u_U + L_v * v_U
+    M_U = M_u * u_U + M_v * v_U
+
     L_ρ, M_ρ = wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
         # compute jacobian sub-matrices
     Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
@@ -108,7 +118,7 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     return [Jyaa Jyas Jyap; Jysa Jyss Jysp]
 end
 
-# --- convenience methods --- #
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::Wagner, stru::TypicalSection; U, rho)
 
@@ -125,7 +135,7 @@ end
 
 # --- Plotting --- #
 
-@recipe function f(aero::Wagner, stru::TypicalSection, x, y, p, t)
+@recipe function f(aero::Wagner, stru::TypicalSection, dx, x, y, p, t)
 
     framestyle --> :origin
     grid --> false

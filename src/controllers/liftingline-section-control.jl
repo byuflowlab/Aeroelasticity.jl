@@ -9,7 +9,18 @@ functions of the 3D system's control inputs.
 """
 struct LiftingLineSectionControl <: AbstractModel end
 
+"""
+    LiftingLineSectionControl()
+
+Initialize an object of type [`LiftingLineSectionControl`](@ref)
+"""
+
+# --- Traits --- #
+
 number_of_states(::Type{<:LiftingLineSectionControl}) = 1
 number_of_inputs(::Type{<:LiftingLineSectionControl}) = 0
 number_of_parameters(::Type{<:LiftingLineSectionControl}) = 0
+
 inplaceness(::Type{<:LiftingLineSectionControl}) = OutOfPlace()
+
+# --- Internal Methods for Couplings --- #

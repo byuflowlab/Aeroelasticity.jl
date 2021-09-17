@@ -32,3 +32,12 @@ function separate_parameters(model::SimpleFlap, p)
 
     return (cld=p[1], cdd=p[2], cmd=p[3])
 end
+
+# --- Internal Methods --- #
+
+function simpleflap_loads(b, U, ρ, clδ, cdδ, cmδ, δ)
+    L = ρ*U^2*b*clδ*δ
+    D = ρ*U^2*b*cdδ*δ
+    M = 2*ρ*U^2*b^2*cmδ*δ
+    return L, D, M
+end

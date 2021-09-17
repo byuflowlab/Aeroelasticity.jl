@@ -15,7 +15,7 @@ function couple_models(aero::Wagner, stru::LiftingLineSection, flap::SimpleFlap,
     return (aero, stru, flap, ctrl)
 end
 
-# --- traits --- #
+# --- Traits --- #
 
 function number_of_additional_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
@@ -29,7 +29,7 @@ function coupling_inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection},
     return OutOfPlace()
 end
 
-function coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
+function coupling_rate_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
     ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
 
     return Linear()
@@ -41,36 +41,51 @@ function coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSectio
     return Nonlinear()
 end
 
-# --- methods --- #
+function coupling_parameter_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
+
+    return Nonlinear()
+end
+
+function coupling_time_gradient_type(::Type{<:Wagner}, ::Type{LiftingLineSection},
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
+
+    return Zeros()
+end
+
+# --- Methods --- #
 
 function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t)
-    # extract model constants
-    C1 = aero.C1
-    C2 = aero.C2
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
+    # extract state variables
+    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
     a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    # calculate aerodynamic loads
-    L, M = wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
-    # add loads due to flap deflections
-    L += ρ*u^2*b*clδ*δ
-    D = ρ*u^2*b*cdδ*δ
-    M += 2*ρ*u^2*b^2*cmδ*δ
-    # forces and moments per unit span
-    f = SVector(D, 0, L)
-    m = SVector(0, M, 0)
+    # extract model constants
+    C1 = aero.C1
+    C2 = aero.C2
+    # freestream velocity components
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
+    # aerodynamic loads
+    La, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    # loads due to flap deflections
+    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    # loads per unit span
+    f = SVector(Df, 0, La + Lf)
+    m = SVector(0, Ma + Mf, 0)
     # return portion of inputs that is not dependent on the state rates
     return SVector(u, v, ω, f..., m...)
 end
 
-function get_coupling_mass_matrix(aero::Wagner, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t)
+# --- Performance Overloads --- #
+
+function get_coupling_rate_jacobian(aero::Wagner, stru::LiftingLineSection,
+    flap::SimpleFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
+    # extract state variables
+    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
@@ -86,80 +101,16 @@ function get_coupling_mass_matrix(aero::Wagner, stru::LiftingLineSection,
         0 0      0   0    0   0   0    0   0;
         0 0      0   0    0   0   0    0   0;
         0 0      0   0    0   0   0    0   0;
-        0 0   -L_dvx 0 -L_dvz 0 -L_dωy 0   0;
+        0 0    L_dvx 0  L_dvz 0  L_dωy 0   0;
         0 0      0   0    0   0   0    0   0;
-        0 0   -M_dvx 0 -M_dvz 0 -M_dωy 0   0;
+        0 0    M_dvx 0  M_dvz 0  M_dωy 0   0;
         0 0      0   0    0   0   0    0   0
         ]
 end
 
-# --- performance overloads --- #
+# TODO: State and parameter jacobians
 
-function get_coupling_state_jacobian(aero::Wagner, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t)
-    # extract state variables
-    λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
-    # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    u_vx = 1
-    v_vz = 1
-    ω_ωy = 1
-    # model constants
-    C1 = aero.C1
-    C2 = aero.C2
-    # calculate loads
-    out = wagner_loads_λ(a, b, ρ, a0, u)
-    L_λ, M_λ = out[1,:], out[2,:]
-    L_vx, M_vx = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
-    L_vz, M_vz = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
-    L_ωy, M_ωy = wagner_loads_ω(a, b, ρ, a0, C1, C2, u)
-    # add loads due to flap deflections
-    L_vx += 2*ρ*u*b*clδ*δ
-    D_vx = 2*ρ*u*b*cdδ*δ
-    M_vx += 4*ρ*u*b^2*cmδ*δ
-    L_δ = ρ*u^2*b*clδ
-    D_δ = ρ*u^2*b*cdδ
-    M_δ = 2*ρ*u^2*b^2*cmδ
-    # assemble jacobian
-    return @SMatrix [
-         0      0     u_vx 0   0   0   0    0  0;
-         0      0      0   0 v_vz  0   0    0  0;
-         0      0      0   0   0   0  ω_ωy  0  0;
-
-         0      0     D_vx 0   0   0   0    0 D_δ;
-         0      0      0   0   0   0   0    0  0;
-        L_λ[1] L_λ[2] L_vx 0 L_vz  0  L_ωy  0 L_δ;
-         0      0      0   0   0   0   0    0  0;
-        M_λ[1] M_λ[2] M_vx 0 M_vz  0  M_ωy  0 M_δ;
-         0      0      0   0   0   0   0    0  0
-        ]
-end
-
-# --- unit testing methods --- #
-
-function get_coupling_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, dx, x, p, t)
-    # extract state rates
-    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz, dδ = dx
-    # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-    # local freestream velocity components
-    vdot = dvz
-    ωdot = dωy
-    # calculate aerodynamic loads
-    L, M = wagner_rate_loads(a, b, ρ, vdot, ωdot)
-    # forces and moments per unit span
-    f = SVector(0, 0, L)
-    m = SVector(0, M, 0)
-    # return inputs
-    return SVector(0, 0, 0, f..., m...)
-end
-
-# --- convenience methods --- #
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::Wagner, stru::LiftingLineSection,
     flap::SimpleFlap, ctrl::LiftingLineSectionControl; rho)

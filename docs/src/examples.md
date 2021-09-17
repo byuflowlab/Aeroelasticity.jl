@@ -2,6 +2,12 @@
 
 ## Aeroelastic Analysis of a Typical Section
 
+```@setup typical-section
+using Plots
+pyplot()
+nothing #hide
+```
+
 In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.
 
 ![](typical-section.svg)
@@ -26,17 +32,11 @@ where ``a`` is the normalized distance from the semichord to the reference point
 \omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}
 ```
 
-```@setup typical-section
-using Plots
-pyplot()
-nothing #hide
-```
-
 ```@example typical-section-stability
-using AerostructuralDynamics, LinearAlgebra
+using AerostructuralDynamics, DifferentialEquations, LinearAlgebra
 
 # reduced velocity range
-V = range(0, 3.1, length=5000) # = U/(b*ωθ) (reduced velocity)
+V = range(1e-6, 3.1, length=5000) # = U/(b*ωθ) (reduced velocity)
 
 # non-dimensional parameters
 a = -1/5 # reference point normalized location
@@ -81,6 +81,18 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
     # coupled model
     model = couple_models(aerodynamic_model, structural_model)
 
+    # ode representation of the coupled model
+    f = get_ode(model)
+
+    # equilibrium rates are zero
+    dx = zeros(number_of_states(model))
+
+    # initial guess for equilibrium states
+    x0 = zeros(number_of_states(model))
+
+    # current time
+    t = 0.0
+
     # eigenvalue/eigenvector storage
     nλ = number_of_states(model)
     λ[ia] = zeros(ComplexF64, nλ, length(V))
@@ -90,25 +102,20 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
     # loop through each reduced frequency
     for i = 1:length(V)
 
-        # state variables
-        u_aero = zeros(number_of_states(aerodynamic_model))
-        u_stru = zeros(number_of_states(structural_model))
-        u = vcat(u_aero, u_stru)
-
-        # parameters
+        # set parameters
         p_aero = [a, b, a0, α0]
         p_stru = [kh, kθ, m, Sθ, Iθ]
         p_input = [U[i], ρ]
         p = vcat(p_aero, p_stru, p_input)
 
-        # time
-        t = 0.0
+        # find equilibrium point
+        x = solve(SteadyStateProblem(f, x0, p))
 
-        # calculate inputs
-        y = get_coupling_inputs(model, u, p, t)
+        # find corresponding inputs
+        y = get_coupling_inputs(model, dx, x, p, t)
 
         # perform linear stability analysis
-        λi, Uλi, Vλi = get_eigen(model, u, y, p, t)
+        λi, Uλi, Vλi = get_eigen(model, dx, x, y, p, t)
 
         # correlate eigenvalues
         if i > 1
@@ -116,7 +123,7 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
             Uλpi = Uλ[ia][:,:,i-1]
 
             # current mass matrix
-            Mi = get_mass_matrix(model, u, y, p, t)
+            Mi = get_rate_jacobian(model, dx, x, y, p, t)
 
             # use correlation matrix to correlate eigenmodes
             perm, corruption = correlate_eigenmodes(Uλpi, Mi, Vλi)
@@ -250,6 +257,9 @@ iλ = argmin(abs.(real.(λ[ia][:,it])))
 λf = λ[ia][iλ,it]
 vf = Vλ[ia][:,iλ,it]
 
+# flutter mode state rates
+dxf = zeros(number_of_states(model))
+
 # flutter mode state variables
 xf = zeros(number_of_states(model))
 
@@ -267,11 +277,11 @@ t2 = pi/abs(imag(λf))
 scaling = 0.5
 
 # create animation
-anim = @animate for t in range(t1, t2, length=100)
+anim = @animate for t in range(t1, t2, length=50)
 
     xi = xf + scaling*real.(vf*exp(λf*t))
 
-    plot(model, xi, pf, t)
+    plot(model, dxf, xi, pf, t)
 
 end
 
@@ -318,16 +328,16 @@ kh = m*ωh^2
 kθ = Iθ*ωθ^2
 U = V*b*ωθ
 
-# parameter vector
+# parameters
 p_aero = [a, b, a0, α0]
 p_stru = [kh, kθ, m, Sθ, Iθ]
 p_additional = [U, ρ]
 p = vcat(p_aero, p_stru, p_additional)
 
-# initial state variables
+# initial states
 u0_aero = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 u0_stru = [1.0, 0.0, 0.0, 0.0] # non-zero plunge degree of freedom
-u0 = vcat(u0_aero, u0_stru)
+x0 = vcat(u0_aero, u0_stru)
 
 # simulate from 0 to 10 seconds
 tspan = (0.0, 100.0)
@@ -336,7 +346,7 @@ tspan = (0.0, 100.0)
 f = get_ode(coupled_model)
 
 # construct ODE problem
-prob = DifferentialEquations.ODEProblem(f, u0, tspan, p)
+prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
 
 # solve ODE
 sol = DifferentialEquations.solve(prob)
@@ -375,7 +385,7 @@ We can also visualize and/or create animations of the solution geometry with the
 
 ```@example typical-section-stability
 # Plot Recipes:
-# - plot(model, x, p, t)
+# - plot(model, dx, x, p, t)
 # - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
 # - plot(model, sol, t) # plots the solution geometry at time `t`
 
@@ -396,7 +406,7 @@ Visualizing the solution geometry is especially helpful for identifying mode sha
 
 ```@example typical-section-stability
 # Plot Recipes:
-# - plot(model, x, p, t)
+# - plot(model, dx, x, p, t)
 # - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
 # - plot(model, sol, t) # plots the solution geometry at time `t`
 
@@ -406,10 +416,12 @@ anim = @animate for t in range(tspan[1], tspan[2], length=200)
 end
 
 # save animation
-gif(anim, "typical-section-simulation.gif")
+gif(anim, "typical-section-flutter-mode.gif")
 
 nothing #hide
 ```
+
+![](typical-section-flutter-mode.gif)
 
 ## Aeroelastic Analysis of the Goland Wing
 
@@ -514,7 +526,7 @@ Uλ = zeros(ComplexF64, nev, number_of_states(model), length(Vinf))
 Vλ = zeros(ComplexF64, number_of_states(model), nev, length(Vinf))
 
 # initial guess for state variables
-u0 = zeros(number_of_states(model))
+x0 = zeros(number_of_states(model))
 
 # loop through each velocity
 for i = 1:length(Vinf)
@@ -531,7 +543,7 @@ for i = 1:length(Vinf)
         rho = ρ,
         point_conditions = point_conditions,
         element_loads = element_loads,
-        u = Vinf[i],
+        x = Vinf[i],
         v = 0,
         w = 0,
         p = 0,
@@ -542,16 +554,16 @@ for i = 1:length(Vinf)
     p = vcat(p_aero, p_stru, p_additional)
 
     # find state variables corresponding to steady state operating conditions
-    sol = solve(SteadyStateProblem(f, u0, p), SSRootfind())
+    sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
 
     # use state variables from steady state operating conditions
-    u = sol.u
+    x = sol.x
 
     # calculate inputs corresponding to steady state operating conditions
-    y = get_coupling_inputs(model, u, p, t)
+    y = get_coupling_inputs(model, x, p, t)
 
     # perform linear stability analysis
-    λi, Uλi, Vλi = get_eigen(model, u, y, p, t; nev)
+    λi, Uλi, Vλi = get_eigen(model, x, y, p, t; nev)
 
     # correlate eigenvalues
     if i > 1
@@ -559,7 +571,7 @@ for i = 1:length(Vinf)
         Uλpi = Uλ[:,:,i-1]
 
         # current mass matrix
-        Mi = get_mass_matrix(model, u, y, p, t)
+        Mi = get_mass_matrix(model, x, y, p, t)
 
         # use correlation matrix to correlate eigenmodes
         perm, corruption = AerostructuralDynamics.correlate_eigenmodes(Uλpi, Mi, Vλi)
@@ -576,7 +588,7 @@ for i = 1:length(Vinf)
     Vλ[:,:,i] = Vλi
 
     # update initial guess for the state variables
-    u0 .= u
+    x0 .= x
 end
 ```
 
@@ -662,7 +674,7 @@ using DifferentialEquations
 
 Vinf = 100.0
 
-u0 = zeros(number_of_states(model))
+x0 = zeros(number_of_states(model))
 
 # set parameters
 p_aero = get_parameters(aerodynamic_model; section_parameters =
@@ -674,7 +686,7 @@ p_additional = get_additional_parameters(model;
     rho = ρ,
     point_conditions = point_conditions,
     element_loads = element_loads,
-    u = 100.0,
+    x = 100.0,
     v = 0,
     w = 0,
     p = 0,
@@ -685,7 +697,7 @@ p_additional = get_additional_parameters(model;
 p = vcat(p_aero, p_stru, p_additional)
 
 # update initial state variables with steady state solution
-u0 .= solve(SteadyStateProblem(f, u0, p), SSRootfind())
+x0 .= solve(SteadyStateProblem(f, x0, p), SSRootfind())
 
 # simulate from 0 to 10 seconds
 tspan = (0.0, 10.0)
@@ -694,7 +706,7 @@ tspan = (0.0, 10.0)
 f = get_ode(model)
 
 # construct ODE problem
-prob = DifferentialEquations.ODEProblem(f, u0, tspan, p)
+prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
 
 # solve ODE
 sol = DifferentialEquations.solve(prob)
@@ -789,7 +801,7 @@ t = 0.0
 λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
 
 # initial guess for state variables
-u0 = zeros(number_of_states(model))
+x0 = zeros(number_of_states(model))
 
 # loop through each velocity
 for i = 1:length(Vinf)
@@ -807,7 +819,7 @@ for i = 1:length(Vinf)
         rho = ρ,
         point_conditions = point_conditions,
         element_loads = element_loads,
-        u = Vinf[i]*cos(α),
+        x = Vinf[i]*cos(α),
         v = 0,
         w = -Vinf[i]*sin(α),
         p = 0,
@@ -818,21 +830,21 @@ for i = 1:length(Vinf)
     p = vcat(p_aero, p_stru, p_additional)
 
     # find state variables corresponding to steady state operating conditions
-    sol = solve(SteadyStateProblem(f, u0, p), SSRootfind())
+    sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
 
     # use state variables from steady state operating conditions
-    u = sol.u
+    x = sol.x
 
     # calculate inputs corresponding to steady state operating conditions
-    y = get_coupling_inputs(model, u, p, t)
+    y = get_coupling_inputs(model, x, p, t)
 
     # perform linear stability analysis
-    λi, Uλi, Vλi = get_eigen(model, u, y, p, t; nev = number_of_states(model))
+    λi, Uλi, Vλi = get_eigen(model, x, y, p, t; nev = number_of_states(model))
 
     # correlate eigenvalues
     if i > 1
         # calculate mass matrix
-        Mi = get_mass_matrix(model, u, y, p, t)
+        Mi = get_mass_matrix(model, x, y, p, t)
 
         # use correlation matrix to correlate eigenmodes
         perm, corruption = AerostructuralDynamics.correlate_eigenmodes(Uλpi, Mi, Vλi)
@@ -850,7 +862,7 @@ for i = 1:length(Vinf)
     Uλpi = Uλi
 
     # update initial guess for the state variables
-    u0 .= u
+    x0 .= x
 end
 
 nothing #hide
@@ -1033,7 +1045,7 @@ model = couple_models(aerodynamic_model, structural_model, dynamics_model)
 # eigenvalue storage
 λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
 
-u0 = zeros(number_of_states(model))
+x0 = zeros(number_of_states(model))
 
 # loop through each velocity
 for i = 1:length(Vinf)
@@ -1049,24 +1061,24 @@ for i = 1:length(Vinf)
     t = 0
 
     # find state variables corresponding to steady state operating conditions
-    fresid = u -> get_rates(model, u, get_coupling_inputs(model, u, p, t), p, t)
-    sol = nlsolve(fresid, u0)
-    u = sol.zero
+    fresid = x -> get_rates(model, x, get_coupling_inputs(model, x, p, t), p, t)
+    sol = nlsolve(fresid, x0)
+    x = sol.zero
 
     # calculate the inputs corresponding to steady state operating conditions
-    y = get_coupling_inputs(model, u, p, t)
+    y = get_coupling_inputs(model, x, p, t)
 
     # calculate the mass matrix corresponding to steady state operating conditions
-    M = get_mass_matrix(model, u, y, p, t)
+    M = get_mass_matrix(model, x, y, p, t)
 
     # calculate the jacobian corresponding to steady state operating conditions
-    J = get_state_jacobian(model, u, y, p, t)
+    J = get_state_jacobian(model, x, y, p, t)
 
     # solve the generalized eigenvalue problem
     λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
 
     # update initial guess for the state variables
-    u0 .= u
+    x0 .= x
 end
 ```
 

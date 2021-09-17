@@ -8,114 +8,56 @@ model introduces the freestream air density ``\\rho`` as an additional parameter
 """
 couple_models(aero::Peters, stru::LiftingLineSection) = (aero, stru)
 
-# --- traits --- #
+# --- Traits --- #
 
 number_of_additional_parameters(::Type{<:Peters}, ::Type{LiftingLineSection}) = 1
-coupling_inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Linear()
-coupling_state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Nonlinear()
 
-# --- methods --- #
+coupling_inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection}) = OutOfPlace()
+
+coupling_rate_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Linear()
+coupling_state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_parameter_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{<:Peters}, ::Type{LiftingLineSection}) = Zeros()
+
+# --- Methods --- #
 
 function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    s, p, t) where {N,TF,SV,SA}
+    dx, x, p, t) where {N,TF,SV,SA}
+
+    # extract rate variables
+    dλ = dx[SVector{N}(1:N)]
+    dvx, dvy, dvz, dωx, dωy, dωz = dx[SVector{6}(N+1:N+6)]
+
     # extract state variables
-    λ = s[SVector{N}(1:N)]
-    vx, vy, vz, ωx, ωy, ωz = s[SVector{6}(N+1:N+6)]
+    λ = x[SVector{N}(1:N)]
+    vx, vy, vz, ωx, ωy, ωz = x[SVector{6}(N+1:N+6)]
+
     # extract parameters
     a, b, a0, α0, ρ = p
+
     # extract model constants
     bbar = aero.b
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    # calculate aerodynamic loads
-    L, M = peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    # forces and moments per unit span
-    f = SVector(0, 0, L)
-    m = SVector(0, M, 0)
-    # return portion of inputs that is not dependent on the state rates
-    return vcat(u, ω, 0, 0, f, m)
-end
 
-function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA},
-    stru::LiftingLineSection, s, p, t) where {N,TF,SV,SA}
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    vdot_dvz = 1
-    ωdot_dωy = 1
-    # calculate loads
-    L_dvx, M_dvx = peters_loads_udot()
-    L_dvz, M_dvz = peters_loads_vdot(a, b, ρ)
-    L_dωy, M_dωy = peters_loads_ωdot(a, b, ρ)
-    # construct submatrices
-    Mda = zeros(SMatrix{4,N,TF})
-    Mds = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0;
-        0 0 -vdot_dvz 0 0 0; 0 0 0 0 -ωdot_dωy 0]
-    Mra = zeros(SMatrix{6,N,TF})
-    Mrs = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; -L_dvx 0 -L_dvz 0 -L_dωy 0;
-        0 0 0 0 0 0; -M_dvx 0 -M_dvz 0 -M_dωy 0; 0 0 0 0 0 0]
-    # assemble mass matrix
-    return [Mda Mds; Mra Mrs]
-end
+    # freestream velocity components
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
 
-# --- performance overloads --- #
+    # aerodynamic loads
+    La, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
 
-function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::LiftingLineSection, s, p, t) where {N,TF,SV,SA}
-    # extract state variables
-    λ = s[SVector{N}(1:N)]
-    vx, vy, vz, ωx, ωy, ωz = s[SVector{6}(N+1:N+6)]
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # extract model constants
-    bbar = aero.b
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    u_vx = 1
-    ω_ωy = 1
-    # compute loads
-    out = peters_loads_λ(a, b, ρ, a0, bbar, u)
-    L_λ, M_λ = out[1,:], out[2,:]
-    L_vx, M_vx = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    L_vz, M_vz = peters_loads_v(a, b, ρ, a0, u)
-    L_ωy, M_ωy = peters_loads_ω(a, b, ρ, a0, u)
-    # construct submatrices
-    Jda = zeros(SMatrix{4,N,TF})
-    Jds = @SMatrix [u_vx 0 0 0 0 0; 0 0 0 0 ω_ωy 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
-    Jra = vcat(zero(L_λ'), zero(L_λ'), L_λ', zero(M_λ'), M_λ', zero(M_λ'))
-    Jrs = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_vx 0 L_vz 0 L_ωy 0;
-        0 0 0 0 0 0; M_vx 0 M_vz 0 M_ωy 0; 0 0 0 0 0 0]
-    # assemble jacobian
-    return [Jda Jds; Jra Jrs]
-end
+    # loads per unit span
+    f = SVector(0, 0, La)
+    m = SVector(0, Ma, 0)
 
-# --- unit testing methods --- #
-
-function get_coupling_inputs_using_state_rates(aero::Peters{N,TF,SV,SA},
-    stru::LiftingLineSection, ds, s, p, t) where {N,TF,SV,SA}
-    # extract state rates
-    dλ = ds[SVector{N}(1:N)]
-    dvx, dvy, dvz, dωx, dωy, dωz = ds[SVector{6}(N+1:N+6)]
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    vdot = dvz
-    ωdot = dωy
-    # calculate aerodynamic loads
-    L, M = peters_rate_loads(a, b, ρ, vdot, ωdot)
-    # forces and moments per unit span
-    f = SVector(0, 0, L)
-    m = SVector(0, M, 0)
     # return inputs
-    return vcat(0, 0, vdot, ωdot, f, m)
+    return SVector(u, ω, vdot, ωdot, f..., m...)
 end
 
-# --- convenience methods --- #
+# --- Performance Overloads --- #
+
+#TODO: State rate, state, and parameter jacobians
+
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::Peters, stru::LiftingLineSection; rho)
 

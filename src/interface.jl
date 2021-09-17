@@ -1,30 +1,20 @@
 """
     couple_models(models...)
 
-Couples multiple models together to form a coupled model.
+Couples multiple models together to form a coupled model.  The coupled model is
+represented as a tuple of models, though this may change in the future.
 """
 couple_models(models...) = models
 
 """
     number_of_states(model)
 
-Return the total number of states corresponding to the model or models.
+Return the total number of state variables corresponding to the model or models.
 """
 number_of_states
 
-# dispatch on model object
-function number_of_states(model::TM) where TM <: AbstractModel
-    return _number_of_states(unsteadyness(TM), model)
-end
-
-# dispatch on model type
-function number_of_states(::Type{TM}) where TM <: AbstractModel
-    return _number_of_states()
-end
-
 # by default, dispatch on type
 number_of_states(model::TM) where TM <: AbstractModel = number_of_states(TM)
-
 
 # models with no states have... no states
 number_of_states(::Type{TM}) where TM <: NoStateModel = 0
@@ -35,7 +25,7 @@ function number_of_states(models::NTuple{N,AbstractModel}) where N
 end
 
 # coupled models have concatenated states
-function number_of_states(::Type{TM}) where TM<:NTuple{N,AbstractModel} where N
+function number_of_states(::Type{TM}) where TM <: NTuple{N,AbstractModel} where N
     return sum(number_of_states.(TM.parameters))
 end
 
@@ -49,7 +39,7 @@ number_of_inputs
 # by default, dispatch on type
 number_of_inputs(model::TM) where TM <: AbstractModel = number_of_inputs(TM)
 
-# models with no states have no inputs
+# models with no state variables also have no inputs
 number_of_inputs(::Type{TM}) where TM <: NoStateModel = 0
 
 # coupled models have concatenated inputs
@@ -72,12 +62,12 @@ number_of_parameters
 # by default, dispatch on type
 number_of_parameters(model::TM) where TM <: AbstractModel = number_of_parameters(TM)
 
-# coupled models have concatenated parameters
+# coupled models have concatenated parameters + additional parameters
 function number_of_parameters(models::NTuple{N,AbstractModel}) where N
     sum(number_of_parameters.(models)) + number_of_additional_parameters(models...)
 end
 
-# coupled models have concatenated parameters
+# coupled models have concatenated parameters + additional parameters
 function number_of_parameters(::Type{TM}) where TM <: NTuple{N,AbstractModel} where N
     return sum(number_of_parameters.(TM.parameters)) + number_of_additional_parameters(TM.parameters...)
 end
@@ -108,10 +98,10 @@ Return the indices corresponding to the state variables for each model in `model
 """
 function state_indices(models::NTuple{N,AbstractModel}) where N
     # input indices
-    Nu = number_of_states.(models)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    return UnitRange.(iu1, iu2)
+    Nx = number_of_states.(models)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    return UnitRange.(ix1, ix2)
 end
 
 """
@@ -167,6 +157,45 @@ function get_states(model::AbstractModel; kwargs...)
 end
 
 """
+    get_inputs(model; kwargs...)
+
+Return the input vector corresponding to `model` using the input values in `kwargs`.
+"""
+function get_inputs(model::AbstractModel; kwargs...)
+    y = zeros(number_of_inputs(model))
+    set_inputs!(y, model; kwargs...)
+    return y
+end
+
+"""
+    get_parameters(model; kwargs...)
+
+Return the parameter vector corresponding to `model` using the parameter values
+in `kwargs`.
+"""
+function get_parameters(model::AbstractModel; kwargs...)
+    p = zeros(number_of_parameters(model))
+    set_parameters!(p, model; kwargs...)
+    return p
+end
+
+"""
+    get_additional_parameters(model; kwargs...)
+
+Return the elements of the parameter vector corresponding to the additional
+parameters of coupled model `model` using the parameters specified in `kwargs`
+"""
+function get_additional_parameters(models::NTuple{N,AbstractModel};
+    kwargs...) where N
+
+    padd = zeros(number_of_additional_parameters(models...))
+
+    set_additional_parameters!(padd, models...; kwargs...)
+
+    return padd
+end
+
+"""
     set_states!(x, model; kwargs...)
 
 In-place version of [`get_states`](@ref)
@@ -184,17 +213,6 @@ model of coupled model `model` to the values specified in `kwargs`
 function set_states!(x, model::NTuple{N,AbstractModel}, i; kwargs...) where N
 
     return set_states!(view(x, state_indices(model)[i]), model[i]; kwargs...)
-end
-
-"""
-    get_inputs(model; kwargs...)
-
-Return the input vector corresponding to `model` using the input values in `kwargs`.
-"""
-function get_inputs(model::AbstractModel; kwargs...)
-    y = zeros(number_of_inputs(model))
-    set_inputs!(y, model; kwargs...)
-    return y
 end
 
 """
@@ -218,18 +236,6 @@ function set_inputs!(y, model::NTuple{N,AbstractModel}, i; kwargs...) where N
 end
 
 """
-    get_parameters(model; kwargs...)
-
-Return the parameter vector corresponding to `model` using the parameter values
-in `kwargs`.
-"""
-function get_parameters(model::AbstractModel; kwargs...)
-    p = zeros(number_of_parameters(model))
-    set_parameters!(p, model; kwargs...)
-    return p
-end
-
-"""
     set_parameters!(p, model; kwargs...)
 
 In-place version of [`get_parameters`](@ref)
@@ -245,22 +251,6 @@ model of coupled model `model` to the values specified in `kwargs`
 function set_parameters!(p, model::NTuple{N,AbstractModel}, i; kwargs...) where N
 
     return set_parameters!(view(p, parameter_indices(model)[i]), model[i]; kwargs...)
-end
-
-"""
-    get_additional_parameters(model; kwargs...)
-
-Return the elements of the parameter vector corresponding to the additional
-parameters of coupled model `model` using the parameters specified in `kwargs`
-"""
-function get_additional_parameters(models::NTuple{N,AbstractModel};
-    kwargs...) where N
-
-    padd = zeros(number_of_additional_parameters(models...))
-
-    set_additional_parameters!(padd, models...; kwargs...)
-
-    return padd
 end
 
 """
@@ -328,6 +318,14 @@ function separate_parameters(models::NTuple{N,AbstractModel}, p) where N
 end
 
 """
+    separate_additional_parameters(model, p)
+
+Separate the additional parameter vector entries in `p` corresponding to the
+model coupling, if applicable.
+"""
+separate_additional_parameters
+
+"""
     get_residual(models, dx, x, y, p, t)
 
 Calculate the residual for the specified model or models.
@@ -336,10 +334,7 @@ function get_residual(models::T, dx, x, y, p, t) where T
     return _get_residual(inplaceness(T), models, dx, x, y, p, t)
 end
 
-function get_residual(models::T, args...) where T<:NoStateModel
-    return SVector{0,Float64}()
-end
-
+# models with no states have no residual
 function get_residual(models::T, args...) where T <: NoStateModel
     return SVector{0,Float64}()
 end
@@ -349,7 +344,7 @@ function _get_residual(::InPlace, models, dx, x, y, p, t)
     TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
     resid = similar(dx, TF)
     get_residual!(resid, models, dx, x, y, p, t)
-    return dx
+    return resid
 end
 
 # calculate residual for a combination of models
@@ -363,10 +358,10 @@ end
     dx, x, y, p, t) where N
 
     # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
 
     Ny = number_of_inputs.(models.parameters)
     iy2 = cumsum(Ny)
@@ -385,13 +380,14 @@ end
     for i = 1:N
         expr = quote
             $expr
-            $(resid[i]) = get_residual(models[$i], dx[$(iu[i])], x[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
+            $(resid[i]) = get_residual(models[$i], dx[$(ix[i])], x[$(ix[i])],
+                y[$(iy[i])], p[$(ip[i])], t)
         end
     end
 
     expr = quote
         $expr
-        dx = vcat($(resid...))
+        resid = vcat($(resid...))
     end
 
     return expr
@@ -411,18 +407,18 @@ function _get_residual!(resid, ::OutOfPlace, models, dx, x, y, p, t)
     return resid .= get_residual(models, dx, x, y, p, t)
 end
 
-# calculate state residual for a combination of models
-function _get_residual!(resid, ::InPlace, models::NTuple{N,AbstractModel}, dx,
-    x, y, p, t) where N
+# calculate residual for a combination of models
+function _get_residual!(resid, ::InPlace, models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
 
-    iu = state_indices(models)
+    ix = state_indices(models)
     iy = input_indices(models)
     ip = parameter_indices(models)
 
     for i = 1:length(models)
-        vresid = view(resid, iu[i])
-        vdx = view(dx, iu[i])
-        vx = view(x, iu[i])
+        vresid = view(resid, ix[i])
+        vdx = view(dx, ix[i])
+        vx = view(x, ix[i])
         vy = view(y, iy[i])
         vp = view(p, ip[i])
         get_residual!(vresid, models[i], vdx, vx, vy, vp, t)
@@ -431,536 +427,678 @@ function _get_residual!(resid, ::InPlace, models::NTuple{N,AbstractModel}, dx,
     return resid
 end
 
-"""
-    get_rates(models, x, y, p, t)
+# --- Performance Overloads --- #
 
-Calculate the (mass-matrix multipled) state rates for the specified model or models.
 """
-function get_rates(models::T, x, y, p, t) where T
-    return _get_rates(rate_jacobian_type(T), inplaceness(T), models, x, y, p, t)
-end
+    get_rate_jacobian(model)
+    get_rate_jacobian(model, p)
+    get_rate_jacobian(model, dx, x, y, p, t)
 
-function get_rates(models::T, args...) where T<:NoStateModel
-    return SVector{0,Float64}()
+Calculate the jacobian of the residual function for `model` with respect to the
+state rates
+"""
+function get_rate_jacobian(models::TM, args...) where TM
+    return _get_rate_jacobian(rate_jacobian_type(TM), inplaceness(TM), models, args...)
 end
 
 # dispatch to an in-place function
-function _get_rates(::Any, ::InPlace, models, x, y, p, t)
-    TF = promote_type(eltype(x), eltype(y), eltype(p), typeof(t))
-    du = similar(x, TF)
-    get_rates!(du, models, x, y, p, t)
-    return du
-end
-
-# derive state rates from residual expression
-function _get_rates(::Identity, ::OutOfPlace, models, x, y, p, t)
-    return -get_residual(models, Zeros(x), x, y, p, t)
-end
-
-# derive state rates from residual expression
-function _get_rates(::Invariant, ::OutOfPlace, models, x, y, p, t)
-    return -get_residual(models, Zeros(x), x, y, p, t)
-end
-
-# derive state rates from residual expression
-function _get_rates(::Constant, ::OutOfPlace, models, x, y, p, t)
-    return -get_residual(models, Zeros(x), x, y, p, t)
-end
-
-# derive state rates from residual expression
-function _get_rates(::Linear, ::OutOfPlace, models, x, y, p, t)
-    return -get_residual(models, Zeros(x), x, y, p, t)
-end
-
-# calculate state rates for a combination of models
-function _get_rates(::OutOfPlace, models::NTuple{N,AbstractModel}, x, y, p, t) where N
-    return get_model_rates(models, x, y, p, t)
-end
-
-@generated function get_model_rates(models::NTuple{N,AbstractModel}, x, y, p, t) where N
-    # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
-
-    Ny = number_of_inputs.(models.parameters)
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny .+ 1
-    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
-
-    Np = number_of_parameters.(models.parameters)
-    ip2 = cumsum(Np)
-    ip1 = ip2 .- Np .+ 1
-    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
-
-    # initialize state variable names
-    dui = [Symbol("du", i) for i = 1:N]
-
-    expr = :()
-    for i = 1:N
-        expr = quote
-            $expr
-            $(dui[i]) = get_rates(models[$i], u[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t)
-        end
-    end
-
-    expr = quote
-        $expr
-        du = vcat($(dui...))
-    end
-
-    return expr
-end
-
-"""
-    get_rates!(dx, models, x, y, p, t)
-
-In-place version of [`get_rates`](@ref)
-"""
-function get_rates!(dx, models::T, x, y, p, t) where T
-    return _get_rates!(dx, inplaceness(T), models, x, y, p, t)
-end
-
-# dispatch to an out-of-place function
-function _get_rates!(dx, ::OutOfPlace, models, x, y, p, t)
-    return dx .= get_rates(models, x, y, p, t)
-end
-
-# derive state rates from residual expression
-function _get_rates!(dx, ::Identity, ::OutOfPlace, models, x, y, p, t)
-
-    get_residual!(dx, models, Zeros(x), x, y, p, t)
-
-    dx .*= -1
-
-    return dx
-end
-
-# derive state rates from residual expression
-function _get_rates!(::Invariant, ::OutOfPlace, models, x, y, p, t)
-
-    get_residual!(dx, models, Zeros(x), x, y, p, t)
-
-    dx .*= -1
-
-    return dx
-end
-
-# derive state rates from residual expression
-function _get_rates!(::Constant, ::OutOfPlace, models, x, y, p, t)
-
-    get_residual!(dx, models, Zeros(x), x, y, p, t)
-
-    dx .*= -1
-
-    return dx
-end
-
-# derive state rates from residual expression
-function _get_rates!(::Linear, ::OutOfPlace, models, x, y, p, t)
-
-    get_residual!(dx, models, Zeros(x), x, y, p, t)
-
-    dx .*= -1
-
-    return dx
-end
-
-# calculate state rates for a combination of models
-function _get_rates!(dx, ::InPlace, models::NTuple{N,AbstractModel}, x, y, p, t) where N
-
-    iu = state_indices(models)
-    iy = input_indices(models)
-    ip = parameter_indices(models)
-
-    for i = 1:length(models)
-        vdx = view(dx, iu[i])
-        vx = view(x, iu[i])
-        vy = view(y, iy[i])
-        vp = view(p, ip[i])
-        get_rates!(vdx, models[i], vx, vy, vp, t)
-    end
-
-    return dx
-end
-
-"""
-    get_mass_matrix(models)
-    get_mass_matrix(models, u, y, p, t)
-
-Calculate the mass matrix for a model or combination of models.
-"""
-function get_mass_matrix(models::TM, args...; kwargs...) where TM
-    return _get_mass_matrix(mass_matrix_type(TM), inplaceness(TM), models,
-        args...; kwargs...)
+function _get_rate_jacobian(::Any, ::InPlace, models)
+    Nx = number_of_states(models)
+    J = Matrix{Float64}(undef, Nx, Nx)
+    return get_rate_jacobian!(J, models)
 end
 
 # dispatch to an in-place function
-function _get_mass_matrix(::Any, ::InPlace, models; kwargs...)
-    Nu = number_of_states(models)
-    M = zeros(Nu,Nu)
-    return get_mass_matrix!(M, models; kwargs...)
+function _get_rate_jacobian(::Any, ::InPlace, models, p)
+    TF = promote_type(eltype(p))
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Nx, Nx)
+    return get_rate_jacobian!(J, models, p)
 end
 
 # dispatch to an in-place function
-function _get_mass_matrix(::Any, ::InPlace, models, u, y, p, t; kwargs...)
-    Nu = number_of_states(models)
-    M = similar(u, Nu, Nu)
-    return get_mass_matrix!(M, models, u, y, p, t; kwargs...)
+function _get_rate_jacobian(::Any, ::InPlace, models, dx, x, y, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Nx, Nx)
+    return get_rate_jacobian!(J, models, dx, x, y, p, t)
 end
 
 # return an empty matrix
-function _get_mass_matrix(::Empty, ::OutOfPlace, models, args...; kwargs...)
-    return SMatrix{0, 0, Float64}()
-end
-
-# return the identity matrix
-function _get_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
-    kwargs...) where TM
-
-    Nu = number_of_states(TM)
-
-    return zero(SMatrix{Nu, Nu, Float64})
-end
-
-# return the identity matrix
-function _get_mass_matrix(::Identity, ::OutOfPlace, models::TM, args...;
-    kwargs...) where TM
-
-    Nu = number_of_states(TM)
-
-    return SMatrix{Nu, Nu, Float64}(I)
-end
-
-# dispatch to the `get_mass_matrix` without arguments
-function _get_mass_matrix(::Constant, ::OutOfPlace, models, u, y, p, t; kwargs...)
-    return get_mass_matrix(models; kwargs...)
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix(::Constant, ::OutOfPlace, models::NTuple{N, AbstractModel}) where N
-
-    # initialize mass matrix
-    M = initialize_mass_matrix(models)
-
-    # calculate input jacobian
-    D = input_jacobian(models)
-
-    # calculate input mass matrix
-    My = get_coupling_mass_matrix(models)
-
-    return M + D*My
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix(::Linear, ::OutOfPlace, models::NTuple{N, AbstractModel},
-    u, y, p, t) where N
-
-    # initialize mass matrix
-    M = initialize_mass_matrix(models, u, y, p, t)
-
-    # calculate input jacobian
-    D = get_input_jacobian(models, u, y, p, t)
-
-    # calculate input mass matrix
-    My = get_coupling_mass_matrix(models, u, p, t)
-
-    return M + D*My
-end
-
-function initialize_mass_matrix(models::NTuple{N,AbstractModel}) where N
-    initialize_static_mass_matrix(models)
-end
-
-function initialize_mass_matrix(models::NTuple{N,AbstractModel}, u, y, p, t) where N
-    initialize_varying_mass_matrix(models, u, y, p, t)
-end
-
-@generated function initialize_static_mass_matrix(models::NTuple{N,AbstractModel}) where N
-
-    # get number of state variables in each model
-    Nu = number_of_states.(models.parameters)
-
-    # initialize row names
-    Mi = [Symbol("M", i) for i = 1:N]
-
-    # initialize off-diagonal terms
-    Mij = [zeros(SMatrix{Nu[i], Nu[j], Float64}) for i = 1:N, j = 1:N]
-
-    # construct all columns
-    expr = quote
-        $(Mi[1]) = vcat(get_mass_matrix(models[1]), $(Mij[1, 2:end]...))
-    end
-    for i = 2:N
-        expr = quote
-            $expr
-            $(Mi[i]) = vcat($(Mij[i, 1:i-1]...), get_mass_matrix(models[$i]), $(Mij[i, i+1:end]...))
-        end
-    end
-    expr = quote
-        $expr
-        M = hcat($(Mi...))
-    end
-
-    return expr
-end
-
-@generated function initialize_varying_mass_matrix(models::NTuple{N,AbstractModel},
-    u, y, p, t) where N
-
-    # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
-
-    Ny = number_of_inputs.(models.parameters)
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny .+ 1
-    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
-
-    Np = number_of_parameters.(models.parameters)
-    ip2 = cumsum(Np)
-    ip1 = ip2 .- Np .+ 1
-    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
-
-    # initialize row names
-    Mi = [Symbol("M", i) for i = 1:N]
-
-    # initialize off-diagonal terms
-    Mij = [zeros(SMatrix{Nu[i], Nu[j], Float64}) for i = 1:N, j = 1:N]
-
-    # construct all columns
-    expr = quote
-        $(Mi[1]) = vcat(get_mass_matrix(models[1], u[$(iu[1])], y[$(iy[1])], p[$(ip[1])], t),
-            $(Mij[2:end, 1]...))
-    end
-    for i = 2:N
-        expr = quote
-            $expr
-            $(Mi[i]) = vcat($(Mij[1:i-1, i]...), get_mass_matrix(models[$i], u[$(iu[i])],
-                y[$(iy[i])], p[$(ip[i])], t), $(Mij[i+1:end, i]...))
-        end
-    end
-    expr = quote
-        $expr
-        M = hcat($(Mi...))
-    end
-
-    return expr
-end
-
-"""
-    get_mass_matrix!(M, models)
-    get_mass_matrix!(M, models, u, y, p, t)
-
-In-place version of `get_mass_matrix`.
-"""
-function get_mass_matrix!(M, models::TM, args...; kwargs...) where TM
-    return _get_mass_matrix!(M, mass_matrix_type(TM), inplaceness(TM), models,
-        args...; kwargs...)
-end
-
-# dispatch to an out-of-place function
-function _get_mass_matrix!(M, ::Any, ::OutOfPlace, models, args...; kwargs...)
-    return M .= get_mass_matrix(models, args...; kwargs...)
-end
-
-# return an empty matrix
-function _get_mass_matrix!(M, ::Empty, ::InPlace, models, args...; kwargs...)
-    return M
-end
-
-# return the identity matrix
-function _get_mass_matrix!(M, ::Zeros, ::InPlace, models, args...; kwargs...)
-    return M .= 0
-end
-
-# return the identity matrix
-function _get_mass_matrix!(M, ::Identity, ::InPlace, models, args...; kwargs...)
-    M .= 0
-    for i = 1:N
-        M[i,i] = 1
-    end
-    return M
-end
-
-# dispatch to `get_mass_matrix!` without arguments
-function _get_mass_matrix!(M, ::Constant, ::InPlace, models, u, y, p, t; kwargs...)
-    return get_mass_matrix!(M, models; kwargs...)
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix!(M, ::Constant, ::InPlace, models::NTuple{N, AbstractModel};
-    My = similar(M, number_of_inputs(models), number_of_states(models))) where N
-
-    # get state and parameter indices
-    iu = state_indices(models)
-    iy = input_indices(models)
-
-    # calculate input mass matrix
-    get_coupling_mass_matrix!(My, models)
-
-    # calculate mass matrix
-    for i = 1:length(models)
-        D = get_input_jacobian(models[i])
-        for j = 1:length(models)
-            Mij = view(M, iu[i], iu[j])
-            Myij = view(My, iy[i], iu[j])
-            if i == j
-                get_mass_matrix!(Mij, models)
-                mul!(Mij, D, Myij, 1, 1)
-            else
-                mul!(Mij, D, Myij)
-            end
-        end
-    end
-
-    return M
-end
-
-# calculate mass matrix for a combination of models
-function _get_mass_matrix!(M, ::Linear, ::InPlace,
-    models::NTuple{N, AbstractModel}, u, y, p, t; My = similar(M, number_of_inputs(models),
-    number_of_states(models))) where N
-
-    # get state and parameter indices
-    iu = state_indices(models)
-    iy = input_indices(models)
-    ip = parameter_indices(models)
-
-    # calculate input mass matrix
-    get_coupling_mass_matrix!(My, models, u, p, t)
-
-    # calculate mass matrix
-    for i = 1:N
-        ui = view(u, iu[i])
-        yi = view(y, iy[i])
-        pi = view(p, ip[i])
-        D = get_input_jacobian(models[i], ui, yi, pi, t)
-        for j = 1:N
-            Mij = view(M, iu[i], iu[j])
-            Myij = view(My, iy[i], iu[j])
-            if i == j
-                get_mass_matrix!(Mij, models[i], ui, yi, pi, t)
-                mul!(Mij, D, Myij, 1, 1)
-            else
-                mul!(Mij, D, Myij)
-            end
-        end
-    end
-
-    return M
-end
-
-"""
-    get_state_jacobian(models, u, y, p, t)
-
-Calculate the jacobian with respect to the state variables for the specified
-models.
-"""
-function get_state_jacobian(models::T, u, y, p, t) where T
-    return _get_state_jacobian(state_jacobian_type(T), inplaceness(T), models,
-        u, y, p, t)
-end
-
-# dispatch to an in-place function
-function _get_state_jacobian(::Any, ::InPlace, models)
-    Nu = number_of_states(models)
-    M = zeros(Nu,Nu)
-    return get_state_jacobian!(M, models)
-end
-
-# dispatch to an in-place function
-function _get_state_jacobian(::Any, ::InPlace, models, u, y, p, t)
-    TF = promote_type(eltype(u), eltype(y), eltype(p), typeof(t))
-    Nu = number_of_states(models)
-    M = zeros(TF, Nu, Nu)
-    return get_state_jacobian!(M, models, u, y, p, t)
-end
-
-# return an empty matrix
-function _get_state_jacobian(::Empty, ::OutOfPlace, models, args...)
-    return SMatrix{0, 0, Float64}()
+function _get_rate_jacobian(::Empty, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Nx, Nx, Float64})
 end
 
 # return a zero matrix
-function _get_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
-    Nu = number_of_states(TM)
-    return zero(SMatrix{Nu, Nu, Float64})
+function _get_rate_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Nx, Nx, Float64})
 end
 
 # return the identity matrix
-function _get_state_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
-    Nu = number_of_states(TM)
-    return SMatrix{Nu, Nu, Float64}(I)
+function _get_rate_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    return SMatrix{Nx, Nx, Float64}(I)
 end
 
-# dispatch to the `get_state_jacobian` without arguments
-function _get_state_jacobian(::Constant, ::OutOfPlace, models, u, y, p, t)
-    return get_state_jacobian(models)
+# dispatch to `get_rate_jacobian` without arguments
+function _get_rate_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_rate_jacobian(models)
 end
 
-# use automatic differentiation since a custom definition is absent
-function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace, models,
-    u, y, p, t)
-
-    f = u -> get_rates(models, u, y, p, t)
-
-    return ForwardDiff.jacobian(f, u)
+# dispatch to `get_rate_jacobian` without arguments
+function _get_rate_jacobian(::Invariant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_rate_jacobian(models)
 end
 
-# calculate state jacobian for a combination of models
-function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
+# dispatch to `get_rate_jacobian` with only parameters as arguments
+function _get_rate_jacobian(::Constant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_rate_jacobian(models, p)
+end
+
+# use automatic differentiation since a custom jacobian definition is absent
+function _get_rate_jacobian(::Invariant, ::OutOfPlace, models::TM) where TM
+
+    Nx = number_of_states(TM)
+    Ny = number_of_inputs(TM)
+    Np = number_of_parameters(TM)
+
+    dx = zeros(SVector{Nx,Float64})
+    x = zeros(SVector{Nx,Float64})
+    y = zeros(SVector{Ny,Float64})
+    p = zeros(SVector{Np,Float64})
+    t = 0
+
+    f = dx -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, dx)
+end
+
+# use automatic differentiation since a custom jacobian definition is absent
+function _get_rate_jacobian(::Constant, ::OutOfPlace, models::TM, p) where TM
+
+    Nx = number_of_states(TM)
+    Ny = number_of_inputs(TM)
+
+    dx = zeros(SVector{Nx,Float64})
+    x = zeros(SVector{Nx,Float64})
+    y = zeros(SVector{Ny,Float64})
+    t = 0
+
+    f = dx -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, dx)
+end
+
+# use automatic differentiation since a custom jacobian definition is absent
+function _get_rate_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace, models, dx, x, y, p, t)
+
+    f = dx -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, dx)
+end
+
+# calculate the rate jacobian for a combination of models
+function _get_rate_jacobian(::Invariant, ::OutOfPlace,
     models::NTuple{N, AbstractModel}) where N
 
-    # initialize mass matrix
-    J = initialize_state_jacobian(models)
+    # partial of residual expression wrt state rates
+    r_dx = get_rate_partial(models)
 
-    # calculate input jacobian
-    D = input_jacobian(models)
+    # partial of residual expression wrt to inputs
+    r_y = get_input_jacobian(models)
 
-    # calculate input jacobian
-    Jy = get_coupling_state_jacobian(models)
+    # partial of input expression wrt state rates
+    y_dx = get_coupling_rate_jacobian(models)
 
-    return J + D*Jy
+    # calculate jacobian (chain rule)
+    return r_dx + r_y*y_dx
 end
 
-# calculate state jacobian for a combination of models
-function _get_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
-    models::NTuple{N, AbstractModel}, u, y, p, t) where N
+# calculate the rate jacobian for a combination of models
+function _get_rate_jacobian(::Constant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, p) where N
 
-    # initialize mass matrix
-    J = initialize_state_jacobian(models, u, y, p, t)
+    # partial of residual expression wrt state rates
+    r_dx = get_rate_partial(models, p)
 
-    # calculate input jacobian
-    D = get_input_jacobian(models, u, y, p, t)
+    # partial of residual expression wrt to inputs
+    r_y = get_input_jacobian(models, p)
 
-    # calculate input jacobian
-    Jy = get_coupling_state_jacobian(models, u, p, t)
+    # partial of input expression wrt state rates
+    y_dx = get_coupling_rate_jacobian(models, p)
 
-    return J + D*Jy
+    # calculate jacobian (chain rule)
+    return r_dx + r_y*y_dx
 end
 
-function initialize_state_jacobian(models::NTuple{N,AbstractModel}) where N
-    initialize_static_state_jacobian(models)
+# calculate the rate jacobian for a combination of models
+function _get_rate_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, dx, x, y, p, t) where N
+
+    # partial of residual expression wrt state rates
+    r_dx = get_rate_partial(models, dx, x, y, p, t)
+
+    # partial of residual expression wrt to inputs
+    r_y = get_input_jacobian(models, dx, x, y, p, t)
+
+    # partial of input expression wrt state rates
+    y_dx = get_coupling_rate_jacobian(models, dx, x, p, t)
+
+    return r_dx + r_y*y_dx
 end
 
-function initialize_state_jacobian(models::NTuple{N,AbstractModel}, u, y, p, t) where N
-    initialize_varying_state_jacobian(models, u, y, p, t)
+function get_rate_partial(models::NTuple{N,AbstractModel}) where N
+    get_invariant_rate_partial(models)
 end
 
-@generated function initialize_static_state_jacobian(models::NTuple{N,AbstractModel}) where N
+function get_rate_partial(models::NTuple{N,AbstractModel}, p) where N
+    get_constant_rate_partial(models, p)
+end
+
+function get_rate_partial(models::NTuple{N,AbstractModel}, dx, x, y, p, t) where N
+    get_varying_rate_partial(models, dx, x, y, p, t)
+end
+
+@generated function get_invariant_rate_partial(models::NTuple{N,AbstractModel}) where N
 
     # get number of state variables in each model
-    Nu = number_of_states.(models.parameters)
+    Nx = number_of_states.(models.parameters)
 
     # initialize row names
     Ji = [Symbol("J", i) for i = 1:N]
 
     # initialize off-diagonal terms
-    Jij = [zeros(SMatrix{Nu[i], Nu[j], Float64}) for i = 1:N, j = 1:N]
+    Jij = [zeros(SMatrix{Nx[i], Nx[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_rate_jacobian(models[1]), $(Jij[1, 2:end]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[i, 1:i-1]...), get_rate_jacobian(models[$i]), $(Jij[i, i+1:end]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    return expr
+end
+
+@generated function get_constant_rate_partial(models::NTuple{N,AbstractModel},
+    p) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Nx[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_rate_jacobian(models[1], p[$(ip[1])]), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_rate_jacobian(models[$i],
+                p[$(ip[i])]), $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    return expr
+end
+
+@generated function get_varying_rate_partial(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Nx[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_rate_jacobian(models[1], dx[$(ix[1])], x[$(ix[1])],
+            y[$(iy[1])], p[$(ip[1])], t), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_rate_jacobian(models[$i],
+                dx[$(ix[i])], x[$(ix[i])], y[$(iy[i])], p[$(ip[i])], t),
+                $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    return expr
+end
+
+"""
+    get_rate_jacobian!(J, model)
+    get_rate_jacobian!(J, model, p)
+    get_rate_jacobian!(J, model, dx, x, y, p, t)
+
+In-place version of [`get_rate_jacobian`](@ref).
+"""
+function get_rate_jacobian!(J, model::TM; kwargs...) where TM
+    return _get_rate_jacobian!(J, rate_jacobian_type(TM), inplaceness(TM),
+        model; kwargs...)
+end
+
+function get_rate_jacobian!(J, model::TM, p; kwargs...) where TM
+    return _get_rate_jacobian!(J, rate_jacobian_type(TM), inplaceness(TM),
+        model, p; kwargs...)
+end
+
+function get_rate_jacobian!(J, model::TM, dx, x, y, p, t; kwargs...) where TM
+    return _get_rate_jacobian!(J, rate_jacobian_type(TM), inplaceness(TM),
+        model, dx, x, y, p, t; kwargs...)
+end
+
+# dispatch to an out-of-place function
+function _get_rate_jacobian!(J, ::Any, ::OutOfPlace, model, args...; kwargs...)
+    return J .= get_rate_jacobian(model, args...; kwargs...)
+end
+
+# return an empty matrix
+function _get_rate_jacobian!(J, ::Empty, ::InPlace, model, args...; kwargs...)
+    return J
+end
+
+# return a zero matrix
+function _get_rate_jacobian!(J, ::Zeros, ::InPlace, model, args...; kwargs...)
+    return J .= 0
+end
+
+# return the identity matrix
+function _get_rate_jacobian!(J, ::Identity, ::InPlace, model, args...; kwargs...)
+    J .= 0
+    for i = 1:number_of_states(model)
+        J[i,i] = 1
+    end
+    return J
+end
+
+# dispatch to `get_rate_jacobian!` without arguments
+function _get_rate_jacobian!(J, ::Invariant, ::InPlace, model, dx, x, y, p, t; kwargs...)
+
+    return get_rate_jacobian!(J, model; kwargs...)
+end
+
+# dispatch to `get_rate_jacobian!` without arguments
+function _get_rate_jacobian!(J, ::Invariant, ::InPlace, model, p; kwargs...)
+
+    return get_rate_jacobian!(J, model; kwargs...)
+end
+
+# dispatch to `get_rate_jacobian!` with only parameters as arguments
+function _get_rate_jacobian!(J, ::Constant, ::InPlace, model, dx, x, y, p, t; kwargs...)
+
+    return get_rate_jacobian!(J, model, p; kwargs...)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_rate_jacobian!(J, ::Invariant, ::InPlace, model)
+
+    dx = FillArrays.Zeros(number_of_states(model))
+    x = FillArrays.Zeros(number_of_states(model))
+    y = FillArrays.Zeros(number_of_inputs(model))
+    p = FillArrays.Zeros(number_of_parameters(model))
+    t = 0
+
+    f = dx -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, dx))
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_rate_jacobian!(J, ::Constant, ::InPlace, model, p)
+
+    dx = FillArrays.Zeros(number_of_states(model))
+    x = FillArrays.Zeros(number_of_states(model))
+    y = FillArrays.Zeros(number_of_inputs(model))
+    t = 0
+
+    f = dx -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, dx))
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_rate_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model, dx, x, y, p, t)
+
+    f = dx -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, dx))
+end
+
+# calculate rate jacobian for a combination of models
+function _get_rate_jacobian!(J, ::Invariant, ::InPlace,
+    models::NTuple{N, AbstractModel};
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dyddx_cache = similar(J, number_of_inputs(models), number_of_states(models))
+    ) where N
+
+    # get state and input indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+
+    # calculate input mass matrix
+    get_coupling_rate_jacobian!(dyddx_cache, models)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        get_input_jacobian!(ri_yi, models[i])
+        for j = 1:length(models)
+            ri_dxj = view(J, ix[i], ix[j])
+            yi_dxj = view(dyddx_cache, iy[i], ix[j])
+            if i == j
+                get_rate_jacobian!(ri_dxj, models)
+                mul!(ri_dxj, ri_yi, yi_dxj, 1, 1)
+            else
+                mul!(ri_dxj, ri_yi, yi_dxj)
+            end
+        end
+    end
+
+    return J
+end
+
+# calculate rate jacobian for a combination of models
+function _get_rate_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N, AbstractModel}, p;
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dyddx_cache = similar(J, number_of_inputs(models), number_of_states(models))
+    ) where N
+
+    # get state and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # calculate input rate jacobian
+    get_coupling_rate_jacobian!(dyddx_cache, models, p)
+
+    # calculate rate jacobian
+    for i = 1:N
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        dxi = view(dx, ix[i])
+        xi = view(x, ix[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        get_input_jacobian!(ri_yi, models[i], p)
+        for j = 1:N
+            ri_dxj = view(J, ix[i], ix[j])
+            yi_dxj = view(dyddx_cache, iy[i], ix[j])
+            if i == j
+                get_rate_jacobian!(ri_dxj, models[i], p)
+                mul!(ri_dxj, ri_yi, yi_dxj, 1, 1)
+            else
+                mul!(ri_dxj, ri_yi, yi_dxj)
+            end
+        end
+    end
+
+    return J
+end
+
+# calculate rate jacobian for a combination of models
+function _get_rate_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N, AbstractModel}, dx, x, y, p, t;
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dyddx_cache = similar(J, number_of_inputs(models), number_of_states(models))
+    ) where N
+
+    # get state and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # calculate input rate jacobian
+    get_coupling_rate_jacobian!(dyddx_cache, models, dx, x, p, t)
+
+    # calculate rate jacobian
+    for i = 1:N
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        dxi = view(dx, ix[i])
+        xi = view(x, ix[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], dxi, xi, yi, pi, t)
+        for j = 1:N
+            ri_dxj = view(J, ix[i], ix[j])
+            yi_dxj = view(dyddx_cache, iy[i], ix[j])
+            if i == j
+                get_rate_jacobian!(ri_dxj, models[i], dxi, xi, yi, pi, t)
+                mul!(ri_dxj, ri_yi, yi_dxj, 1, 1)
+            else
+                mul!(ri_dxj, ri_yi, yi_dxj)
+            end
+        end
+    end
+
+    return J
+end
+
+"""
+    get_state_jacobian(model)
+    get_state_jacobian(model, p)
+    get_state_jacobian(model, dx, x, y, p, t)
+
+Calculate the jacobian of the residual function for `model` with respect to the
+state variables
+"""
+function get_state_jacobian(model::TM, args...) where TM
+    return _get_state_jacobian(state_jacobian_type(TM), inplaceness(TM), model, args...)
+end
+
+# dispatch to an in-place function
+function _get_state_jacobian(::Any, ::InPlace, models)
+    Nx = number_of_states(models)
+    J = Matrix{Float64}(undef, Nx, Nx)
+    return get_state_jacobian!(J, models)
+end
+
+# dispatch to an in-place function
+function _get_state_jacobian(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Nx, Nx)
+    return get_state_jacobian!(J, models, p)
+end
+
+# dispatch to an in-place function
+function _get_state_jacobian(::Any, ::InPlace, models, dx, x, y, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Nx, Nx)
+    return get_state_jacobian!(J, models, dx, x, y, p, t)
+end
+
+# return an empty matrix
+function _get_state_jacobian(::Empty, ::OutOfPlace, models, args...)
+    return zeros(SMatrix{0, 0, Float64})
+end
+
+# return a zero matrix
+function _get_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Nx, Nx, Float64})
+end
+
+# return the identity matrix
+function _get_state_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    return SMatrix{Nx, Nx, Float64}(I)
+end
+
+# dispatch to the `get_state_jacobian` without arguments
+function _get_state_jacobian(::Invariant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_state_jacobian(models)
+end
+
+# dispatch to the `get_state_jacobian` without arguments
+function _get_state_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_state_jacobian(models)
+end
+
+# dispatch to `get_state_jacobian` with only parameters as arguments
+function _get_state_jacobian(::Constant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_state_jacobian(models, p)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian(::Invariant, ::OutOfPlace, model::TM) where TM
+
+    Nx = number_of_states(TM)
+    Ny = number_of_inputs(TM)
+    Np = number_of_parameters(TM)
+
+    dx = zeros(SVector{Nx,Float64})
+    x = zeros(SVector{Nx,Float64})
+    y = zeros(SVector{Ny,Float64})
+    p = zeros(SVector{Np,Float64})
+    t = 0
+
+    f = x -> get_residual(model, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, x)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian(::Constant, ::OutOfPlace, models, p)
+
+    f = x -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, x)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace, models, dx, x, y, p, t)
+
+    f = x -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, x)
+end
+
+# calculate state jacobian for a combination of models
+function _get_state_jacobian(::Invariant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}) where N
+
+    # initialize mass matrix
+    r_x = get_state_partial(models)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models)
+
+    # calculate input jacobian
+    y_x = get_coupling_state_jacobian(models)
+
+    return r_x + r_y*y_x
+end
+
+# calculate state jacobian for a combination of models
+function _get_state_jacobian(::Constant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, p) where N
+
+    # initialize mass matrix
+    r_x = get_state_partial(models, p)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models, p)
+
+    # calculate input jacobian
+    y_x = get_coupling_state_jacobian(models, p)
+
+    return r_x + r_y*y_x
+end
+
+# calculate state jacobian for a combination of models
+function _get_state_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, dx, x, y, p, t) where N
+
+    # initialize mass matrix
+    r_x = get_state_partial(models, dx, x, y, p, t)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models, dx, x, y, p, t)
+
+    # calculate input jacobian
+    y_x = get_coupling_state_jacobian(models, dx, x, p, t)
+
+    return r_x + r_y*y_x
+end
+
+function get_state_partial(models::NTuple{N,AbstractModel}) where N
+    get_invariant_state_partial(models)
+end
+
+function get_state_partial(models::NTuple{N,AbstractModel}, p) where N
+    get_constant_state_partial(models, p)
+end
+
+function get_state_partial(models::NTuple{N,AbstractModel}, dx, x, y, p, t) where N
+    get_varying_state_partial(models, dx, x, y, p, t)
+end
+
+@generated function get_invariant_state_partial(models::NTuple{N,AbstractModel}) where N
+
+    # get number of state variables in each model
+    Nx = number_of_states.(models.parameters)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Nx[j], Float64}) for i = 1:N, j = 1:N]
 
     # construct all columns
     expr = quote
@@ -980,14 +1118,14 @@ end
     return expr
 end
 
-@generated function initialize_varying_state_jacobian(models::NTuple{N,AbstractModel},
-    u, y, p, t) where N
+@generated function get_constant_state_partial(models::NTuple{N,AbstractModel},
+    p) where N
 
     # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
 
     Ny = number_of_inputs.(models.parameters)
     iy2 = cumsum(Ny)
@@ -1003,18 +1141,17 @@ end
     Ji = [Symbol("J", i) for i = 1:N]
 
     # initialize off-diagonal terms
-    Jij = [zeros(SMatrix{Nu[i], Nu[j], Float64}) for i = 1:N, j = 1:N]
+    Jij = [zeros(SMatrix{Nx[i], Nx[j], Float64}) for i = 1:N, j = 1:N]
 
     # construct all columns
     expr = quote
-        $(Ji[1]) = vcat(get_state_jacobian(models[1], u[$(iu[1])], y[$(iy[1])],
-            p[$(ip[1])], t), $(Jij[2:end, 1]...))
+        $(Ji[1]) = vcat(get_state_jacobian(models[1], p[$(ip[1])]), $(Jij[2:end, 1]...))
     end
     for i = 2:N
         expr = quote
             $expr
             $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_state_jacobian(models[$i],
-                u[$(iu[i])], y[$(iy[i])], p[$(ip[i])], t), $(Jij[i+1:end, i]...))
+                p[$(ip[i])]), $(Jij[i+1:end, i]...))
         end
     end
     expr = quote
@@ -1025,238 +1162,14 @@ end
     return expr
 end
 
-"""
-    get_state_jacobian!(J, models, u, y, p, t)
-
-In-place version of [`get_state_jacobian`](@ref)
-"""
-function get_state_jacobian!(J, models::T, args...; kwargs...) where T
-    return _get_state_jacobian!(J, state_jacobian_type(T), inplaceness(T),
-        models, args...; kwargs...)
-end
-
-# dispatch to an out-of-place function
-function _get_state_jacobian!(J, ::Any, ::OutOfPlace, models, args...; kwargs...)
-    return J .= get_state_jacobian(models, args...; kwargs...)
-end
-
-# return an empty matrix
-function _get_state_jacobian!(J, ::Empty, ::InPlace, models, args...; kwargs...)
-    return J
-end
-
-# return the identity matrix
-function _get_state_jacobian!(J, ::Zeros, ::InPlace, models, args...; kwargs...)
-    return J .= 0
-end
-
-# return the identity matrix
-function _get_state_jacobian!(J, ::Identity, ::InPlace, models, args...; kwargs...)
-    J .= 0
-    for i = 1:N
-        J[i,i] = 1
-    end
-    return J
-end
-
-# dispatch to `get_state_jacobian!` without arguments
-function _get_state_jacobian!(J, ::Constant, ::OutOfPlace, models, u, y, p, t; kwargs...)
-    return get_state_jacobian!(J, models; kwargs...)
-end
-
-# calculate state jacobian for a combination of models
-function _get_state_jacobian!(J, ::Constant, ::InPlace, models::NTuple{N,AbstractModel};
-    Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
-
-    # get dimensions
-    Nu = number_of_states.(models)
-    Ny = number_of_inputs.(models)
-    Np = number_of_parameters.(models)
-
-    # state variable indices
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = UnitRange.(iu1, iu2)
-
-    # input variable indices
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny .+ 1
-    iy = UnitRange.(iy1, iy2)
-
-    # get input jacobian
-    get_coupling_state_jacobian!(Jy, models)
-
-    # calculate jacobian
-    for i = 1:length(models)
-        D = get_input_jacobian(models[i])
-        for j = 1:length(models)
-            Jij = view(J, iu[i], iu[j])
-            Jyij = view(Jy, iy[i], iu[j])
-            if i == j
-                get_state_jacobian!(Jij, models[i])
-                mul!(Jij, D, Jyij, 1, 1)
-            else
-                mul!(Jij, D, Jyij)
-            end
-        end
-    end
-
-    return J
-end
-
-# use automatic differentiation since a custom definition is absent
-function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace, model,
-    u, y, p, t)
-
-    f = u -> get_rates(models, u, y, p, t)
-
-    return copyto!(J, ForwardDiff.jacobian(f, u))
-end
-
-# calculate state jacobian for a combination of models
-function _get_state_jacobian!(J, ::Union{Linear, Nonlinear}, ::InPlace,
-    models::NTuple{N,AbstractModel}, u, y, p, t;
-    Jy = zeros(number_of_inputs(models), number_of_states(models))) where N
-
-    # get dimensions
-    Nu = number_of_states.(models)
-    Ny = number_of_inputs.(models)
-    Np = number_of_parameters.(models)
-
-    # state variable indices
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = UnitRange.(iu1, iu2)
-
-    # input variable indices
-    iy2 = cumsum(Ny)
-    iy1 = iy2 .- Ny .+ 1
-    iy = UnitRange.(iy1, iy2)
-
-    # parameter indices
-    ip2 = cumsum(Np)
-    ip1 = ip2 .- Np .+ 1
-    ip = UnitRange.(ip1, ip2)
-
-    # get input jacobian
-    get_coupling_state_jacobian!(Jy, models, u, p, t)
-
-    # calculate jacobian
-    for i = 1:length(models)
-        ui = view(u, iu[i])
-        yi = view(y, iy[i])
-        pi = view(p, ip[i])
-        D = get_input_jacobian(models[i], ui, yi, pi, t)
-        for j = 1:length(models)
-            Jij = view(J, iu[i], iu[j])
-            Jyij = view(Jy, iy[i], iu[j])
-            if i == j
-                get_state_jacobian!(Jij, models[i], ui, yi, pi, t)
-                mul!(Jij, D, Jyij, 1, 1)
-            else
-                mul!(Jij, D, Jyij)
-            end
-        end
-    end
-
-    return J
-end
-
-"""
-    get_input_jacobian(models)
-    get_input_jacobian(models, u, y, p, t)
-
-Calculate the jacobian with respect to the inputs for the specified model or models.
-"""
-function get_input_jacobian(models::TM, args...) where TM
-    return _get_input_jacobian(input_jacobian_type(TM), models, args...)
-end
-
-# return an empty matrix
-function _get_input_jacobian(::Empty, models::TM, args...) where TM
-    Ny = number_of_inputs(TM)
-    return SMatrix{Ny, 0, Float64}()
-end
-
-# return a zero-valued matrix
-function _get_input_jacobian(::Zeros, models, args...)
-    Ny = number_of_inputs(models)
-    Nu = number_of_states(models)
-    return FillMap(0, Ny, Nu)
-end
-
-# return an identity matrix
-function _get_input_jacobian(::Identity, models, args...)
-    Ny = number_of_inputs(models)
-    Nu = number_of_states(models)
-    @assert Ny == Nu
-    return LinearMap(I, Ny)
-end
-
-# dispatch to the `get_input_jacobian` function without arguments
-function _get_input_jacobian(::Constant, models, u, y, p, t)
-    return get_input_jacobian(models)
-end
-
-# calculate input jacobian for a combination of models
-function _get_input_jacobian(::Constant, models::NTuple{N,AbstractModel}) where N
-    static_input_jacobian(models)
-end
-
-# use automatic differentiation since a custom definition is absent
-function _get_input_jacobian(::Union{Linear, Nonlinear}, model, u, y, p, t)
-
-    f = y -> get_rates(model, u, y, p, t)
-
-    return ForwardDiff.jacobian(f, y)
-end
-
-# calculate input jacobian for a combination of models
-function _get_input_jacobian(::Union{Linear, Nonlinear},
-    models::NTuple{N,AbstractModel}, u, y, p, t) where N
-
-    varying_input_jacobian(models, u, y, p, t)
-end
-
-@generated function static_input_jacobian(models::NTuple{N,AbstractModel}) where N
-
-    # get number of state variables in each model
-    Nu = number_of_states.(models.parameters)
-    Ny = number_of_inputs.(models.parameters)
-
-    # initialize row names
-    Di = [Symbol("D", i) for i = 1:N]
-
-    # initialize off-diagonal terms
-    Dij = [zeros(SMatrix{Nu[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
-
-    # construct all columns
-    expr = quote
-        $(Di[1]) = vcat(get_input_jacobian(models[1]), $(Dij[2:end, 1]...))
-    end
-    for i = 2:N
-        expr = quote
-            $expr
-            $(Di[i]) = vcat($(Dij[1:i-1, i]...), get_input_jacobian(models[$i]),
-                $(Dij[i+1:end, i]...))
-        end
-    end
-    expr = quote
-        $expr
-        D = hcat($(Di...))
-    end
-
-    return expr
-end
-
-@generated function varying_input_jacobian(models::NTuple{N,AbstractModel},
-    u, y, p, t) where N
+@generated function get_varying_state_partial(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
 
     # get indices of state, input, and parameter vectors for each model
-    Nu = number_of_states.(models.parameters)
-    iu2 = cumsum(Nu)
-    iu1 = iu2 .- Nu .+ 1
-    iu = ntuple(i->SVector{Nu[i]}(iu1[i]:iu2[i]), N)
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
 
     Ny = number_of_inputs.(models.parameters)
     iy2 = cumsum(Ny)
@@ -1269,364 +1182,2465 @@ end
     ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
 
     # initialize row names
-    Di = [Symbol("D", i) for i = 1:N]
+    Ji = [Symbol("J", i) for i = 1:N]
 
     # initialize off-diagonal terms
-    Dij = [zeros(SMatrix{Nu[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
+    Jij = [zeros(SMatrix{Nx[i], Nx[j], Float64}) for i = 1:N, j = 1:N]
 
     # construct all columns
     expr = quote
-        $(Di[1]) = vcat(get_input_jacobian(models[1], u[$(iu[1])], y[$(iy[1])], p[$(ip[1])], t),
-            $(Dij[2:end, 1]...))
+        $(Ji[1]) = vcat(get_state_jacobian(models[1], dx[$(ix[1])], x[$(ix[1])],
+            y[$(iy[1])], p[$(ip[1])], t), $(Jij[2:end, 1]...))
     end
     for i = 2:N
         expr = quote
             $expr
-            $(Di[i]) = vcat($(Dij[1:i-1, i]...), get_input_jacobian(models[$i], u[$(iu[i])],
-                y[$(iy[i])], p[$(ip[i])], t), $(Dij[i+1:end, i]...))
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_state_jacobian(models[$i],
+                dx[$(ix[i])], x[$(ix[i])], y[$(iy[i])], p[$(ip[i])], t), $(Jij[i+1:end, i]...))
         end
     end
     expr = quote
         $expr
-        D = hcat($(Di...))
+        J = hcat($(Ji...))
     end
 
     return expr
 end
 
 """
-    get_coupling_mass_matrix(models)
-    get_coupling_mass_matrix(models, u, p, t)
+    get_state_jacobian!(J, model)
+    get_state_jacobian!(J, model, p)
+    get_state_jacobian!(J, model, dx, x, y, p, t)
 
-Calculate the input function mass matrix for the specified combination of models.
+In-place version of [`get_state_jacobian`](@ref)
 """
-get_coupling_mass_matrix
-
-function get_coupling_mass_matrix(models::TM; kwargs...) where TM
-    return _get_coupling_mass_matrix(coupling_mass_matrix_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models; kwargs...)
+function get_state_jacobian!(J, model::TM; kwargs...) where TM
+    return _get_state_jacobian!(J, state_jacobian_type(TM), inplaceness(TM),
+        model; kwargs...)
 end
 
-function get_coupling_mass_matrix(models::TM, u, p, t; kwargs...) where TM
-    return _get_coupling_mass_matrix(coupling_mass_matrix_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_state_jacobian!(J, model::TM, p; kwargs...) where TM
+    return _get_state_jacobian!(J, state_jacobian_type(TM), inplaceness(TM),
+        model, p; kwargs...)
 end
 
-# dispatch to an in-place function
-function _get_coupling_mass_matrix(::Any, ::InPlace, models; kwargs...)
-    Ny = number_of_inputs(models)
-    Nu = number_of_states(models)
-    M = zeros(Ny,Nu)
-    return get_coupling_mass_matrix!(M, models; kwargs...)
-end
-
-# dispatch to an in-place function
-function _get_coupling_mass_matrix(::Any, ::InPlace, models, u, p, t; kwargs...)
-    Ny = number_of_inputs(models)
-    Nu = number_of_states(models)
-    M = similar(u, Ny, Nu)
-    return get_coupling_mass_matrix!(M, models, u, p, t; kwargs...)
-end
-
-# return an empty matrix
-function _get_coupling_mass_matrix(::Empty, ::OutOfPlace, models::TM, args...;
-    kwargs...) where TM
-
-    Ny = number_of_inputs(TM)
-
-    return SMatrix{Ny, 0, Float64}()
-end
-
-# return a matrix of zeros
-function _get_coupling_mass_matrix(::Zeros, ::OutOfPlace, models::TM, args...;
-    kwargs...) where TM
-
-    Ny = number_of_inputs(TM)
-    Nu = number_of_states(TM)
-
-    return zeros(SMatrix{Ny, Nu, Float64})
-end
-
-# dispatch to the `get_coupling_mass_matrix` function without arguments
-function _get_coupling_mass_matrix(::Constant, ::OutOfPlace, models, u, p, t; kwargs...)
-    return get_coupling_mass_matrix(models; kwargs...)
-end
-
-# dispatch to the user-provided function for the specific combination of models
-function _get_coupling_mass_matrix(::Constant, ::OutOfPlace,
-    models::NTuple{N,AbstractModel}; kwargs...) where N
-
-    return get_coupling_mass_matrix(models...; kwargs...)
-end
-
-# dispatch to the user-provided function for the specific combination of models
-function _get_coupling_mass_matrix(::Linear, ::OutOfPlace,
-    models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
-
-    return get_coupling_mass_matrix(models..., u, p, t; kwargs...)
-end
-
-"""
-    get_coupling_mass_matrix!(My, models)
-    get_coupling_mass_matrix!(My, models, u, p, t)
-
-In-place version of [`get_coupling_mass_matrix`](@ref).
-"""
-get_coupling_mass_matrix!
-
-function get_coupling_mass_matrix!(My, models::TM; kwargs...) where TM
-    return _get_coupling_mass_matrix!(My, coupling_mass_matrix_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models; kwargs...)
-end
-
-function get_coupling_mass_matrix!(My, models::TM, u, p, t; kwargs...) where TM
-    return _get_coupling_mass_matrix!(My, coupling_mass_matrix_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_state_jacobian!(J, model::TM, dx, x, y, p, t; kwargs...) where TM
+    return _get_state_jacobian!(J, state_jacobian_type(TM), inplaceness(TM),
+        model, dx, x, y, p, t; kwargs...)
 end
 
 # dispatch to an out-of-place function
-function _get_coupling_mass_matrix!(My, ::Any, ::OutOfPlace, models, args...; kwargs...)
-    return My .= get_coupling_mass_matrix(models, args...; kwargs...)
+function _get_state_jacobian!(J, ::Any, ::OutOfPlace, model, args...; kwargs...)
+    return J .= get_state_jacobian(model, args...; kwargs...)
 end
 
 # return an empty matrix
-function _get_coupling_mass_matrix!(My, ::Empty, ::InPlace, models, args...; kwargs...)
-    return My
+function _get_state_jacobian!(J, ::Empty, ::InPlace, models, args...; kwargs...)
+    return J
 end
 
-# return a matrix of zeros
-function _get_coupling_mass_matrix!(My, ::Zeros, ::InPlace, models, args...; kwargs...)
-    return My .= 0
+# return a zero matrix
+function _get_state_jacobian!(J, ::Zeros, ::InPlace, models, args...; kwargs...)
+    return J .= 0
 end
 
-# dispatch to `get_coupling_mass_matrix!` without arguments
-function _get_coupling_mass_matrix!(My, ::Constant, ::InPlace, models, u, p, t; kwargs...)
-    return get_coupling_mass_matrix!(My, models; kwargs...)
+# return the identity matrix
+function _get_state_jacobian!(J, ::Identity, ::InPlace, models, args...; kwargs...)
+    J .= 0
+    for i = 1:number_of_states(models)
+        J[i,i] = 1
+    end
+    return J
 end
 
-# dispatch to the user-provided function for the specific combination of models
-function _get_coupling_mass_matrix!(My, ::Constant, ::InPlace,
-    models::NTuple{N,AbstractModel}; kwargs...) where N
+# dispatch to `get_state_jacobian!` without arguments
+function _get_state_jacobian!(J, ::Invariant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
 
-    get_coupling_mass_matrix!(My, models...; kwargs...)
-
-    return My
+    return get_state_jacobian!(J, models; kwargs...)
 end
 
-# dispatch to the user-provided function for the specific combination of models
-function _get_coupling_mass_matrix!(My, ::Linear, ::InPlace,
-    models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
+# dispatch to `get_state_jacobian!` without arguments
+function _get_state_jacobian!(J, ::Invariant, ::InPlace, model, p; kwargs...)
 
-    get_coupling_mass_matrix!(My, models..., u, p, t; kwargs...)
+    return get_state_jacobian!(J, model; kwargs...)
+end
 
-    return My
+# dispatch to `get_state_jacobian!` with only parameters as arguments
+function _get_state_jacobian!(J, ::Constant, ::InPlace, model, dx, x, y, p, t; kwargs...)
+
+    return get_state_jacobian!(J, model, p; kwargs...)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_state_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model, dx, x, y, p, t)
+
+    f = x -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, x))
+end
+
+# calculate state jacobian for a combination of models
+function _get_state_jacobian!(J, ::Invariant, ::InPlace, models::NTuple{N,AbstractModel};
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dydx_cache = similar(J, number_of_inputs(models), number_of_states(models))
+    ) where N
+
+    # get state and input indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+
+    # get input jacobian
+    get_coupling_state_jacobian!(dydx_cache, models)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        get_input_jacobian!(ri_yi, models[i])
+        for j = 1:length(models)
+            ri_xj = view(J, ix[i], ix[j])
+            yi_xj = view(dydx_cache, iy[i], ix[j])
+            if i == j
+                get_state_jacobian!(ri_xj, models[i])
+                mul!(ri_xj, ri_yi, yi_xj, 1, 1)
+            else
+                mul!(ri_xj, ri_yi, yi_xj)
+            end
+        end
+    end
+
+    return J
+end
+
+# calculate state jacobian for a combination of models
+function _get_state_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p;
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dydx_cache = similar(J, number_of_inputs(models), number_of_states(models))
+    ) where N
+
+    # get state and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input state jacobian
+    get_coupling_state_jacobian!(dydx_cache, models, p)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], pi)
+        for j = 1:length(models)
+            ri_xj = view(J, ix[i], ix[j])
+            yi_xj = view(dydx_cache, iy[i], ix[j])
+            if i == j
+                get_state_jacobian!(ri_xj, models[i], pi)
+                mul!(ri_xj, ri_yi, yi_xj, 1, 1)
+            else
+                mul!(ri_xj, ri_yi, yi_xj)
+            end
+        end
+    end
+
+    return J
+end
+
+# calculate state jacobian for a combination of models
+function _get_state_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, y, p, t;
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dydx_cache = similar(J, number_of_inputs(models), number_of_states(models))
+    ) where N
+
+    # get state, input, and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input state jacobian
+    get_coupling_state_jacobian!(dydx_cache, models, dx, x, p, t)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        dxi = view(dx, ix[i])
+        xi = view(x, ix[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], dxi, xi, yi, pi, t)
+        for j = 1:length(models)
+            ri_xj = view(J, ix[i], ix[j])
+            yi_xj = view(dydx_cache, iy[i], ix[j])
+            if i == j
+                get_state_jacobian!(ri_xj, models[i], dxi, xi, yi, pi, t)
+                mul!(ri_xj, ri_yi, yi_xj, 1, 1)
+            else
+                mul!(ri_xj, ri_yi, yi_xj)
+            end
+        end
+    end
+
+    return J
 end
 
 """
-    get_coupling_inputs_using_state_rates(models, u, p, t)
+    get_input_jacobian(model)
+    get_input_jacobian(model, p)
+    get_input_jacobian(model, dx, x, y, p, t)
 
-Calculate the portion of the inputs which are dependent on the state rates.  This
-function is used to test the mass matrices associated with each input mass matrix.
+Calculate the jacobian of the residual function for `model` with respect to the
+input variables
 """
-function get_coupling_inputs_using_state_rates(models::NTuple{N,AbstractModel}, du, u, p, t) where N
-    return get_coupling_inputs_using_state_rates(models..., du, u, p, t)
+function get_input_jacobian(models::TM) where TM
+    return _get_input_jacobian(input_jacobian_type(TM), inplaceness(TM), models)
 end
 
-"""
-    get_coupling_inputs(models, u, p, t)
+function get_input_jacobian(models::TM, p) where TM
+    return _get_input_jacobian(input_jacobian_type(TM), inplaceness(TM), models, p)
+end
 
-Calculate the inputs to the specified combination of models.
-"""
-function get_coupling_inputs(models::TM, u, p, t) where TM
-    return _get_coupling_inputs(coupling_inplaceness(TM.parameters...), models, u, p, t)
+function get_input_jacobian(models::TM, dx, x, y, p, t) where TM
+    return _get_input_jacobian(input_jacobian_type(TM), inplaceness(TM), models,
+        dx, x, y, p, t)
 end
 
 # dispatch to an in-place function
-function _get_coupling_inputs(::InPlace, models, u, p, t)
+function _get_input_jacobian(::Any, ::InPlace, models)
+    Nx = number_of_states(models)
     Ny = number_of_inputs(models)
-    y = similar(u, Ny)
-    get_coupling_inputs!(y, models, u, p, t)
+    J = Matrix{Float64}(undef, Nx, Ny)
+    return get_input_jacobian!(J, models)
+end
+
+# dispatch to an in-place function
+function _get_input_jacobian(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Nx = number_of_states(models)
+    Ny = number_of_inputs(models)
+    J = Matrix{TF}(undef, Nx, Ny)
+    return get_input_jacobian!(J, models, p)
+end
+
+# dispatch to an in-place function
+function _get_input_jacobian(::Any, ::InPlace, models, dx, x, y, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
+    Nx = number_of_states(models)
+    Ny = number_of_inputs(models)
+    J = Matrix{TF}(undef, Nx, Ny)
+    return get_input_jacobian!(J, models, dx, x, y, p, t)
+end
+
+# return an empty matrix
+function _get_input_jacobian(::Empty, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    Ny = number_of_inputs(TM)
+    return zero(SMatrix{Nx, Ny, Float64})
+end
+
+# return a zero matrix
+function _get_input_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    Ny = number_of_inputs(TM)
+    return zero(SMatrix{Nx, Ny, Float64})
+end
+
+# return the identity matrix
+function _get_input_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    Ny = number_of_inputs(TM)
+    return SMatrix{Nx, Ny, Float64}(I)
+end
+
+# dispatch to `get_input_jacobian` without arguments
+function _get_input_jacobian(::Invariant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_input_jacobian(models)
+end
+
+# dispatch to the `get_input_jacobian` without arguments
+function _get_input_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_input_jacobian(models)
+end
+
+# dispatch to `get_input_jacobian` with only parameters as arguments
+function _get_input_jacobian(::Constant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_input_jacobian(models, p)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian(::Invariant, ::OutOfPlace, models)
+
+    f = y -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, y)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian(::Constant, ::OutOfPlace, models, p)
+
+    f = y -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, y)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace, models, dx, x, y, p, t)
+
+    f = y -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, y)
+end
+
+# calculate input jacobian for a combination of models
+function _get_input_jacobian(::Invariant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}) where N
+
+    return get_invariant_input_partial(models)
+end
+
+# calculate input jacobian for a combination of models
+function _get_input_jacobian(::Constant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, p) where N
+
+    return get_constant_input_partial(models, p)
+end
+
+# calculate input jacobian for a combination of models
+function _get_input_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace, models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    return get_varying_input_partial(models, dx, x, y, p, t)
+end
+
+@generated function get_invariant_input_partial(models::NTuple{N,AbstractModel}) where N
+
+    # get number of state variables in each model
+    Nx = number_of_states.(models.parameters)
+    Ny = number_of_inputs.(models.parameters)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_input_jacobian(models[1]), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_input_jacobian(models[$i]),
+                $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    return expr
+end
+
+@generated function get_constant_input_partial(models::NTuple{N,AbstractModel},
+    p) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_input_jacobian(models[1], p[$(ip[1])]), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_input_jacobian(models[$i],
+                p[$(ip[i])]), $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    return expr
+end
+
+@generated function get_varying_input_partial(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Ny[j], Float64}) for i = 1:N, j = 1:N]
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_input_jacobian(models[1], dx[$(ix[1])], x[$(ix[1])],
+            y[$(iy[1])], p[$(ip[1])], t), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_input_jacobian(models[$i],
+                dx[$(ix[i])], x[$(ix[i])], y[$(iy[i])], p[$(ip[i])], t),
+                $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    return expr
+end
+
+"""
+    get_input_jacobian!(J, model)
+    get_input_jacobian!(J, model, p)
+    get_input_jacobian!(J, model, dx, x, y, p, t)
+
+In-place version of [`get_input_jacobian`](@ref)
+"""
+function get_input_jacobian!(J, model::TM; kwargs...) where TM
+    return _get_input_jacobian!(J, input_jacobian_type(TM), inplaceness(TM),
+        model; kwargs...)
+end
+
+function get_input_jacobian!(J, model::TM, p; kwargs...) where TM
+    return _get_input_jacobian!(J, input_jacobian_type(TM), inplaceness(TM),
+        model, p; kwargs...)
+end
+
+function get_input_jacobian!(J, model::TM, dx, x, y, p, t; kwargs...) where TM
+    return _get_input_jacobian!(J, input_jacobian_type(TM), inplaceness(TM),
+        model, dx, x, y, p, t; kwargs...)
+end
+
+# dispatch to an out-of-place function
+function _get_input_jacobian!(J, ::Any, ::OutOfPlace, model, args...; kwargs...)
+    return J .= get_input_jacobian(model, args...; kwargs...)
+end
+
+# return an empty matrix
+function _get_input_jacobian!(J, ::Empty, ::InPlace, model, args...; kwargs...)
+    return J
+end
+
+# return a zero matrix
+function _get_input_jacobian!(J, ::Zeros, ::InPlace, model, args...; kwargs...)
+    return J .= 0
+end
+
+# return the identity matrix
+function _get_input_jacobian!(J, ::Identity, ::InPlace, model, args...; kwargs...)
+    J .= 0
+    for i = 1:number_of_states(model)
+        J[i,i] = 1
+    end
+    return J
+end
+
+# dispatch to `get_input_jacobian!` without arguments
+function _get_input_jacobian!(J, ::Invariant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
+
+    return get_input_jacobian!(J, models; kwargs...)
+end
+
+# dispatch to `get_input_jacobian!` without arguments
+function _get_input_jacobian!(J, ::Invariant, ::InPlace, model, p;
+    kwargs...)
+
+    return get_input_jacobian!(J, models; kwargs...)
+end
+
+# dispatch to `get_input_jacobian!` with only parameters as arguments
+function _get_input_jacobian!(J, ::Constant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
+
+    return get_input_jacobian!(J, models, p; kwargs...)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian!(J, ::Invariant, ::InPlace, model)
+
+    f = y -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, y))
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian!(J, ::Constant, ::InPlace, model, p)
+
+    f = y -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, y))
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_input_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model, dx, x, y, p, t)
+
+    f = y -> get_residual(model, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, y))
+end
+
+# calculate input jacobian for a combination of models
+function _get_input_jacobian!(J, ::Invariant, ::InPlace, models::NTuple{N,AbstractModel}) where N
+
+    # get state and input indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+
+    # calculate jacobian
+    J .= 0
+    for i = 1:length(models)
+        Jii = view(J, ix[i], iy[j])
+        get_state_jacobian!(Jii, models[i])
+    end
+
+    return J
+end
+
+# calculate input jacobian for a combination of models
+function _get_input_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    # get state and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # calculate jacobian
+    J .= 0
+    for i = 1:length(models)
+        Jii = view(J, ix[i], iy[j])
+        pi = view(p, ip[i])
+        get_input_jacobian!(Jii, models[i], pi)
+    end
+
+    return J
+end
+
+# calculate input jacobian for a combination of models
+function _get_input_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, y, p, t) where N
+
+    # get state and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # calculate jacobian
+    J .= 0
+    for i = 1:length(models)
+        Jii = view(J, ix[i], iy[j])
+        dxi = view(dx, ix[i])
+        xi = view(x, ix[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        get_input_jacobian!(Jii, models[i], dxi, xi, yi, pi, t)
+    end
+
+    return J
+end
+
+"""
+    get_parameter_jacobian(model)
+    get_parameter_jacobian(model, p)
+    get_parameter_jacobian(model, dx, x, y, p, t)
+
+Calculate the jacobian of the residual function for `model` with respect to the
+parameters
+"""
+function get_parameter_jacobian(models::TM) where TM
+    return _get_parameter_jacobian(parameter_jacobian_type(TM), inplaceness(TM), models)
+end
+
+function get_parameter_jacobian(models::TM, p) where TM
+    return _get_parameter_jacobian(parameter_jacobian_type(TM), inplaceness(TM),
+        models, p)
+end
+
+function get_parameter_jacobian(models::TM, dx, x, y, p, t) where TM
+    return _get_parameter_jacobian(parameter_jacobian_type(TM), inplaceness(TM), models,
+        dx, x, y, p, t)
+end
+
+# dispatch to an in-place function
+function _get_parameter_jacobian(::Any, ::InPlace, models)
+    Nx = number_of_states(models)
+    Np = number_of_parameters(models)
+    J = Matrix{Float64}(undef, Nx, Np)
+    return get_parameter_jacobian!(J, models)
+end
+
+# dispatch to an in-place function
+function _get_parameter_jacobian(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Nx = number_of_states(models)
+    Np = number_of_parameters(models)
+    J = Matrix{TF}(undef, Nx, Np)
+    return get_parameter_jacobian!(J, models, p)
+end
+
+# dispatch to an in-place function
+function _get_parameter_jacobian(::Any, ::InPlace, models, dx, x, y, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
+    Nx = number_of_states(models)
+    Np = number_of_parameters(models)
+    J = Matrix{TF}(undef, Nx, Np)
+    return get_parameter_jacobian!(J, models, dx, x, y, p, t)
+end
+
+# return an empty matrix
+function _get_parameter_jacobian(::Empty, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    Np = number_of_parameters(TM)
+    return zero(SMatrix{Nx, Np, Float64})
+end
+
+# return a zero matrix
+function _get_parameter_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    Np = number_of_parameters(TM)
+    return zero(SMatrix{Nx, Np, Float64})
+end
+
+# return the identity matrix
+function _get_parameter_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    Np = number_of_parameters(TM)
+    return SMatrix{Nx, Np, Float64}(I)
+end
+
+# dispatch to `get_parameter_jacobian` without arguments
+function _get_parameter_jacobian(::Invariant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_parameter_jacobian(models)
+end
+
+# dispatch to `get_parameter_jacobian` without arguments
+function _get_parameter_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_parameter_jacobian(models)
+end
+
+# dispatch to `get_parameter_jacobian` with only parameters as arguments
+function _get_parameter_jacobian(::Constant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_parameter_jacobian(models, p)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_parameter_jacobian(::Invariant, ::OutOfPlace, models)
+
+    f = p -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, p)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_parameter_jacobian(::Constant, ::OutOfPlace, models, p)
+
+    f = p -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, p)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_parameter_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace, models, dx, x, y, p, t)
+
+    f = p -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.jacobian(f, p)
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_parameter_jacobian(::Invariant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}) where N
+
+    # initialize mass matrix
+    r_p = get_parameter_partial(models)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models)
+
+    # calculate input jacobian
+    y_p = get_coupling_parameter_jacobian(models)
+
+    return r_p + r_y*y_p
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_parameter_jacobian(::Constant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, p) where N
+
+    # initialize parameter jacobian
+    r_p = get_parameter_partial(models, p)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models, p)
+
+    # calculate coupling function parameter jacobian
+    y_p = get_coupling_parameter_jacobian(models, p)
+
+    return r_p + r_y*y_p
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_parameter_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, dx, x, y, p, t) where N
+
+    # initialize parameter jacobian
+    r_p = get_parameter_partial(models, dx, x, y, p, t)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models, dx, x, y, p, t)
+
+    # calculate coupling function parameter jacobian
+    y_p = get_coupling_parameter_jacobian(models, dx, x, p, t)
+
+    return r_p + r_y*y_p
+end
+
+function get_parameter_partial(models::NTuple{N,AbstractModel}) where N
+    get_invariant_parameter_partial(models)
+end
+
+function get_parameter_partial(models::NTuple{N,AbstractModel}, p) where N
+    get_constant_parameter_partial(models, p)
+end
+
+function get_parameter_partial(models::NTuple{N,AbstractModel}, dx, x, y, p, t) where N
+    get_varying_parameter_partial(models, dx, x, y, p, t)
+end
+
+@generated function get_invariant_parameter_partial(models::NTuple{N,AbstractModel}) where N
+
+    # get number of state variables and parameters in each model
+    Nx = number_of_states.(models.parameters)
+    Np = number_of_parameters.(models.parameters)
+    Npadd = number_of_additional_parameters(models.parameters...)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Np[j], Float64}) for i = 1:N, j = 1:N]
+
+    # initialize columns for additional parameters
+    Jadd = zeros(SMatrix{sum(Nx), Npadd})
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_parameter_jacobian(models[1]), $(Jij[1, 2:end]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[i, 1:i-1]...), get_parameter_jacobian(models[$i]), $(Jij[i, i+1:end]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    # add columns for additional parameters
+    expr = quote
+        $expr
+        J = hcat(J, $Jadd)
+    end
+
+    return expr
+end
+
+@generated function get_constant_parameter_partial(models::NTuple{N,AbstractModel},
+    p) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Np[j], Float64}) for i = 1:N, j = 1:N]
+
+    # initialize additional columns for additional parameters
+    Jadd = zeros(SMatrix{sum(Nx), Npadd})
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_parameter_jacobian(models[1], p[$(ip[1])]), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_parameter_jacobian(models[$i],
+                p[$(ip[i])]), $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    # add columns for additional parameters
+    expr = quote
+        $expr
+        J = hcat(J, $Jadd)
+    end
+
+    return expr
+end
+
+@generated function get_varying_parameter_partial(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize row names
+    Ji = [Symbol("J", i) for i = 1:N]
+
+    # initialize off-diagonal terms
+    Jij = [zeros(SMatrix{Nx[i], Np[j], Float64}) for i = 1:N, j = 1:N]
+
+    # initialize additional columns for additional parameters
+    Jadd = zeros(SMatrix{sum(Nx), Npadd})
+
+    # construct all columns
+    expr = quote
+        $(Ji[1]) = vcat(get_parameter_jacobian(models[1], dx[$(ix[1])], x[$(ix[1])],
+            y[$(iy[1])], p[$(ip[1])], t), $(Jij[2:end, 1]...))
+    end
+    for i = 2:N
+        expr = quote
+            $expr
+            $(Ji[i]) = vcat($(Jij[1:i-1, i]...), get_parameter_jacobian(models[$i],
+                dx[$(ix[i])], x[$(ix[i])], y[$(iy[i])], p[$(ip[i])], t), $(Jij[i+1:end, i]...))
+        end
+    end
+    expr = quote
+        $expr
+        J = hcat($(Ji...))
+    end
+
+    # add columns for additional parameters
+    expr = quote
+        $expr
+        J = hcat(J, $Jadd)
+    end
+
+    return expr
+end
+
+"""
+    get_parameter_jacobian!(J, model)
+    get_parameter_jacobian!(J, model, p)
+    get_parameter_jacobian!(J, model, dx, x, y, p, t)
+
+In-place version of [`get_parameter_jacobian`](@ref)
+"""
+function get_parameter_jacobian!(J, model::TM; kwargs...) where TM
+    return _get_parameter_jacobian!(J, parameter_jacobian_type(TM), inplaceness(TM),
+        model; kwargs...)
+end
+
+function get_parameter_jacobian!(J, model::TM, p; kwargs...) where TM
+    return _get_parameter_jacobian!(J, parameter_jacobian_type(TM), inplaceness(TM),
+        model, p; kwargs...)
+end
+
+function get_parameter_jacobian!(J, model::TM, dx, x, y, p, t; kwargs...) where TM
+    return _get_parameter_jacobian!(J, parameter_jacobian_type(TM), inplaceness(TM),
+        model, dx, x, y, p, t; kwargs...)
+end
+
+# dispatch to an out-of-place function
+function _get_parameter_jacobian!(J, ::Any, ::OutOfPlace, models, args...; kwargs...)
+    return J .= get_parameter_jacobian(models, args...; kwargs...)
+end
+
+# return an empty matrix
+function _get_parameter_jacobian!(J, ::Empty, ::InPlace, models, args...; kwargs...)
+    return J
+end
+
+# return a zero matrix
+function _get_parameter_jacobian!(J, ::Zeros, ::InPlace, models, args...; kwargs...)
+    return J .= 0
+end
+
+# return the identity matrix
+function _get_parameter_jacobian!(J, ::Identity, ::InPlace, models, args...; kwargs...)
+    J .= 0
+    for i = 1:number_of_states(models)
+        J[i,i] = 1
+    end
+    return J
+end
+
+# dispatch to `get_parameter_jacobian!` without arguments
+function _get_parameter_jacobian!(J, ::Invariant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
+
+    return get_parameter_jacobian!(J, models; kwargs...)
+end
+
+# dispatch to `get_parameter_jacobian!` without arguments
+function _get_parameter_jacobian!(J, ::Invariant, ::InPlace, model, p; kwargs...)
+
+    return get_parameter_jacobian!(J, models; kwargs...)
+end
+
+# dispatch to `get_parameter_jacobian!` with only parameters as arguments
+function _get_parameter_jacobian!(J, ::Constant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
+
+    return get_parameter_jacobian!(J, models, p; kwargs...)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_parameter_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model, dx, x, y, p, t)
+
+    f = p -> get_residual(model, dx, x, y, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, p))
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_parameter_jacobian!(J, ::Invariant, ::InPlace, models::NTuple{N,AbstractModel};
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dydp_cache = similar(J, number_of_inputs(models), number_of_parameters(models))
+    ) where N
+
+    # get state and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input parameter jacobian
+    get_coupling_parameter_jacobian!(dydp_cache, models)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        get_input_jacobian!(ri_yi, models[i])
+        for j = 1:length(models)
+            ri_pj = view(J, ix[i], ip[j])
+            yi_pj = view(dydp_cache, iy[i], ip[j])
+            if i == j
+                get_parameter_jacobian!(ri_pj, models[i])
+                mul!(ri_pj, ri_yi, yi_pj, 1, 1)
+            else
+                mul!(ri_pj, ri_yi, yi_pj)
+            end
+        end
+    end
+
+    return J
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_parameter_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, y, p, t;
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dydp_cache = similar(J, number_of_inputs(models), number_of_parameters(models))
+    ) where N
+
+    # get state, input, and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input jacobian
+    get_coupling_parameter_jacobian!(dydp_cache, models, p)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], pi)
+        for j = 1:length(models)
+            ri_pj = view(J, ix[i], ip[j])
+            yi_pj = view(dydp_cache, iy[i], ip[j])
+            if i == j
+                get_parameter_jacobian!(ri_pj, models[i], pi)
+                mul!(ri_pj, ri_yi, yi_pj, 1, 1)
+            else
+                mul!(ri_pj, ri_yi, yi_pj)
+            end
+        end
+    end
+
+    return J
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_parameter_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, y, p, t;
+    drdy_cache = similar(J, number_of_states(models), number_of_inputs(models)),
+    dydp_cache = similar(J, number_of_inputs(models), number_of_parameters(models))
+    ) where N
+
+    # get state, input, and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input jacobian
+    get_coupling_parameter_jacobian!(dydp_cache, models, dx, x, p, t)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        dxi = view(dx, ix[i])
+        xi = view(x, ix[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], dxi, xi, yi, pi, t)
+        for j = 1:length(models)
+            ri_pj = view(J, ix[i], ip[j])
+            yi_pj = view(dydp_cache, iy[i], ip[j])
+            if i == j
+                get_parameter_jacobian!(ri_pj, models[i], dxi, xi, yi, pi, t)
+                mul!(ri_pj, ri_yi, yi_pj, 1, 1)
+            else
+                mul!(ri_pj, ri_yi, yi_pj)
+            end
+        end
+    end
+
+    return J
+end
+
+"""
+    get_time_gradient(model, [dx, x, y, p, t])
+
+Calculate the derivative of the residual function for `model` with respect to time
+"""
+function get_time_gradient(models::TM) where TM
+    return _get_time_gradient(time_gradient_type(TM), inplaceness(TM), models)
+end
+
+function get_time_gradient(models::TM, p) where TM
+    return _get_time_gradient(time_gradient_type(TM), inplaceness(TM), models, p)
+end
+
+function get_time_gradient(models::TM, dx, x, y, p, t) where TM
+    return _get_time_gradient(time_gradient_type(TM), inplaceness(TM), models,
+        dx, x, y, p, t)
+end
+
+# dispatch to an in-place function
+function _get_time_gradient(::Any, ::InPlace, models)
+    Nx = number_of_states(models)
+    dT = Vector{Float64}(undef, Nx)
+    return get_time_gradient!(dT, models)
+end
+
+# dispatch to an in-place function
+function _get_time_gradient(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Nx = number_of_states(models)
+    dT = Vector{TF}(undef, Nx)
+    return get_time_gradient!(dT, models, p)
+end
+
+# dispatch to an in-place function
+function _get_time_gradient(::Any, ::InPlace, models, dx, x, y, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(y), eltype(p), typeof(t))
+    Nx = number_of_states(models)
+    dT = Vector{TF}(undef, Nx)
+    return get_time_gradient!(dT, models, dx, x, y, p, t)
+end
+
+# return an empty vector
+function _get_time_gradient(::Empty, ::OutOfPlace, models, args...)
+    return zeros(SVector{0, Float64})
+end
+
+# return a zero vector
+function _get_time_gradient(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Nx = number_of_states(TM)
+    return zeros(SVector{Nx, Float64})
+end
+
+# dispatch to `get_time_gradient` without arguments
+function _get_time_gradient(::Invariant, ::OutOfPlace, models, p)
+    return get_time_gradient(models)
+end
+
+# dispatch to `get_time_gradient` without arguments
+function _get_time_gradient(::Invariant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_time_gradient(models)
+end
+
+# dispatch to `get_time_gradient` with only parameters as arguments
+function _get_time_gradient(::Constant, ::OutOfPlace, models, dx, x, y, p, t)
+    return get_time_gradient(models, p)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_time_gradient(::Invariant, ::OutOfPlace, models)
+
+    f = t -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.derivative(f, t)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_time_gradient(::Constant, ::OutOfPlace, models, p)
+
+    f = t -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.derivative(f, t)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_time_gradient(::Union{Linear,Nonlinear}, ::OutOfPlace, models, dx, x, y, p, t)
+
+    f = t -> get_residual(models, dx, x, y, p, t)
+
+    return ForwardDiff.derivative(f, t)
+end
+
+# calculate time derivative for a combination of models
+function _get_time_gradient(::Invariant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}) where N
+
+    # initialize mass matrix
+    r_t = get_time_partial(models)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models)
+
+    # calculate input jacobian
+    y_t = get_coupling_time_gradient(models)
+
+    return r_t + r_y*y_t
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_time_gradient(::Constant, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, p) where N
+
+    # initialize parameter jacobian
+    r_t = get_time_partial(models, p)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models, p)
+
+    # calculate coupling function parameter jacobian
+    y_t = get_coupling_time_gradient(models, p)
+
+    return r_t + r_y*y_t
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_time_gradient(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N, AbstractModel}, dx, x, y, p, t) where N
+
+    # initialize parameter jacobian
+    r_t = get_time_partial(models, dx, x, y, p, t)
+
+    # calculate input jacobian
+    r_y = get_input_jacobian(models, dx, x, y, p, t)
+
+    # calculate coupling function parameter jacobian
+    y_t = get_coupling_time_gradient(models, dx, x, p, t)
+
+    return r_t + r_y*y_t
+end
+
+function get_time_partial(models::NTuple{N,AbstractModel}) where N
+    return get_invariant_time_partial(models)
+end
+
+function get_time_partial(models::NTuple{N,AbstractModel}, p) where N
+    return get_constant_time_partial(models, p)
+end
+
+function get_time_partial(models::NTuple{N,AbstractModel}, dx, x, y, p, t) where N
+    return get_varying_time_partial(models, dx, x, y, p, t)
+end
+
+@generated function get_invariant_time_partial(models::NTuple{N,AbstractModel}) where N
+
+    # initialize residual names
+    dT = [Symbol("dT", i) for i = 1:N]
+
+    expr = :()
+    for i = 1:N
+        expr = quote
+            $expr
+            $(dT[i]) = get_time_gradient(models[$i])
+        end
+    end
+
+    expr = quote
+        $expr
+        dT = vcat($(dT...))
+    end
+
+    return expr
+end
+
+@generated function get_constant_time_partial(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    # get indices of parameters for each model
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize residual names
+    dT = [Symbol("dT", i) for i = 1:N]
+
+    expr = :()
+    for i = 1:N
+        expr = quote
+            $expr
+            $(dT[i]) = get_time_gradient(models[$i], p[$(ip[i])])
+        end
+    end
+
+    expr = quote
+        $expr
+        dT = vcat($(dT...))
+    end
+
+    return expr
+end
+
+@generated function get_varying_time_partial(models::NTuple{N,AbstractModel},
+    dx, x, y, p, t) where N
+
+    # get indices of state, input, and parameter vectors for each model
+    Nx = number_of_states.(models.parameters)
+    ix2 = cumsum(Nx)
+    ix1 = ix2 .- Nx .+ 1
+    ix = ntuple(i->SVector{Nx[i]}(ix1[i]:ix2[i]), N)
+
+    Ny = number_of_inputs.(models.parameters)
+    iy2 = cumsum(Ny)
+    iy1 = iy2 .- Ny .+ 1
+    iy = ntuple(i->SVector{Ny[i]}(iy1[i]:iy2[i]), N)
+
+    Np = number_of_parameters.(models.parameters)
+    ip2 = cumsum(Np)
+    ip1 = ip2 .- Np .+ 1
+    ip = ntuple(i->SVector{Np[i]}(ip1[i]:ip2[i]), N)
+
+    # initialize residual names
+    dT = [Symbol("dT", i) for i = 1:N]
+
+    expr = :()
+    for i = 1:N
+        expr = quote
+            $expr
+            $(dT[i]) = get_time_gradient(models[$i], dx[$(ix[i])], x[$(ix[i])],
+                y[$(iy[i])], p[$(ip[i])], t)
+        end
+    end
+
+    expr = quote
+        $expr
+        dT = vcat($(dT...))
+    end
+
+    return expr
+end
+
+"""
+    get_time_gradient!(dT, model)
+    get_time_gradient!(dT, model, p)
+    get_time_gradient!(dT, model, dx, x, y, p, t)
+
+In-place version of [`get_time_gradient`](@ref)
+"""
+function get_time_gradient!(dT, model::TM; kwargs...) where TM
+    return _get_time_gradient!(dT, time_gradient_type(TM), inplaceness(TM),
+        model; kwargs...)
+end
+
+function get_time_gradient!(dT, model::TM, p; kwargs...) where TM
+    return _get_time_gradient!(dT, time_gradient_type(TM), inplaceness(TM),
+        model, p; kwargs...)
+end
+
+function get_time_gradient!(dT, model::TM, dx, x, y, p, t; kwargs...) where TM
+    return _get_time_gradient!(dT, time_gradient_type(TM), inplaceness(TM),
+        model, dx, x, y, p, t; kwargs...)
+end
+
+# dispatch to an out-of-place function
+function _get_time_gradient!(dT, ::Any, ::OutOfPlace, models, args...; kwargs...)
+    return dT .= get_time_gradient(models, args...; kwargs...)
+end
+
+# return an empty vector
+function _get_time_gradient!(dT, ::Empty, ::InPlace, models, args...; kwargs...)
+    return dT
+end
+
+# return a zero vector
+function _get_time_gradient!(dT, ::Zeros, ::InPlace, models, args...; kwargs...)
+    return dT .= 0
+end
+
+# dispatch to `get_time_gradient!` without arguments
+function _get_time_gradient!(dT, ::Invariant, ::InPlace, model, p;
+    kwargs...)
+
+    return get_time_gradient!(dT, models; kwargs...)
+end
+
+# dispatch to `get_time_gradient!` without arguments
+function _get_time_gradient!(dT, ::Invariant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
+
+    return get_time_gradient!(dT, models; kwargs...)
+end
+
+# dispatch to `get_time_gradient!` with only parameters as arguments
+function _get_time_gradient!(dT, ::Constant, ::InPlace, model, dx, x, y, p, t;
+    kwargs...)
+
+    return get_time_gradient!(dT, models, p; kwargs...)
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_time_gradient!(dT, ::Invariant, ::InPlace, model)
+
+    f = t -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(dT, ForwardDiff.derivative(f, t))
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_time_gradient!(dT, ::Constant, ::InPlace, model, p)
+
+    f = t -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(dT, ForwardDiff.derivative(f, t))
+end
+
+# use automatic differentiation since a custom definition is absent
+function _get_time_gradient!(dT, ::Union{Linear,Nonlinear}, ::InPlace, model, dx, x, y, p, t)
+
+    f = t -> get_residual(models, dx, x, y, p, t)
+
+    return copyto!(dT, ForwardDiff.derivative(f, t))
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_time_gradient!(dT, ::Invariant, ::InPlace, models::NTuple{N,AbstractModel};
+    drdy_cache = similar(dT, number_of_states(models), number_of_inputs(models)),
+    dydt_cache = similar(dT, number_of_inputs(models))
+    ) where N
+
+    # get state and input indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+
+    # get input jacobian
+    get_coupling_time_gradient!(dydt_cache, models)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        get_input_jacobian!(ri_yi, models[i])
+        for j = 1:length(models)
+            ri_t = view(dT, ix[i])
+            yi_t = view(dydt_cache, iy[i])
+            if i == j
+                get_parameter_jacobian!(Jij, models[i])
+                mul!(ri_t, ri_yi, yi_t, 1, 1)
+            else
+                mul!(ri_t, ri_yi, yi_t)
+            end
+        end
+    end
+
+    return dT
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_time_gradient!(dT, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p;
+    drdy_cache = similar(dT, number_of_states(models), number_of_inputs(models)),
+    dydt_cache = similar(dT, number_of_inputs(models))
+    ) where N
+
+    # get state, input, and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input jacobian
+    get_coupling_time_gradient!(dydt_cache, models, p)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], pi)
+        for j = 1:length(models)
+            ri_t = view(dT, ix[i], ix[j])
+            yi_t = view(dydt_cache, iy[i], ix[j])
+            if i == j
+                get_parameter_jacobian!(ri_t, models[i], pi)
+                mul!(ri_t, ri_yi, yi_t, 1, 1)
+            else
+                mul!(ri_t, ri_yi, yi_t)
+            end
+        end
+    end
+
+    return dT
+end
+
+# calculate parameter jacobian for a combination of models
+function _get_time_gradient!(dT, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, y, p, t;
+    drdy_cache = similar(dT, number_of_states(models), number_of_inputs(models)),
+    dydt_cache = similar(dT, number_of_inputs(models))
+    ) where N
+
+    # get state, input, and parameter indices
+    ix = state_indices(models)
+    iy = input_indices(models)
+    ip = parameter_indices(models)
+
+    # get input jacobian
+    get_coupling_time_gradient!(dydt_cache, models, dx, x, p, t)
+
+    # calculate jacobian
+    for i = 1:length(models)
+        ri_yi = view(drdy_cache, ix[i], iy[i])
+        dxi = view(dx, ix[i])
+        xi = view(x, ix[i])
+        yi = view(y, iy[i])
+        pi = view(p, ip[i])
+        ri_yi = get_input_jacobian!(ri_yi, models[i], dxi, xi, yi, pi, t)
+        for j = 1:length(models)
+            ri_t = view(dT, ix[i], ix[j])
+            yi_t = view(dydt_cache, iy[i], ix[j])
+            if i == j
+                get_parameter_jacobian!(ri_t, models[i], dxi, xi, yi, pi, t)
+                mul!(ri_t, ri_yi, yi_t, 1, 1)
+            else
+                mul!(ri_t, ri_yi, yi_t)
+            end
+        end
+    end
+
+    return dT
+end
+
+"""
+    get_coupling_inputs(models, dx, x, p, t)
+
+Calculate the inputs to the specified combination of models.
+"""
+function get_coupling_inputs(models::TM, dx, x, p, t) where TM
+    return _get_coupling_inputs(coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# dispatch to an in-place function
+function _get_coupling_inputs(::InPlace, models, dx, x, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(p), typeof(t))
+    Ny = number_of_inputs(models)
+    y = zeros(TF, Ny)
+    get_coupling_inputs!(y, models, dx, x, p, t)
     return y
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_coupling_inputs(::OutOfPlace, models::NTuple{N,AbstractModel}, u, p, t) where N
-    return get_coupling_inputs(models..., u, p, t)
+function _get_coupling_inputs(::OutOfPlace, models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+    return get_coupling_inputs(models..., dx, x, p, t)
 end
 
 """
-    get_coupling_inputs!(y, models::NTuple{N,AbstractModel}, u, p, t) where N
+    get_coupling_inputs!(y, models::NTuple{N,AbstractModel}, dx, x, p, t) where N
 
 In-place version of [`get_coupling_inputs`](@ref)
 """
-function get_coupling_inputs!(y, models::T, u, p, t) where T
-    return _get_coupling_inputs!(y, coupling_inplaceness(T.parameters...), models, u, p, t)
+function get_coupling_inputs!(y, models::T, dx, x, p, t) where T
+    return _get_coupling_inputs!(y, coupling_inplaceness(T.parameters...), models,
+        dx, x, p, t)
 end
 
 # dispatch to an out-of-place function
-function _get_coupling_inputs!(y, ::OutOfPlace, models, u, p, t)
-    return y .= get_coupling_inputs(models, u, p, t)
+function _get_coupling_inputs!(y, ::OutOfPlace, models, dx, x, p, t)
+    return y .= get_coupling_inputs(models, dx, x, p, t)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_coupling_inputs!(y, ::InPlace, models::NTuple{N,AbstractModel}, u, p, t) where N
-    return get_coupling_inputs!(y, models..., u, p, t)
+function _get_coupling_inputs!(y, ::InPlace, models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+    return get_coupling_inputs!(y, models..., dx, x, p, t)
 end
 
 """
-    get_coupling_state_jacobian(models::NTuple{N,AbstractModel}, u, p, t) where N
+    get_coupling_rate_jacobian(model)
+    get_coupling_rate_jacobian(model, p)
+    get_coupling_rate_jacobian(model, dx, x, p, t)
 
-Calculate the jacobian of the input function with respect to the state variables
-for the specified combination of models.
+Calculate the jacobian of the coupling function for `model` with respect to the
+state rates
+"""
+get_coupling_rate_jacobian
+
+function get_coupling_rate_jacobian(models::TM) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_rate_jacobian(coupling_rate_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
+end
+
+function get_coupling_rate_jacobian(models::TM, p) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_rate_jacobian(coupling_rate_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_rate_jacobian(models::TM, dx, x, p, t) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_rate_jacobian(coupling_rate_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# use automatic differentiation if the jacobian is not defined
+function get_coupling_rate_jacobian(args...)
+
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = dx -> get_coupling_inputs(models, dx, x, p, t)
+
+    return ForwardDiff.jacobian(f, dx)
+end
+
+# dispatch to an in-place function
+function _get_coupling_rate_jacobian(::Any, ::InPlace, models)
+    Ny = number_of_inputs(models)
+    Nx = number_of_states(models)
+    J = Matrix{Float64}(undef, Ny, Nx)
+    return get_coupling_rate_jacobian!(J, models)
+end
+
+# dispatch to an in-place function
+function _get_coupling_rate_jacobian(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Ny = number_of_inputs(models)
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Ny, Nx)
+    return get_coupling_rate_jacobian!(J, models, p)
+end
+
+# dispatch to an in-place function
+function _get_coupling_rate_jacobian(::Any, ::InPlace, models, dx, x, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(p), typeof(t))
+    Ny = number_of_inputs(models)
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Ny, Nx)
+    return get_coupling_rate_jacobian!(J, models, dx, x, p, t)
+end
+
+# return an empty matrix
+function _get_coupling_rate_jacobian(::Empty, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Ny, Nx, Float64})
+end
+
+# return a zero matrix
+function _get_coupling_rate_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Ny, Nx, Float64})
+end
+
+# return the identity matrix
+function _get_coupling_rate_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Nx = number_of_states(TM)
+    return SMatrix{Ny, Nx, Float64}(I)
+end
+
+# dispatch to the `get_coupling_rate_jacobian` function without arguments
+function _get_coupling_rate_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_coupling_rate_jacobian(models)
+end
+
+# dispatch to the `get_coupling_rate_jacobian` function without arguments
+function _get_coupling_rate_jacobian(::Invariant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_rate_jacobian(models)
+end
+
+# dispatch to `get_coupling_rate_jacobian` with only parameters as arguments
+function _get_coupling_rate_jacobian(::Constant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_rate_jacobian(models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_rate_jacobian(::Invariant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    return get_coupling_rate_jacobian(models...)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_rate_jacobian(::Constant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    return get_coupling_rate_jacobian(models..., p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_rate_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    return get_coupling_rate_jacobian(models..., dx, x, p, t)
+end
+
+"""
+    get_coupling_rate_jacobian!(J, model)
+    get_coupling_rate_jacobian!(J, model, p)
+    get_coupling_rate_jacobian!(J, model, dx, x, p, t)
+
+In-place version of [`get_coupling_rate_jacobian`](@ref).
+"""
+get_coupling_rate_jacobian!
+
+function get_coupling_rate_jacobian!(J, models::TM) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_rate_jacobian!(J, coupling_rate_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
+end
+
+function get_coupling_rate_jacobian!(J, models::TM, p) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_rate_jacobian!(J, coupling_rate_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_rate_jacobian!(J, models::TM, dx, x, p, t) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_rate_jacobian!(J, coupling_rate_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# use automatic differentiation if the jacobian is not defined
+function get_coupling_rate_jacobian!(J, args...)
+
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = dx -> get_coupling_inputs(models, dx, x, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, dx))
+end
+
+# dispatch to an out-of-place function
+function _get_coupling_rate_jacobian!(J, ::Any, ::OutOfPlace, models, args...)
+    return J .= get_coupling_rate_jacobian(models, args...)
+end
+
+# return an empty matrix
+function _get_coupling_rate_jacobian!(J, ::Empty, ::InPlace, models, args...)
+    return J
+end
+
+# return a zero matrix
+function _get_coupling_rate_jacobian!(J, ::Zeros, ::InPlace, models, args...)
+    return J .= 0
+end
+
+# return the identity matrix
+function _get_coupling_rate_jacobian!(J, ::Identity, ::InPlace, models, args...)
+    J .= 0
+    for i = 1:number_of_inputs(models)
+        J[i,i] = 1
+    end
+    return J
+end
+
+# dispatch to `get_coupling_rate_jacobian!` without arguments
+function _get_coupling_rate_jacobian!(J, ::Invariant, ::InPlace, models, p)
+
+    return get_coupling_rate_jacobian!(J, models)
+end
+
+# dispatch to `get_coupling_rate_jacobian!` without arguments
+function _get_coupling_rate_jacobian!(J, ::Invariant, ::InPlace, models, dx, x, p, t)
+
+    return get_coupling_rate_jacobian!(J, models)
+end
+
+# dispatch to `get_coupling_rate_jacobian!` with only parameters as arguments
+function _get_coupling_rate_jacobian!(J, ::Constant, ::InPlace, models, dx, x, p, t)
+
+    return get_coupling_rate_jacobian!(J, models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_rate_jacobian!(J, ::Invariant, ::InPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    get_coupling_rate_jacobian!(J, models...)
+
+    return J
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_rate_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    get_coupling_rate_jacobian!(J, models..., p)
+
+    return J
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_rate_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    get_coupling_rate_jacobian!(J, models..., dx, x, p, t)
+
+    return J
+end
+
+"""
+    get_coupling_state_jacobian(model)
+    get_coupling_state_jacobian(model, p)
+    get_coupling_state_jacobian(model, dx, x, y, p, t)
+
+Calculate the jacobian of the coupling function for `model` with respect to the
+state variables
 """
 get_coupling_state_jacobian
 
-function get_coupling_state_jacobian(models::TM; kwargs...) where TM
+function get_coupling_state_jacobian(models::TM) where TM <: NTuple{N, AbstractModel} where N
     return _get_coupling_state_jacobian(coupling_state_jacobian_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models; kwargs...)
+        coupling_inplaceness(TM.parameters...), models)
 end
 
-function get_coupling_state_jacobian(models::TM, u, p, t; kwargs...) where TM
+function get_coupling_state_jacobian(models::TM, p) where TM <: NTuple{N, AbstractModel} where N
     return _get_coupling_state_jacobian(coupling_state_jacobian_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_state_jacobian(models::TM, dx, x, p, t) where TM <: NTuple{N, AbstractModel} where N
+    return _get_coupling_state_jacobian(coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
 end
 
 # use automatic differentiation if jacobian is not defined
 function get_coupling_state_jacobian(args...)
 
-    models = args[1:end-3]
-    u = args[end-2]
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
     p = args[end-1]
     t = args[end]
 
-    f = u -> get_coupling_inputs(models, u, p, t)
+    f = x -> get_coupling_inputs(models, dx, x, p, t)
 
-    return ForwardDiff.jacobian(f, u)
+    return ForwardDiff.jacobian(f, x)
 end
 
 # dispatch to an in-place function
-function _get_coupling_state_jacobian(::Any, ::InPlace, models; kwargs...)
+function _get_coupling_state_jacobian(::Any, ::InPlace, models)
     Ny = number_of_inputs(models)
-    Nu = number_of_states(models)
-    M = zeros(Ny,Nu)
-    return get_coupling_state_jacobian!(M, models; kwargs...)
+    Nx = number_of_states(models)
+    J = Matrix{Float64}(undef, Ny, Nx)
+    return get_coupling_state_jacobian!(J, models)
 end
 
 # dispatch to an in-place function
-function _get_coupling_state_jacobian(::Any, ::InPlace, models, u, p, t; kwargs...)
+function _get_coupling_state_jacobian(::Any, ::InPlace, models, p)
+    TF = eltype(p)
     Ny = number_of_inputs(models)
-    Nu = number_of_states(models)
-    M = similar(u, Ny, Nu)
-    return get_coupling_state_jacobian!(M, models, u, p, t; kwargs...)
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Ny, Nx)
+    return get_coupling_state_jacobian!(J, models, dx, x, p, t)
+end
+
+# dispatch to an in-place function
+function _get_coupling_state_jacobian(::Any, ::InPlace, models, dx, x, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(p), typeof(t))
+    Ny = number_of_inputs(models)
+    Nx = number_of_states(models)
+    J = Matrix{TF}(undef, Ny, Nx)
+    return get_coupling_state_jacobian!(J, models, dx, x, p, t)
 end
 
 # return an empty matrix
-function _get_coupling_state_jacobian(::Empty, ::OutOfPlace, models::TM, args...;
-    kwargs...) where TM
-
+function _get_coupling_state_jacobian(::Empty, ::OutOfPlace, models::TM, args...) where TM
     Ny = number_of_inputs(TM)
-
-    return SMatrix{Ny, 0, Float64}()
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Ny, Nx, Float64})
 end
 
 # return a matrix of zeros
-function _get_coupling_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...;
-    kwargs...) where TM
-
+function _get_coupling_state_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
     Ny = number_of_inputs(TM)
-    Nu = number_of_states(TM)
-
-    return zeros(SMatrix{Ny, Nu, Float64})
+    Nx = number_of_states(TM)
+    return zeros(SMatrix{Ny, Nx, Float64})
 end
 
-# dispatch to the `get_coupling_state_jacobian` function without arguments
-function _get_coupling_state_jacobian(::Constant, ::OutOfPlace, models, u, p, t; kwargs...)
-    return get_coupling_state_jacobian(models; kwargs...)
+# return the identity matrix
+function _get_coupling_state_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Nx = number_of_states(TM)
+    return SMatrix{Ny, Nx, Float64}(I)
+end
+
+# dispatch to `get_coupling_state_jacobian` function without arguments
+function _get_coupling_state_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_coupling_state_jacobian(models)
+end
+
+# dispatch to `get_coupling_state_jacobian` function without arguments
+function _get_coupling_state_jacobian(::Invariant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_state_jacobian(models)
+end
+
+# dispatch to `get_coupling_state_jacobian` with only parameters as arguments
+function _get_coupling_state_jacobian(::Constant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_state_jacobian(models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_state_jacobian(::Invariant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    return get_coupling_state_jacobian(models...)
 end
 
 # dispatch to the user-provided function for the specific combination of models
 function _get_coupling_state_jacobian(::Constant, ::OutOfPlace,
-    models::NTuple{N,AbstractModel}; kwargs...) where N
+    models::NTuple{N,AbstractModel}, p) where N
 
-    return get_coupling_state_jacobian(models...; kwargs...)
+    return get_coupling_state_jacobian(models..., p)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_coupling_state_jacobian(::Union{Linear, Nonlinear}, ::OutOfPlace,
-    models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
+function _get_coupling_state_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
 
-    return get_coupling_state_jacobian(models..., u, p, t; kwargs...)
+    return get_coupling_state_jacobian(models..., dx, x, p, t)
 end
 
 """
-    get_coupling_state_jacobian!(J, models, u, p, t)
+    get_coupling_state_jacobian!(J, model)
+    get_coupling_state_jacobian!(J, model, p)
+    get_coupling_state_jacobian!(J, model, dx, x, p, t)
 
 In-place version of [`get_coupling_state_jacobian`](@ref)
 """
 get_coupling_state_jacobian!
 
-function get_coupling_state_jacobian!(Jy, models::TM; kwargs...) where TM
-    return _get_coupling_state_jacobian!(Jy, coupling_state_jacobian_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models; kwargs...)
+function get_coupling_state_jacobian!(J, models::TM) where TM
+    return _get_coupling_state_jacobian!(J, coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
 end
 
-function get_coupling_state_jacobian!(Jy, models::TM, u, p, t; kwargs...) where TM
-    return _get_coupling_state_jacobian!(Jy, coupling_state_jacobian_type(TM.parameters...),
-        coupling_inplaceness(TM.parameters...), models, u, p, t; kwargs...)
+function get_coupling_state_jacobian!(J, models::TM, p) where TM
+    return _get_coupling_state_jacobian!(J, coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_state_jacobian!(J, models::TM, dx, x, p, t) where TM
+    return _get_coupling_state_jacobian!(J, coupling_state_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
 end
 
 # use automatic differentiation if jacobian is not defined
-function get_coupling_state_jacobian!(Jy, args...)
+function get_coupling_state_jacobian!(J, args...)
 
-    models = args[1:end-3]
-    u = args[end-2]
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
     p = args[end-1]
     t = args[end]
 
-    f = u -> get_coupling_inputs(models, u, p, t)
+    f = x -> get_coupling_inputs(models, dx, x, p, t)
 
-    return copyto!(Jy, ForwardDiff.jacobian(f, u))
+    return copyto!(J, ForwardDiff.jacobian(f, x))
 end
 
 # dispatch to an out-of-place function
-function _get_coupling_state_jacobian!(Jy, ::Any, ::OutOfPlace, models, args...; kwargs...)
-    return Jy .= get_coupling_state_jacobian(models, args...; kwargs...)
+function _get_coupling_state_jacobian!(J, ::Any, ::OutOfPlace, models, args...)
+    return J .= get_coupling_state_jacobian(models, args...)
 end
 
 # return an empty matrix
-function _get_coupling_state_jacobian!(Jy, ::Empty, ::InPlace, models, args...; kwargs...)
-    return Jy
+function _get_coupling_state_jacobian!(J, ::Empty, ::InPlace, models, args...)
+    return J
 end
 
-# return a matrix of zeros
-function _get_coupling_state_jacobian!(Jy, ::Zeros, ::InPlace, models, args...; kwargs...)
-    return Jy .= 0
+# return a zero matrix
+function _get_coupling_state_jacobian!(J, ::Zeros, ::InPlace, models, args...)
+    return J .= 0
+end
+
+# return the identity matrix
+function _get_coupling_state_jacobian!(J, ::Identity, ::InPlace, models, args...)
+    J .= 0
+    for i = 1:number_of_inputs(models)
+        J[i,i] = 1
+    end
+    return J
 end
 
 # dispatch to `get_coupling_state_jacobian!` without arguments
-function _get_coupling_state_jacobian!(Jy, ::Constant, ::InPlace, models, u, p, t; kwargs...)
-    return get_coupling_state_jacobian!(Jy, models; kwargs...)
+function _get_coupling_state_jacobian!(J, ::Invariant, ::InPlace, models, p)
+
+    return get_coupling_state_jacobian!(J, models)
+end
+
+# dispatch to `get_coupling_state_jacobian!` without arguments
+function _get_coupling_state_jacobian!(J, ::Invariant, ::InPlace, models, dx, x, p, t)
+
+    return get_coupling_state_jacobian!(J, models)
+end
+
+# dispatch to `get_coupling_rate_jacobian!` with only parameters as arguments
+function _get_coupling_state_jacobian!(J, ::Constant, ::InPlace, models, dx, x, p, t)
+
+    return get_coupling_state_jacobian!(J, models, p)
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_coupling_state_jacobian!(Jy, ::Constant, ::InPlace,
-    models::NTuple{N,AbstractModel}; kwargs...) where N
+function _get_coupling_state_jacobian!(J, ::Invariant, ::InPlace,
+    models::NTuple{N,AbstractModel}) where N
 
-    get_coupling_state_jacobian!(Jy, models...; kwargs...)
+    get_coupling_state_jacobian!(J, models...)
 
-    return Jy
+    return J
 end
 
 # dispatch to the user-provided function for the specific combination of models
-function _get_coupling_state_jacobian!(Jy, ::Union{Linear, Nonlinear}, ::InPlace,
-    models::NTuple{N,AbstractModel}, u, p, t; kwargs...) where N
+function _get_coupling_state_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p) where N
 
-    get_coupling_state_jacobian!(Jy, models..., u, p, t; kwargs...)
+    get_coupling_state_jacobian!(J, models..., p)
 
-    return Jy
+    return J
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_state_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    get_coupling_state_jacobian!(J, models..., dx, x, p, t)
+
+    return J
 end
 
 """
+    get_coupling_parameter_jacobian(model)
+    get_coupling_parameter_jacobian(model, p)
+    get_coupling_parameter_jacobian(model, dx, x, y, p, t)
+
+Calculate the jacobian of the coupling function for `model` with respect to the
+parameters
+"""
+get_coupling_parameter_jacobian
+
+function get_coupling_parameter_jacobian(models::TM) where TM
+    return _get_coupling_parameter_jacobian(coupling_parameter_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
+end
+
+function get_coupling_parameter_jacobian(models::TM, p) where TM
+    return _get_coupling_parameter_jacobian(coupling_parameter_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_parameter_jacobian(models::TM, dx, x, p, t) where TM
+    return _get_coupling_parameter_jacobian(coupling_parameter_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# use automatic differentiation if jacobian is not defined
+function get_coupling_parameter_jacobian(args...)
+
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = p -> get_coupling_inputs(models, dx, x, p, t)
+
+    return ForwardDiff.jacobian(f, p)
+end
+
+# dispatch to an in-place function
+function _get_coupling_parameter_jacobian(::Any, ::InPlace, models)
+    Ny = number_of_inputs(models)
+    Np = number_of_parameters(models)
+    J = Matrix{Float64}(undef, Ny, Np)
+    return get_coupling_parameter_jacobian!(J, models)
+end
+
+# dispatch to an in-place function
+function _get_coupling_parameter_jacobian(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Ny = number_of_inputs(models)
+    Np = number_of_parameters(models)
+    J = Matrix{TF}(undef, Ny, Np)
+    return get_coupling_parameter_jacobian!(J, models)
+end
+
+# dispatch to an in-place function
+function _get_coupling_parameter_jacobian(::Any, ::InPlace, models, dx, x, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(p), typeof(t))
+    Ny = number_of_inputs(models)
+    Np = number_of_parameters(models)
+    J = Matrix{TF}(undef, Ny, Np)
+    return get_coupling_parameter_jacobian!(J, models, dx, x, p, t)
+end
+
+# return an empty matrix
+function _get_coupling_parameter_jacobian(::Empty, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Np = number_of_parameters(TM)
+    return zeros(SMatrix{Ny, Np, Float64})
+end
+
+# return a zero matrix
+function _get_coupling_parameter_jacobian(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Np = number_of_parameters(TM)
+    return zeros(SMatrix{Ny, Np, Float64})
+end
+
+# return the identity matrix
+function _get_coupling_parameter_jacobian(::Identity, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    Np = number_of_parameters(TM)
+    return SMatrix{Ny, Np, Float64}(I)
+end
+
+# dispatch to the `get_coupling_parameter_jacobian` function without arguments
+function _get_coupling_parameter_jacobian(::Invariant, ::OutOfPlace, models, p)
+    return get_coupling_parameter_jacobian(models)
+end
+
+# dispatch to the `get_coupling_parameter_jacobian` function without arguments
+function _get_coupling_parameter_jacobian(::Invariant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_parameter_jacobian(models)
+end
+
+# dispatch to `get_coupling_parameter_jacobian` with only parameters as arguments
+function _get_coupling_parameter_jacobian(::Constant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_parameter_jacobian(models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_parameter_jacobian(::Invariant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    return get_coupling_parameter_jacobian(models...)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_parameter_jacobian(::Constant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    return get_coupling_parameter_jacobian(models..., p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_parameter_jacobian(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    return get_coupling_parameter_jacobian(models..., dx, x, p, t)
+end
+
+"""
+    get_coupling_parameter_jacobian!(J, model)
+    get_coupling_parameter_jacobian!(J, model, p)
+    get_coupling_parameter_jacobian!(J, model, dx, x, p, t)
+
+In-place version of [`get_coupling_parameter_jacobian`](@ref)
+"""
+get_coupling_parameter_jacobian!
+
+function get_coupling_parameter_jacobian!(J, models::TM) where TM
+    return _get_coupling_parameter_jacobian!(J, coupling_parameter_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
+end
+
+function get_coupling_parameter_jacobian!(J, models::TM, p) where TM
+    return _get_coupling_parameter_jacobian!(J, coupling_parameter_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_parameter_jacobian!(J, models::TM, dx, x, p, t) where TM
+    return _get_coupling_parameter_jacobian!(J, coupling_parameter_jacobian_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# use automatic differentiation if jacobian is not defined
+function get_coupling_parameter_jacobian!(J, args...)
+
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = p -> get_coupling_inputs(models, dx, x, p, t)
+
+    return copyto!(J, ForwardDiff.jacobian(f, p))
+end
+
+# dispatch to an out-of-place function
+function _get_coupling_parameter_jacobian!(J, ::Any, ::OutOfPlace, models, args...)
+    return J .= get_coupling_parameter_jacobian(models, args...)
+end
+
+# return an empty matrix
+function _get_coupling_parameter_jacobian!(J, ::Empty, ::InPlace, models, args...)
+    return J
+end
+
+# return a zero matrix
+function _get_coupling_parameter_jacobian!(J, ::Zeros, ::InPlace, models, args...)
+    return J .= 0
+end
+
+# return the identity matrix
+function _get_coupling_parameter_jacobian!(J, ::Identity, ::InPlace, models, args...)
+    J .= 0
+    for i = 1:number_of_inputs(models)
+        J[i,i] = 1
+    end
+    return J
+end
+
+# dispatch to `get_coupling_parameter_jacobian!` without arguments
+function _get_coupling_parameter_jacobian!(J, ::Invariant, ::InPlace, models, p)
+    return get_coupling_parameter_jacobian!(J, models)
+end
+
+# dispatch to `get_coupling_parameter_jacobian!` without arguments
+function _get_coupling_parameter_jacobian!(J, ::Invariant, ::InPlace, models, dx, x, p, t)
+    return get_coupling_parameter_jacobian!(J, models)
+end
+
+# dispatch to `get_coupling_parameter_jacobian!` with only parameters as arguments
+function _get_coupling_parameter_jacobian!(J, ::Constant, ::InPlace, models, dx, x, p, t)
+    return get_coupling_parameter_jacobian!(J, models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_parameter_jacobian!(J, ::Invariant, ::InPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    get_coupling_parameter_jacobian!(J, models...)
+
+    return J
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_parameter_jacobian!(J, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    get_coupling_parameter_jacobian!(J, models..., p)
+
+    return J
+end
+
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_parameter_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    get_coupling_parameter_jacobian!(J, models..., dx, x, p, t)
+
+    return J
+end
+
+"""
+    get_coupling_time_gradient(model)
+    get_coupling_time_gradient(model, p)
+    get_coupling_time_gradient(model, dx, x, y, p, t)
+
+Calculate the derivative of the coupling function for `model` with respect to time
+"""
+get_coupling_time_gradient
+
+function get_coupling_time_gradient(models::TM) where TM
+    return _get_coupling_time_gradient(coupling_time_gradient_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
+end
+
+function get_coupling_time_gradient(models::TM, p) where TM
+    return _get_coupling_time_gradient(coupling_time_gradient_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_time_gradient(models::TM, dx, x, p, t) where TM
+    return _get_coupling_time_gradient(coupling_time_gradient_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# use automatic differentiation if jacobian is not defined
+function get_coupling_time_gradient(args...)
+
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = t -> get_coupling_inputs(models, dx, x, p, t)
+
+    return ForwardDiff.derivative(f, t)
+end
+
+# dispatch to an in-place function
+function _get_coupling_time_gradient(::Any, ::InPlace, models)
+    Ny = number_of_inputs(models)
+    dT = Vector{Float64}(undef, Ny)
+    return get_coupling_time_gradient!(dT, models)
+end
+
+# dispatch to an in-place function
+function _get_coupling_time_gradient(::Any, ::InPlace, models, p)
+    TF = eltype(p)
+    Ny = number_of_inputs(models)
+    dT = Vector{TF}(undef, Ny)
+    return get_coupling_time_gradient!(dT, models, p)
+end
+
+# dispatch to an in-place function
+function _get_coupling_time_gradient(::Any, ::InPlace, models, dx, x, p, t)
+    TF = promote_type(eltype(dx), eltype(x), eltype(p), typeof(t))
+    Ny = number_of_inputs(models)
+    dT = Vector{TF}(undef, Ny)
+    return get_coupling_time_gradient!(dT, models, dx, x, p, t)
+end
+
+# return an empty vector
+function _get_coupling_time_gradient(::Empty, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    return zeros(SVector{Ny, Float64})
+end
+
+# return a zero vector
+function _get_coupling_time_gradient(::Zeros, ::OutOfPlace, models::TM, args...) where TM
+    Ny = number_of_inputs(TM)
+    return zeros(SVector{Ny, Float64})
+end
+
+# dispatch to the `get_coupling_time_gradient` function without arguments
+function _get_coupling_time_gradient(::Invariant, ::OutOfPlace, models, p)
+    return get_coupling_time_gradient(models)
+end
+
+# dispatch to the `get_coupling_time_gradient` function without arguments
+function _get_coupling_time_gradient(::Invariant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_time_gradient(models)
+end
+
+# dispatch to `get_coupling_time_gradient` with only parameters as arguments
+function _get_coupling_time_gradient(::Constant, ::OutOfPlace, models, dx, x, p, t)
+    return get_coupling_time_gradient(models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_time_gradient(::Invariant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    return get_coupling_time_gradient(models...)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_time_gradient(::Constant, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    return get_coupling_time_gradient(models..., p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_time_gradient(::Union{Linear,Nonlinear}, ::OutOfPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    return get_coupling_time_gradient(models..., dx, x, p, t)
+end
+
+"""
+    get_coupling_time_gradient!(dT, model)
+    get_coupling_time_gradient!(dT, model, p)
+    get_coupling_time_gradient!(dT, model, dx, x, p, t)
+
+In-place version of [`get_coupling_time_gradient`](@ref)
+"""
+get_coupling_time_gradient!
+
+function get_coupling_time_gradient!(dT, models::TM) where TM
+    return _get_coupling_time_gradient!(dT, coupling_time_gradient_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models)
+end
+
+function get_coupling_time_gradient!(dT, models::TM, p) where TM
+    return _get_coupling_time_gradient!(dT, coupling_time_gradient_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, p)
+end
+
+function get_coupling_time_gradient!(dT, models::TM, dx, x, p, t) where TM
+    return _get_coupling_time_gradient!(dT, coupling_time_gradient_type(TM.parameters...),
+        coupling_inplaceness(TM.parameters...), models, dx, x, p, t)
+end
+
+# use automatic differentiation if jacobian is not defined
+function get_coupling_time_gradient!(dT, args...)
+
+    models = args[1:end-4]
+    dx = args[end-3]
+    x = args[end-2]
+    p = args[end-1]
+    t = args[end]
+
+    f = t -> get_coupling_inputs(models, dx, x, p, t)
+
+    return copyto!(dT, ForwardDiff.derivative(f, t))
+end
+
+# dispatch to an out-of-place function
+function _get_coupling_time_gradient!(dT, ::Any, ::OutOfPlace, models, args...)
+    return dT .= get_coupling_time_gradient(models, args...)
+end
+
+# return an empty matrix
+function _get_coupling_time_gradient!(dT, ::Empty, ::InPlace, models, args...)
+    return dT
+end
+
+# return a matrix of zeros
+function _get_coupling_time_gradient!(dT, ::Zeros, ::InPlace, models, args...)
+    return dT .= 0
+end
+
+# dispatch to `get_coupling_time_gradient!` without arguments
+function _get_coupling_time_gradient!(dT, ::Invariant, ::InPlace, models, p)
+    return get_coupling_time_gradient!(dT, models)
+end
+
+# dispatch to `get_coupling_time_gradient!` without arguments
+function _get_coupling_time_gradient!(dT, ::Invariant, ::InPlace, models, dx, x, p, t)
+    return get_coupling_time_gradient!(dT, models)
+end
+
+# dispatch to `get_coupling_time_gradient!` with only parameters as arguments
+function _get_coupling_time_gradient!(dT, ::Constant, ::InPlace, models, dx, x, p, t)
+    return get_coupling_time_gradient!(dT, models, p)
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_time_gradient!(dT, ::Invariant, ::InPlace,
+    models::NTuple{N,AbstractModel}) where N
+
+    get_coupling_time_gradient!(dT, models...)
+
+    return dT
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_time_gradient!(dT, ::Constant, ::InPlace,
+    models::NTuple{N,AbstractModel}, p) where N
+
+    get_coupling_time_gradient!(dT, models..., p)
+
+    return dT
+end
+
+# dispatch to the user-provided function for the specific combination of models
+function _get_coupling_time_gradient!(dT, ::Union{Linear,Nonlinear}, ::InPlace,
+    models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    get_coupling_time_gradient!(dT, models..., dx, x, p, t)
+
+    return dT
+end
+
+"""
+    get_eigen(model::TM; kwargs...)
+    get_eigen(model::TM, p; kwargs...)
     get_eigen(model::TM, x, y, p, t; kwargs...)
 
 Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
@@ -1636,38 +3650,38 @@ and time `t`.
 For in-place models, the number of eigenvalues to compute may be specified using
 the `nev` keyword argument.
 """
-function get_eigen(model::TM, x, y, p, t; kwargs...) where TM
-    return _get_eigen(inplaceness(TM), model, x, y, p, t; kwargs...)
+get_eigen
+
+function get_eigen(model::TM, args...; kwargs...) where TM
+    return _get_eigen(inplaceness(TM), model, args...; kwargs...)
 end
 
-function _get_eigen(::OutOfPlace, model, x, y, p, t)
-    M = Array(get_mass_matrix(model, x, y, p, t)) # mass matrix
-    K = Array(get_state_jacobian(model, x, y, p, t)) # jacobian
-    E = eigen(K, M) # eigenvalue decomposition
+function _get_eigen(::OutOfPlace, model, args...)
+    A = -Array(get_state_jacobian(model, args...)) # jacobian
+    B = Array(get_rate_jacobian(model, args...)) # mass matrix
+    E = eigen(A, B) # eigenvalue decomposition
     λ = eigvals(E) # eigenvalues
     V = eigvecs(E) # right eigenvector matrix
-    U = I/(M*V) # left eigenvector matrix
+    U = I/(A*V) # left eigenvector matrix
     return λ, U, V
 end
 
-function _get_eigen(::InPlace, model, x, y, p, t; nev=min(20, number_of_states(model)))
+function _get_eigen(::InPlace, model, args...; nev=min(20, number_of_states(model)))
 
-    # calculate the mass matrix corresponding to steady state operating conditions
-    M = get_mass_matrix(model, x, y, p, t)
-
-    # calculate the jacobian corresponding to steady state operating conditions
-    K = get_state_jacobian(model, x, y, p, t)
+    # calculate state and rate jacobians
+    A = -get_state_jacobian(model, args...)
+    B = get_rate_jacobian(model, args...)
 
     # construct linear map
-    T = promote_type(eltype(K), eltype(M))
-    nx = size(K, 1)
-    Kfact = lu(K)
-    f! = (b, x) -> ldiv!(b, Kfact, M*x)
-    fc! = (b, x) -> mul!(b, M', Kfact'\x)
-    A = LinearMap{T}(f!, fc!, nx, nx; ismutating=true)
+    nx = size(A, 1)
+    TF = promote_type(eltype(A), eltype(B))
+    Afact = lu(A)
+    f! = (b, x) -> ldiv!(b, Afact, B*x)
+    fc! = (b, x) -> mul!(b, B', Afact'\x)
+    Abar = LinearMap{T}(f!, fc!, nx, nx; ismutating=true)
 
     # compute eigenvalues and eigenvectors
-    λ, V = partialeigen(partialschur(A; nev=min(nx,nev), which=LM())[1])
+    λ, V = partialeigen(partialschur(Abar; nev=min(nx,nev), which=LM())[1])
 
     # sort eigenvalues by magnitude
     perm = sortperm(λ, by=(λ)->(abs(λ),imag(λ)), rev=true)
@@ -1678,22 +3692,23 @@ function _get_eigen(::InPlace, model, x, y, p, t; nev=min(20, number_of_states(m
     λ .= 1 ./ λ
 
     # also return left eigenvectors
-    U = GXBeam.left_eigenvectors(K, -M, λ, V)
+    U = GXBeam.left_eigenvectors(A, -B, λ, V)
 
     return λ, U, V
 end
 
 """
     get_ode(model)
+    get_ode(model, p)
 
 Construct an ODEFunction corresponding to the specified model or models which
 may be solved using DifferentialEquations.
 """
-function get_ode(model::TM) where TM
-    return _get_ode(mass_matrix_type(TM), inplaceness(TM), model)
+function get_ode(model::TM, args...) where TM
+    return _get_ode(rate_jacobian_type(TM), inplaceness(TM), model, args...)
 end
 
-function _get_ode(::Identity, ::OutOfPlace, model::AbstractModel)
+function _get_ode(::Identity, ::OutOfPlace, model::AbstractModel, p=nothing)
 
     Np = number_of_parameters(model)
     Ny = number_of_inputs(model)
@@ -1701,14 +3716,54 @@ function _get_ode(::Identity, ::OutOfPlace, model::AbstractModel)
     ip = SVector{Np}(1:Np)
     iy = SVector{Ny}(Np+1:Np+Ny)
 
-    f = (u, p, t) -> get_rates(models, u, p[iy], p[ip], t)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dx .*= -1
+    end
+    mass_matrix = I
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        pJ .*= -1
+    end
 
-    jac = (u, p, t) -> get_state_jacobian(models, u, p[iy], p[ip], t)
-
-    return ODEFunction{false,true}(f; jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
-function _get_ode(::Constant, ::OutOfPlace, model::AbstractModel)
+
+function _get_ode(::Identity, ::OutOfPlace, model::NTuple{N,AbstractModel}, p=nothing) where N
+
+    fy = (x, p, t) -> get_coupling_inputs(models, FillArrays.Zeros(x), x, p, t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = I
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Invariant, ::OutOfPlace, model::AbstractModel, p=nothing)
 
     Np = number_of_parameters(model)
     Ny = number_of_inputs(model)
@@ -1716,16 +3771,55 @@ function _get_ode(::Constant, ::OutOfPlace, model::AbstractModel)
     ip = SVector{Np}(1:Np)
     iy = SVector{Ny}(Np+1:Np+Ny)
 
-    f = (u, p, t) -> get_rates(models, u, p[iy], p[ip], t)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(models)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, models, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        pJ .*= -1
+    end
 
-    mass_matrix = get_mass_matrix(models)
-
-    jac = (u, p, t) -> get_state_jacobian(models, u, p[iy], p[ip], t)
-
-    return ODEFunction{false,true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
-function _get_ode(::Linear, ::OutOfPlace, model::AbstractModel)
+function _get_ode(::Invariant, ::OutOfPlace, model::NTuple{N,AbstractModel}, p=nothing) where N
+
+    fy = (x, p, t) -> get_coupling_inputs(models, FillArrays.Zeros(x), x, p, t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, models, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+_get_ode(::Constant, ::OutOfPlace, model) = _get_ode(Linear(), OutOfPlace(), model)
+
+function _get_ode(::Constant, ::OutOfPlace, model::AbstractModel, p)
 
     Np = number_of_parameters(model)
     Ny = number_of_inputs(model)
@@ -1733,145 +3827,437 @@ function _get_ode(::Linear, ::OutOfPlace, model::AbstractModel)
     ip = SVector{Np}(1:Np)
     iy = SVector{Ny}(Np+1:Np+Ny)
 
-    f = (du, u, p, t) -> get_rates!(du, models, u, p[iy], p[ip], t)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, x, p[iy], p[ip], t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model, p)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        pJ .*= -1
+    end
 
-    M = zeros(Nu, Nu)
-    update_func = (M, u, p, t) -> get_mass_matrix!(M, models, p[iy], p[ip], t)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Constant, ::OutOfPlace, model::NTuple{N,AbstractModel}, p) where N
+
+    fy = (x, p, t) -> get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model, p)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Linear, ::OutOfPlace, model::AbstractModel, p=nothing)
+
+    Np = number_of_parameters(model)
+    Ny = number_of_inputs(model)
+
+    ip = SVector{Np}(1:Np)
+    iy = SVector{Ny}(Np+1:Np+Ny)
+
+    M = zeros(Nx, Nx)
+    update_func = (M, x, p, t) -> get_rate_jacobian!(M, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dx .*= -1
+    end
     mass_matrix = DiffEqArrayOperator(M; update_func)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
+        pJ .*= -1
+    end
 
-    jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, p[iy], p[ip], t)
-
-    return ODEFunction{false,true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
-function _get_ode(::Identity, ::InPlace, model::AbstractModel)
+function _get_ode(::Linear, ::OutOfPlace, model::NTuple{N,AbstractModel}, p=nothing) where N
+
+    Nx = number_of_states(model)
+
+    fy = (x, p, t) -> get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
+
+    M = zeros(Nx, Nx)
+    update_func = (M, x, p, t) -> get_rate_jacobian!(M, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Identity, ::InPlace, model::AbstractModel, p=nothing)
 
     # problem dimensions
-    Nu = number_of_states(model)
+    Nx = number_of_states(model)
     Ny = number_of_inputs(model)
     Np = number_of_parameters(model)
 
     ip = 1:Np
     iy = Np+1:Np+Ny
 
-    # construct state rate function
-    f = (du, u, p, t) ->  get_rates!(du, model, u, view(p, iy), view(p, ip), t)
-
-    # construct jacobian function
-    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dx .*= -1
+    end
+    mass_matrix = I
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        pJ .*= -1
+    end
 
     # construct and return an ODEFunction
-    return ODEFunction{true,true}(f; jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Identity, ::InPlace, model::NTuple{N,AbstractModel}, p=nothing) where N
+
+    # problem dimensions
+    Nx = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # cached variables
+    ucache = fill(NaN, Nx)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+
+    fy = (x, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+            # update the cache variables
+            if (x != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= x
+                ycache .= get_coupling_inputs!(ycache, model, FillArrays.Zeros(x), x, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
+        end
+        return y
+    end
+
+    # TODO: use cached variables for input jacobian and coupling function jacobians
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = I
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Invariant, ::InPlace, model::AbstractModel, p=nothing)
+
+    # problem dimensions
+    Nx = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    ip = 1:Np
+    iy = Np+1:Np+Ny
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        pJ .*= -1
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+function _get_ode(::Invariant, ::InPlace, model::NTuple{N,AbstractModel}, p=nothing) where N
+
+    # problem dimensions
+    Nx = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # cached variables
+    ucache = fill(NaN, Nx)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+
+    fy = (x, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+            # update the cache variables
+            if (x != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= x
+                ycache .= get_coupling_inputs!(ycache, model, FillArrays.Zeros(x), x, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
+        end
+        return y
+    end
+
+    # TODO: use cached variables for input jacobian and coupling function jacobians
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
 function _get_ode(::Constant, ::InPlace, model::AbstractModel)
 
     # problem dimensions
-    Nu = number_of_states(model)
+    Nx = number_of_states(model)
     Ny = number_of_inputs(model)
     Np = number_of_parameters(model)
 
     ip = 1:Np
     iy = Np+1:Np+Ny
 
-    # construct state rate function
-    f = (du, u, p, t) -> get_rates!(du, model, u, view(p, iy), view(p, ip), t)
+    M = zeros(Nx, Nx)
+    update_func = (M, x, p, t) -> get_rate_jacobian!(M, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
 
-    # construct mass matrix
-    mass_matrix = get_mass_matrix(model)
-
-    # construct jacobian function
-    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dx .*= -1
+    end
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        pJ .*= -1
+    end
 
     # construct and return an ODEFunction
-    return ODEFunction{true,true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
-function _get_ode(::Linear, ::InPlace, model::AbstractModel)
+function _get_ode(::Constant, ::InPlace, model::NTuple{N,AbstractModel}) where N
 
     # problem dimensions
-    Nu = number_of_states(model)
+    Nx = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # cached variables
+    ucache = fill(NaN, Nx)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+
+    fy = (x, p, t) -> begin
+        # check if we can use the cache variables (no custom types)
+        if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+            # update the cache variables
+            if (x != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= x
+                ycache .= get_coupling_inputs!(ycache, model, FillArrays.Zeros(x), x, p, t)
+                pcache .= p
+                tcache .= t
+            end
+            # use the cached model inputs
+            y = ycache
+        else
+            # calculate model inputs (out-of-place to accomodate custom type)
+            y = get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
+        end
+        return y
+    end
+
+    # TODO: use cached variables for input jacobian and coupling function jacobians
+
+    M = zeros(Nx, Nx)
+    update_func = (M, x, p, t) -> get_rate_jacobian!(M, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
+    end
+
+    # construct and return an ODEFunction
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
+
+
+function _get_ode(::Constant, ::InPlace, model::AbstractModel, p)
+
+    # problem dimensions
+    Nx = number_of_states(model)
     Ny = number_of_inputs(model)
     Np = number_of_parameters(model)
 
     ip = 1:Np
     iy = Np+1:Np+Ny
 
-    # construct state rate function
-    f = (du, u, p, t) -> get_rates!(du, model, u, view(p, iy), view(p, ip), t)
-
-    # construct mass matrix
-    M = zeros(Nu, Nu)
-    update_func = (M, u, p, t) -> get_mass_matrix!(M, model, u, view(p, iy), view(p, ip), t)
-    mass_matrix = DiffEqArrayOperator(M; update_func)
-
-    # construct jacobian function
-    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, view(p, iy), view(p, ip), t)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model, p)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        pJ .*= -1
+    end
 
     # construct and return an ODEFunction
-    return ODEFunction{true,true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
-function _get_ode(::Identity, ::OutOfPlace, model::Tuple)
-
-    fy = (u, p, t) -> get_coupling_inputs(models, u, p, t)
-
-    f = (du, u, p, t) -> get_rates!(du, models, u, fy(u, p, t), p, t)
-
-    jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, fy(u, p, t), p, t)
-
-    return ODEFunction{true,true}(f; jac)
-end
-
-function _get_ode(::Constant, ::OutOfPlace, model::Tuple)
-
-    fy = (u, p, t) -> get_coupling_inputs(models, u, p, t)
-
-    f = (du, u, p, t) -> get_rates!(du, models, u, fy(u, p, t), p, t)
-
-    mass_matrix = get_mass_matrix(models)
-
-    jac = (J, u, p, t) -> get_state_jacobian!(J, models, u, fy(u, p, t), p, t)
-
-    return ODEFunction{true,true}(f; mass_matrix, jac)
-end
-
-function _get_ode(::Linear, ::OutOfPlace, model::Tuple)
-
-    Nu = number_of_states(model)
-
-    fy = (u, p, t) -> get_coupling_inputs(model, u, p, t)
-
-    f = (du, u, p, t) -> get_rates!(du, model, u, fy(u, p, t), p, t)
-
-    M = zeros(Nu, Nu)
-    update_func = (M, u, p, t) -> get_mass_matrix!(M, model, u, fy(u, p, t), p, t)
-    mass_matrix = DiffEqArrayOperator(M; update_func)
-
-    jac = (J, u, p, t) -> get_state_jacobian!(J, model, u, fy(u, p, t), p, t)
-
-    return ODEFunction{true,true}(f; mass_matrix, jac)
-end
-
-function _get_ode(::Identity, ::InPlace, model::Tuple)
+function _get_ode(::Constant, ::InPlace, model::NTuple{N,AbstractModel}, p) where N
 
     # problem dimensions
-    Nu = number_of_states(model)
+    Nx = number_of_states(model)
     Ny = number_of_inputs(model)
     Np = number_of_parameters(model)
 
-    # construct state rate function
-    ucache = fill(NaN, Nu)
+    # cached variables
+    ucache = fill(NaN, Nx)
     ycache = fill(NaN, Ny)
     pcache = fill(NaN, Np)
     tcache = fill(NaN)
-    f = (du, u, p, t) -> begin
+
+    fy = (x, p, t) -> begin
         # check if we can use the cache variables (no custom types)
-        if eltype(du) <: Float64
+        if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
             # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
+            if (x != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= x
+                ycache .= get_coupling_inputs!(ycache, model, FillArrays.Zeros(x), x, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -1879,164 +4265,89 @@ function _get_ode(::Identity, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
         end
-        # calculate state rates
-        get_rates!(du, model, u, y, p, t)
+        return y
     end
 
-    # construct jacobian function
-    jac = (J, u, p, t) -> begin
-        # check if we can use the cache variables (no custom types)
-        if eltype(du) <: Float64
-            # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
-                pcache .= p
-                tcache .= t
-            end
-            # use the cached model inputs
-            y = ycache
-        else
-            # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
-        end
-        # calculate jacobian
-        get_state_jacobian!(J, model, u, y, p, t)
+    # TODO: use cached variables for input jacobian and coupling function jacobians
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = get_rate_jacobian(model, p)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
     end
 
     # construct and return an ODEFunction
-    return ODEFunction{true,true}(f; jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
-function _get_ode(::Constant, ::InPlace, model::Tuple)
+function _get_ode(::Linear, ::InPlace, model::AbstractModel, p=nothing)
 
     # problem dimensions
-    Nu = number_of_states(model)
+    Nx = number_of_states(model)
     Ny = number_of_inputs(model)
     Np = number_of_parameters(model)
 
-    # construct state rate function
-    ucache = fill(NaN, Nu)
-    ycache = fill(NaN, Ny)
-    pcache = fill(NaN, Np)
-    tcache = fill(NaN)
-    f = (du, u, p, t) -> begin
-        # check if we can use the cache variables (no custom types)
-        if eltype(du) <: Float64
-            # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
-                pcache .= p
-                tcache .= t
-            end
-            # use the cached model inputs
-            y = ycache
-        else
-            # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
-        end
-        # calculate state rates
-        get_rates!(du, model, u, y, p, t)
-    end
+    ip = 1:Np
+    iy = Np+1:Np+Ny
 
-    # construct mass matrix
-    mass_matrix = get_mass_matrix(model)
+    M = zeros(Nx, Nx)
+    update_func = (M, x, p, t) -> get_rate_jacobian!(M, model, FillArrays.Zeros(x), x, p[iy], p[ip], t)
 
-    # construct jacobian function
-    jac = (J, u, p, t) -> begin
-        # check if we can use the cache variables (no custom types)
-        if eltype(du) <: Float64
-            # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
-                pcache .= p
-                tcache .= t
-            end
-            # use the cached model inputs
-            y = ycache
-        else
-            # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
-        end
-        # calculate jacobian
-        get_state_jacobian!(J, model, u, y, p, t)
-    end
-
-    # construct and return an ODEFunction
-    return ODEFunction{true,true}(f; mass_matrix, jac)
-end
-
-function _get_ode(::Linear, ::InPlace, model::Tuple)
-
-    # problem dimensions
-    Nu = number_of_states(model)
-    Ny = number_of_inputs(model)
-    Np = number_of_parameters(model)
-
-    # construct state rate function
-    ucache = fill(NaN, Nu)
-    ycache = fill(NaN, Ny)
-    pcache = fill(NaN, Np)
-    tcache = fill(NaN)
-    f = (du, u, p, t) -> begin
-        # check if we can use the cache variables (no custom types)
-        if eltype(du) <: Float64
-            # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
-                pcache .= p
-                tcache .= t
-            end
-            # use the cached model inputs
-            y = ycache
-        else
-            # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
-        end
-        # calculate state rates
-        get_rates!(du, model, u, y, p, t)
-    end
-
-    # construct mass matrix
-    M = zeros(Nu, Nu)
-    My_cache = zeros(Ny, Nu)
-    update_func = (M, u, p, t) -> begin
-        # check if we can use the cache variables (no custom types)
-        if eltype(M) <: Float64
-            # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                # store current input arguments
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
-                pcache .= p
-                tcache .= t
-            end
-            # use the cached model inputs
-            y = ycache
-        else
-            # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
-        end
-        # update type of `My`
-        My = convert(typeof(M), My_cache)
-        # calculate inputs
-        get_mass_matrix!(M, model, u, y, p, t; My)
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dx .*= -1
     end
     mass_matrix = DiffEqArrayOperator(M; update_func)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, view(p, iy), view(p, ip), t)
+        pJ .*= -1
+    end
+    # construct and return an ODEFunction
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
+end
 
-    # construct jacobian function
-    jac = (J, u, p, t) -> begin
+function _get_ode(::Linear, ::InPlace, model::NTuple{N,AbstractModel}, p) where N
+
+    # problem dimensions
+    Nx = number_of_states(model)
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    # cached variables
+    ucache = fill(NaN, Nx)
+    ycache = fill(NaN, Ny)
+    pcache = fill(NaN, Np)
+    tcache = fill(NaN)
+
+    fy = (x, p, t) -> begin
         # check if we can use the cache variables (no custom types)
-        if eltype(J) <: Float64
+        if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
             # update the cache variables
-            if (u != ucache) && (p != pcache) && (t != tcache[])
-                ucache .= u
-                get_coupling_inputs!(ycache, model, u, p, t)
+            if (x != ucache) && (p != pcache) && (t != tcache[])
+                ucache .= x
+                ycache .= get_coupling_inputs!(ycache, model, FillArrays.Zeros(x), x, p, t)
                 pcache .= p
                 tcache .= t
             end
@@ -2044,18 +4355,40 @@ function _get_ode(::Linear, ::InPlace, model::Tuple)
             y = ycache
         else
             # calculate model inputs (out-of-place to accomodate custom type)
-            y = get_coupling_inputs(model, u, p, t)
+            y = get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
         end
-        # calculate jacobian
-        get_state_jacobian!(J, model, u, y, p, t)
+        return y
+    end
+
+    # TODO: use cached variables for input jacobian and coupling function jacobians
+
+    M = zeros(Nx, Nx)
+    update_func = (M, x, p, t) -> get_state_jacobian!(M, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dx .*= -1
+    end
+    mass_matrix = DiffEqArrayOperator(M; update_func)
+    tgrad = (dT, x, p, t) -> begin
+        get_time_gradient!(dT, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        dT .*= -1
+    end
+    jac = (J, x, p, t) -> begin
+        get_state_jacobian!(J, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        J .*= -1
+    end
+    paramjac = (pJ, x, p, t) -> begin
+        get_parameter_jacobian!(pJ, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        pJ .*= -1
     end
 
     # construct and return an ODEFunction
-    return ODEFunction{true,true}(f; mass_matrix, jac)
+    return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
 
 # plotting recipes
-@recipe function f(models::AbstractModel, x, p, t) where N
+@recipe function f(models::AbstractModel, dx, x, p, t) where N
 
     Np = number_of_parameters(models)
     Ny = number_of_inputs(models)
@@ -2063,27 +4396,29 @@ end
     ip = 1:Np
     iy = Np+1:Np+Ny
 
-    return models..., x, p[iy], p[ip], t
+    return models..., dx, x, p[iy], p[ip], t
 end
 
-@recipe function f(models::NTuple{N,AbstractModel}, x, p, t) where N
+@recipe function f(models::NTuple{N,AbstractModel}, dx, x, p, t) where N
 
-    y = get_coupling_inputs(models, x, p, t)
+    y = get_coupling_inputs(models, dx, x, p, t)
 
-    return models..., x, y, p, t
+    return models..., dx, x, y, p, t
 end
 
 @recipe function f(models::NTuple{N,AbstractModel}, sol) where N
 
     it = sol.tslocation
 
-    x = sol.u[it]
+    x = sol.x[it]
     p = sol.prob.p
     t = sol.t[it]
 
-    y = get_coupling_inputs(models, x, p, t)
+    dx = sol(t, Val{1})
 
-    return models..., x, y, p, t
+    y = get_coupling_inputs(models, dx, x, p, t)
+
+    return models..., dx, x, y, p, t
 end
 
 @recipe function f(models::NTuple{N,AbstractModel}, sol, t) where N
@@ -2091,7 +4426,9 @@ end
     x = sol(t)
     p = sol.prob.p
 
-    y = get_coupling_inputs(models, x, p, t)
+    dx = sol(t, Val{1})
 
-    return models..., x, y, p, t
+    y = get_coupling_inputs(models, dx, x, p, t)
+
+    return models..., dx, x, y, p, t
 end

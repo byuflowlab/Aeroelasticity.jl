@@ -8,15 +8,18 @@ as additional parameters.
 """
 couple_models(aero::Peters, stru::TypicalSection) = (aero, stru)
 
-# --- traits --- #
+# --- Traits --- #
 
 number_of_additional_parameters(::Type{<:Peters}, ::Type{TypicalSection}) = 2
+
 coupling_inplaceness(::Type{<:Peters}, ::Type{TypicalSection}) = OutOfPlace()
+
 coupling_rate_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Linear()
 coupling_state_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Nonlinear()
 coupling_parameter_jacobian_type(::Type{<:Peters}, ::Type{TypicalSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{<:Peters}, ::Type{TypicalSection}) = Zeros()
 
-# --- methods --- #
+# --- Methods --- #
 
 function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     dx, x, p, t) where {N,TF,SV,SA}
@@ -39,7 +42,7 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     return SVector(u, ω, vdot, ωdot, L, M)
 end
 
-# --- performance overloads --- #
+# --- Performance Overloads --- #
 
 function get_coupling_rate_jacobian(aero::Peters{N,TF,SV,SA},
     stru::TypicalSection, dx, x, p, t) where {N,TF,SV,SA}
@@ -49,8 +52,13 @@ function get_coupling_rate_jacobian(aero::Peters{N,TF,SV,SA},
     udot_dhdot, vdot_dhdot, ωdot_dhdot = section_accelerations_dhdot()
     udot_dθdot, vdot_dθdot, ωdot_dθdot = section_accelerations_dθdot()
     # calculate aerodynamic loads
-    L_dhdot, M_dhdot = peters_loads_vdot(a, b, ρ)
-    L_dθdot, M_dθdot = peters_loads_ωdot(a, b, ρ)
+    L_vdot, M_vdot = peters_loads_vdot(a, b, ρ)
+    L_ωdot, M_ωdot = peters_loads_ωdot(a, b, ρ)
+    # propagate derivatives
+    L_dhdot = L_vdot * vdot_dhdot + L_ωdot * ωdot_dhdot
+    L_dθdot = L_vdot * vdot_dθdot + L_ωdot * ωdot_dθdot
+    M_dhdot = M_vdot * vdot_dhdot + M_ωdot * ωdot_dhdot
+    M_dθdot = M_vdot * vdot_dθdot + M_ωdot * ωdot_dθdot
     # construct submatrices
     Jyaa = zeros(SMatrix{4,N,TF})
     Jyas = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 vdot_dhdot vdot_dθdot; 0 0 ωdot_dhdot ωdot_dθdot]
@@ -61,7 +69,7 @@ function get_coupling_rate_jacobian(aero::Peters{N,TF,SV,SA},
 end
 
 function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, x, p, t) where {N,TF,SV,SA}
+    stru::TypicalSection, dx, x, p, t) where {N,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
@@ -84,7 +92,8 @@ function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
     return [Jyaa Jyas; Jysa Jyss]
 end
 
-function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx, x, p, t)
+function get_coupling_parameter_jacobian(aero::Peters{N,TF,SV,SA},
+    stru::TypicalSection, dx, x, p, t) where {N,TF,SV,SA}
     # extract rate variables
     dλ = dx[SVector{N}(1:N)]
     dh, dθ, dhdot, dθdot = dx[SVector{4}(N+1:N+4)]
@@ -96,17 +105,24 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     # extract model constants
     bbar = aero.b
     # local freestream velocity components
-    u_U, v_U, ω_U = section_velocities_U(U)
+    u, v, ω = section_velocities(U, θ, hdot, θdot)
+    udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
+    u_U, v_U, ω_U = section_velocities_U(θ)
     # calculate loads
     L_a, M_a = peters_loads_a(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     L_b, M_b = peters_loads_b(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     L_a0, M_a0 = peters_loads_a0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     L_α0, M_α0 = peters_loads_α0(a, b, ρ, a0, u)
-    L_U, M_U = peters_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ωdot, λ1, λ2)
+
+    L_u, M_u = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    L_v, M_v = peters_loads_v(a, b, ρ, a0, U)
+    L_U = L_u * u_U + L_v * v_U
+    M_U = M_u * u_U + M_v * v_U
+
     L_ρ, M_ρ = peters_loads_ρ(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
         # compute jacobian sub-matrices
-    Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
-    Jyas = @SMatrix [0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0]
+    Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 0]
+    Jyas = @SMatrix [0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0]
     Jyap = @SMatrix [u_U 0; ω_U 0; 0 0; 0 0]
     Jysa = @SMatrix [L_a L_b L_a0 L_α0; M_a M_b M_a0 M_α0]
     Jyss = @SMatrix [0 0 0 0 0; 0 0 0 0 0]
@@ -115,7 +131,7 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     return [Jyaa Jyas Jyap; Jysa Jyss Jysp]
 end
 
-# --- convenience methods --- #
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::Peters, stru::TypicalSection; U, rho)
 
@@ -130,10 +146,10 @@ function separate_additional_parameters(aero::Peters, stru::TypicalSection, padd
     return (U = padd[1], rho = padd[2])
 end
 
-# --- plotting --- #
+# --- Plotting --- #
 
 @recipe function f(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    x, y, p, t) where {N,TF,SV,SA}
+    dx, x, y, p, t) where {N,TF,SV,SA}
 
     framestyle --> :origin
     grid --> false

@@ -112,13 +112,13 @@ function quasisteady0_loads_α0(a, b, ρ, a0, α0, u, v)
     return SVector(L_α0, M_α0)
 end
 
-function quasisteady0_u(a, b, ρ, a0, v)
-    L_u = a0*ρ*b*v
+function quasisteady0_loads_u(a, b, ρ, a0, α0, u, v)
+    L_u = a0*ρ*b*v - 2*a0*ρ*b*u*α0
     M_u = (b/2 + a*b)*L_u
     return SVector(L_u, M_u)
 end
 
-function quasisteady0_v(a, b, ρ, a0, u)
+function quasisteady0_loads_v(a, b, ρ, a0, u)
     L_v = a0*ρ*b*u
     M_v = (b/2 + a*b)*L_v
     return SVector(L_v, M_v)
@@ -213,7 +213,7 @@ function quasisteady1_loads_α0(a, b, ρ, a0, u)
     return SVector(L_α0, M_α0)
 end
 
-function quasisteady1_u(a, b, ρ, a0, α0, u, v, ω)
+function quasisteady1_loads_u(a, b, ρ, a0, α0, u, v, ω)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
@@ -229,7 +229,7 @@ function quasisteady1_u(a, b, ρ, a0, α0, u, v, ω)
     return SVector(L_u, M_u)
 end
 
-function quasisteady1_v(a, b, ρ, a0, α0, u)
+function quasisteady1_loads_v(a, b, ρ, a0, α0, u)
     # lift at reference point
     L_v = a0*ρ*u*b
     # moment at reference point
@@ -238,7 +238,7 @@ function quasisteady1_v(a, b, ρ, a0, α0, u)
     return SVector(L_v, M_v)
 end
 
-function quasisteady1_ω(a, b, ρ, a0, u)
+function quasisteady1_loads_ω(a, b, ρ, a0, u)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     # non-circulatory load factor
@@ -322,11 +322,11 @@ quasisteady2_loads_a0(args...) = quasisteady1_loads_a0(args...)
 
 quasisteady2_loads_α0(args...) = quasisteady1_loads_α0(args...)
 
-quasisteady2_loads_u(args...) = quasisteady1_u(args...)
+quasisteady2_loads_u(args...) = quasisteady1_loads_u(args...)
 
-quasisteady2_loads_v(args...) = quasisteady1_v(args...)
+quasisteady2_loads_v(args...) = quasisteady1_loads_v(args...)
 
-quasisteady2_loads_ω(args...) = quasisteady1_ω(args...)
+quasisteady2_loads_ω(args...) = quasisteady1_loads_ω(args...)
 
 function quasisteady2_loads_vdot(a, b, ρ)
     # non-circulatory load factor

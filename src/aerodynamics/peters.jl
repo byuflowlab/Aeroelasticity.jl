@@ -57,11 +57,14 @@ end
 number_of_states(::Type{Peters{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
 number_of_inputs(::Type{<:Peters}) = 4
 number_of_parameters(::Type{<:Peters}) = 4
+
 inplaceness(::Type{<:Peters}) = OutOfPlace()
-mass_matrix_type(::Type{<:Peters}) = Identity()
+
+rate_jacobian_type(::Type{<:Peters}) = Invariant()
 state_jacobian_type(::Type{<:Peters}) = Linear()
 input_jacobian_type(::Type{<:Peters}) = Nonlinear()
 parameter_jacobian_type(::Type{<:Peters}) = Nonlinear()
+time_gradient_type(::Type{<:Peters}) = Zeros()
 
 # --- Methods --- #
 
@@ -78,10 +81,17 @@ function get_residual(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where {N,TF,SV,
     Abar = model.A
     cbar = model.c
     # calculate rates
-    return dλ - peters_rates(λ, u, ω, vdot, ωdot, a, b, Abar, cbar)
+    return peters_residual(dλ, λ, u, ω, vdot, ωdot, a, b, Abar, cbar)
 end
 
 # --- Performance Overloads --- #
+
+function get_rate_jacobian(model::Peters)
+    # extract model constants
+    Abar = model.A
+    # jacobian with respect to aerodynamic states
+    return peters_rate_jacobian(Abar)
+end
 
 function get_state_jacobian(model::Peters, dx, x, y, p, t)
     # extract inputs
@@ -92,7 +102,7 @@ function get_state_jacobian(model::Peters, dx, x, y, p, t)
     Abar = model.A
     cbar = model.c
     # jacobian with respect to aerodynamic states
-    return -peters_state_jacobian(u, b, Abar)
+    return peters_state_jacobian(u, b, cbar)
 end
 
 function get_input_jacobian(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where {N,TF,SV,SA}
@@ -106,7 +116,7 @@ function get_input_jacobian(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where {N,
     Abar = model.A
     cbar = model.c
     # return jacobian
-    return -peters_input_jacobian(λ, u, ω, a, b, Abar, cbar)
+    return peters_input_jacobian(λ, u, ω, a, b, Abar, cbar)
 end
 
 function get_parameter_jacobian(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where {N,TF,SV,SA}
@@ -120,7 +130,7 @@ function get_parameter_jacobian(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where
     Abar = model.A
     cbar = model.c
     # return jacobian
-    return -peters_parameter_jacobian(λ, u, ω, a, b, Abar, cbar)
+    return peters_parameter_jacobian(λ, u, ω, ωdot, a, b, Abar, cbar)
 end
 
 # --- Convenience Functions --- #
@@ -164,35 +174,38 @@ function separate_parameters(model::Peters, p)
     return (a = p[1], b = p[2], a0 = p[3], alpha0 = p[4])
 end
 
+# --- Internal Methods for Model --- #
 
-# --- Internal Methods --- #
+function peters_residual(dλ, λ, u, ω, vdot, ωdot, a, b, Abar, cbar)
 
-function peters_rates(λ, u, ω, vdot, ωdot, a, b, Abar, cbar)
-
-    return Abar\(cbar*(vdot + u*ω + (b/2-a*b)*ωdot) - u/b*λ)
+    return Abar*dλ - cbar*(vdot + u*ω + (b/2-a*b)*ωdot) + u/b*λ
 end
 
-peters_state_jacobian(u, b, Abar) = -inv(Abar)*u/b
+peters_rate_jacobian(Abar) = Abar
+
+peters_state_jacobian(u, b, cbar) = u/b*Diagonal(ones(similar_type(cbar)))
 
 function peters_input_jacobian(λ, u, ω, a, b, Abar, cbar)
 
-    dλ_u = Abar\(cbar*ω - λ/b)
-    dλ_ω = Abar\(u*cbar)
-    dλ_vdot = Abar\cbar
-    dλ_ωdot = Abar\((b/2-a*b)*cbar)
+    dλ_u = -cbar*ω + λ/b
+    dλ_ω = -u*cbar
+    dλ_vdot = -cbar
+    dλ_ωdot = -(b/2-a*b)*cbar
 
-    return [dλ_u dλ_v dλ_vdot dλ_ωdot]
+    return hcat(dλ_u, dλ_ω, dλ_vdot, dλ_ωdot)
 end
 
-function peters_parameter_jacobian(λ, u, ω, a, b, Abar, cbar)
+function peters_parameter_jacobian(λ, u, ω, ωdot, a, b, Abar, cbar)
 
-    dλ_a = -Abar\(a*b*ωdot*cbar)
-    dλ_b = Abar\(cbar*(1/2-a)*ωdot + u/b^2*λ)
+    dλ_a = b*ωdot*cbar
+    dλ_b = -cbar*(1/2-a)*ωdot - u/b^2*λ
     dλ_a0 = zero(cbar)
     dλ_α0 = zero(cbar)
 
-    return [dλ_a dλ_b dλ_a0 dλ_α0]
+    return hcat(dλ_a, dλ_b, dλ_a0, dλ_α0)
 end
+
+# --- Internal Methods for Couplings --- #
 
 function peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     # circulatory load factor

@@ -8,7 +8,9 @@
 
 Author: Taylor McDonnell
 
-**AerostructuralDynamics** is a multi-fidelity modeling and analysis framework which is designed to simulate the behavior of coupled and/or decoupled aerodynamic, structural, and/or rigid-body dynamics models.
+**AerostructuralDynamics** is an extensible multi-fidelity modeling and analysis framework which is designed to simulate the behavior of coupled and/or decoupled aerodynamic, structural, and/or rigid-body dynamics models.  
+
+![](typical-section-flutter-mode.gif)
 
 ## Package Features
  - Provides a framework for coupling multiple models together for analysis and/or simulation.
@@ -30,7 +32,7 @@ Author: Taylor McDonnell
      - Trim (3D)
  - Interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
  - Verified and/or validated against theoretical, computational, and/or experimental results (see the [examples](@ref Examples))
- - May be easily extended to include additional models and/or model couplings.  (See the [developer guide](@ref Developer's Guide))
+ - May be easily extended to include additional models and/or model couplings.  (See the [developer guide](@ref Developer's Guide), pull requests are welcome)
 
 ## Installation
 

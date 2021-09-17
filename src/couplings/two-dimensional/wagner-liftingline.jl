@@ -8,29 +8,34 @@ model introduces the freestream air density ``\\rho`` as an additional parameter
 """
 couple_models(aero::Wagner, stru::LiftingLineSection) = (aero, stru)
 
-# --- traits --- #
+# --- Traits --- #
 
 number_of_additional_parameters(::Type{<:Wagner}, ::Type{LiftingLineSection}) = 1
+
 coupling_inplaceness(::Type{<:Wagner}, ::Type{LiftingLineSection}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Linear()
+
+coupling_rate_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Linear()
 coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_parameter_jacobian_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_time_gradient_type(::Type{<:Wagner}, ::Type{LiftingLineSection}) = Zeros()
 
-# --- methods --- #
+# --- Methods --- #
 
-function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, s, p, t)
+function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, dx, x, p, t)
+    # extract rate variables
+    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz = dx
     # extract state variables
-    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
+    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = x
     # extract parameters
     a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
-    # calculate aerodynamic loads
-    L, M = wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    # freestream velocity components
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
+    # aerodynamic loads
+    L, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # forces and moments per unit span
     f = SVector(0, 0, L)
     m = SVector(0, M, 0)
@@ -38,79 +43,11 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, s, p, t)
     return vcat(u, v, ω, f, m)
 end
 
-function get_coupling_mass_matrix(aero::Wagner, stru::LiftingLineSection, s, p, t)
-    # extract state variables
-    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # calculate loads
-    L_dvx, M_dvx = wagner_loads_udot()
-    L_dvz, M_dvz = wagner_loads_vdot(a, b, ρ)
-    L_dωy, M_dωy = wagner_loads_ωdot(a, b, ρ)
-    # construct submatrices
-    Mda = @SMatrix [0 0; 0 0; 0 0]
-    Mds = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
-    Mra = @SMatrix [0 0; 0 0; 0 0; 0 0; 0 0; 0 0]
-    Mrs = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; -L_dvx 0 -L_dvz 0 -L_dωy 0;
-        0 0 0 0 0 0; -M_dvx 0 -M_dvz 0 -M_dωy 0; 0 0 0 0 0 0]
-    # assemble mass matrix
-    return [Mda Mds; Mra Mrs]
-end
+# --- Performance Overloads --- #
 
-# --- performance overloads --- #
+# TODO: State rate, state, and parameter jacobians
 
-function get_coupling_state_jacobian(aero::Wagner, stru::LiftingLineSection, s, p, t)
-    # extract state variables
-    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = s
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    u_vx = 1
-    v_vz = 1
-    ω_ωy = 1
-    # model constants
-    C1 = aero.C1
-    C2 = aero.C2
-    # calculate loads
-    out = wagner_loads_λ(a, b, ρ, a0, u)
-    L_λ, M_λ = out[1,:], out[2,:]
-    L_vx, M_vx = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
-    L_vz, M_vz = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
-    L_ωy, M_ωy = wagner_loads_ω(a, b, ρ, a0, C1, C2, u)
-    # compute input jacobian sub-matrices
-    Jda = @SMatrix [0 0; 0 0; 0 0]
-    Jds = @SMatrix [u_vx 0 0 0 0 0; 0 0 v_vz 0 0 0; 0 0 0 0 ω_ωy 0]
-    Jra = vcat(zero(L_λ'), zero(L_λ'), L_λ', zero(M_λ'), M_λ', zero(M_λ'))
-    Jrs = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_vx 0 L_vz 0 L_ωy 0;
-        0 0 0 0 0 0; M_vx 0 M_vz 0 M_ωy 0; 0 0 0 0 0 0]
-    # return jacobian
-    return [Jda Jds; Jra Jrs]
-end
-
-# --- unit testing methods --- #
-
-function get_coupling_inputs_using_state_rates(aero::Wagner, stru::LiftingLineSection,
-    ds, s, p, t)
-    # extract state rates
-    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz = ds
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    vdot = dvz
-    ωdot = dωy
-    # calculate aerodynamic loads
-    L, M = wagner_rate_loads(a, b, ρ, vdot, ωdot)
-    # forces and moments per unit span
-    f = SVector(0, 0, L)
-    m = SVector(0, M, 0)
-    # return inputs
-    return vcat(0, 0, 0, f, m)
-end
-
-# --- convenience methods --- #
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::Wagner, stru::LiftingLineSection; rho)
 

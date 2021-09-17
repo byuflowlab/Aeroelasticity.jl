@@ -27,11 +27,14 @@ end
 number_of_states(::Type{<:Wagner}) = 2
 number_of_inputs(::Type{<:Wagner}) = 3
 number_of_parameters(::Type{<:Wagner}) = 4
+
 inplaceness(::Type{<:Wagner}) = OutOfPlace()
-mass_matrix_type(::Type{<:Wagner}) = Identity()
+
+rate_jacobian_type(::Type{<:Wagner}) = Identity()
 state_jacobian_type(::Type{<:Wagner}) = Linear()
 input_jacobian_type(::Type{<:Wagner}) = Nonlinear()
 parameter_jacobian_type(::Type{<:Wagner}) = Nonlinear()
+time_gradient_type(::Type{<:Wagner}) = Zeros()
 
 # --- Methods --- #
 
@@ -64,7 +67,7 @@ function get_state_jacobian(model::Wagner, dx, x, y, p, t)
     ε1 = model.eps1
     ε2 = model.eps2
     # jacobian with respect to aerodynamic states
-    return -wagner_state_jacobian(u, a, b, ε1, ε2)
+    return wagner_state_jacobian(u, a, b, ε1, ε2)
 end
 
 function get_input_jacobian(model::Wagner, dx, x, y, p, t)
@@ -80,7 +83,7 @@ function get_input_jacobian(model::Wagner, dx, x, y, p, t)
     ε1 = model.eps1
     ε2 = model.eps2
     # return jacobian
-    return -wagner_input_jacobian(λ1, λ2, u, v, ω, a, b, α0, C1, C2, ε1, ε2)
+    return wagner_input_jacobian(λ1, λ2, u, v, ω, a, b, α0, C1, C2, ε1, ε2)
 end
 
 function get_parameter_jacobian(model::Wagner, dx, x, y, p, t)
@@ -96,7 +99,7 @@ function get_parameter_jacobian(model::Wagner, dx, x, y, p, t)
     ε1 = model.eps1
     ε2 = model.eps2
     # return jacobian
-    return -wagner_parameter_jacobian(λ1, λ2, u, v, ω, b, α0, C1, C2, ε1, ε2)
+    return wagner_parameter_jacobian(λ1, λ2, u, v, ω, b, α0, C1, C2, ε1, ε2)
 end
 
 # --- Convenience Methods --- #
@@ -140,46 +143,41 @@ end
 # --- Internal Methods --- #
 
 function wagner_residual(dλ1, dλ2, λ1, λ2, u, v, ω, a, b, α0, C1, C2, ε1, ε2)
-    return SVector(dλ1, dλ2) - wagner_rates(λ1, λ2, u, v, ω, a, b, α0,
-        C1, C2, ε1, ε2)
+    r1 = dλ1 + ε1*u/b*λ1 - C1*ε1*u/b*(v + (b/2-a*b)*ω - u*α0)
+    r2 = dλ2 + ε2*u/b*λ2 - C2*ε2*u/b*(v + (b/2-a*b)*ω - u*α0)
+    return SVector(r1, r2)
 end
 
-function wagner_rates(λ1, λ2, u, v, ω, a, b, α0, C1, C2, ε1, ε2)
-    λ1dot = -ε1*u/b*λ1 + C1*ε1*u/b*(v + (b/2-a*b)*ω - u*α0)
-    λ2dot = -ε2*u/b*λ2 + C2*ε2*u/b*(v + (b/2-a*b)*ω - u*α0)
-    return SVector(λ1dot, λ2dot)
-end
-
-wagner_state_jacobian(u, a, b, ε1, ε2) = @SMatrix [-ε1*u/b 0; 0 -ε2*u/b]
+wagner_state_jacobian(u, a, b, ε1, ε2) = @SMatrix [ε1*u/b 0; 0 ε2*u/b]
 
 function wagner_input_jacobian(λ1, λ2, u, v, ω, a, b, α0, C1, C2, ε1, ε2)
 
     tmp1 = v/b + (1/2-a)*ω - 2*α0*u/b
-    λ1dot_u = -ε1/b*λ1 + C1*ε1*tmp1
-    λ2dot_u = -ε2/b*λ2 + C2*ε2*tmp1
+    λ1dot_u = ε1/b*λ1 - C1*ε1*tmp1
+    λ2dot_u = ε2/b*λ2 - C2*ε2*tmp1
 
     tmp2 = u/b
-    λ1dot_v = C1*ε1*tmp2
-    λ2dot_v = C2*ε2*tmp2
+    λ1dot_v = -C1*ε1*tmp2
+    λ2dot_v = -C2*ε2*tmp2
 
     tmp3 = u*(1/2-a)
-    λ1dot_ω = C1*ε1*tmp3
-    λ2dot_ω = C2*ε2*tmp3
+    λ1dot_ω = -C1*ε1*tmp3
+    λ2dot_ω = -C2*ε2*tmp3
 
     return @SMatrix [λ1dot_u λ1dot_v λ1dot_ω; λ2dot_u λ2dot_v λ2dot_ω]
 end
 
 function wagner_parameter_jacobian(λ1, λ2, u, v, ω, b, α0, C1, C2, ε1, ε2)
 
-    λ1dot_a = -C1*ε1*u*ω
-    λ1dot_b = ε1*u/b^2*λ1 - C1*ε1/b^2*(u*v + u^2*α0)
+    λ1dot_a = C1*ε1*u*ω
+    λ1dot_b = -ε1*u/b^2*λ1 + C1*ε1/b^2*(u*v - u^2*α0)
     λ1dot_a0 = 0
-    λ1dot_α0 = -C1*ε1*u^2/b
+    λ1dot_α0 = C1*ε1*u^2/b
 
-    λ2dot_a = -C2*ε2*u*ω
-    λ2dot_b = ε2*u/b^2*λ2 - C2*ε2/b^2*(u*v + u^2*α0)
+    λ2dot_a = C2*ε2*u*ω
+    λ2dot_b = -ε2*u/b^2*λ2 + C2*ε2/b^2*(u*v - u^2*α0)
     λ2dot_a0 = 0
-    λ2dot_α0 = -C2*ε2*u^2/b
+    λ2dot_α0 = C2*ε2*u^2/b
 
     return @SMatrix [
         λ1dot_a λ1dot_b λ1dot_a0 λ1dot_α0;
@@ -319,8 +317,7 @@ function wagner_loads_α0(a, b, ρ, a0, C1, C2, u)
     return SVector(L_α0, M_α0)
 end
 
-
-function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ωdot, λ1, λ2)
+function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
@@ -331,9 +328,9 @@ function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ωdot, λ1, λ2)
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # lift at reference point
-    L_u = tmp1_u*((v + d*ωdot - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ωdot
+    L_u = tmp1_u*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ω
     # moment at reference point
-    M_u = -tmp2*ωdot + (b/2 + a*b)*L_u
+    M_u = -tmp2*ω + (b/2 + a*b)*L_u
 
     return SVector(L_u, M_u)
 end

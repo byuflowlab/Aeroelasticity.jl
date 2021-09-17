@@ -8,181 +8,97 @@ introduces the freestream air density ``\\rho`` as an additional parameter.
 """
 couple_models(aero::QuasiSteady, stru::LiftingLineSection) = (aero, stru)
 
-# --- traits --- #
+# --- Traits --- #
 
+# steady
 number_of_additional_parameters(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = 1
 coupling_inplaceness(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Zeros()
+coupling_rate_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Zeros()
 coupling_state_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_parameter_jacobian_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Nonlinear()
+copuling_time_gradient_type(::Type{QuasiSteady{0}}, ::Type{LiftingLineSection}) = Zeros()
 
+# quasisteady without acceleration terms
 number_of_additional_parameters(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = 1
 coupling_inplaceness(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Zeros()
+coupling_rate_jacobian_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Zeros()
 coupling_state_jacobian_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_parameter_jacobian_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Nonlinear()
+copuling_time_gradient_type(::Type{QuasiSteady{1}}, ::Type{LiftingLineSection}) = Zeros()
 
+# quasisteady with acceleration terms
 number_of_additional_parameters(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = 1
 coupling_inplaceness(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = OutOfPlace()
-coupling_mass_matrix_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Linear()
+coupling_rate_jacobian_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Linear()
 coupling_state_jacobian_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Nonlinear()
+coupling_parameter_jacobian_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Nonlinear()
+copuling_time_gradient_type(::Type{QuasiSteady{2}}, ::Type{LiftingLineSection}) = Zeros()
 
-# --- methods --- #
+# --- Methods --- #
 
-function get_coupling_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection, s, p, t)
+# steady
+function get_coupling_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection, dx, x, p, t)
+    # extract rate variables
+    dvx, dvy, dvz, dωx, dωy, dωz = dx
     # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
+    vx, vy, vz, ωx, ωy, ωz = x
     # extract parameters
     a, b, a0, α0, ρ = p
     # local freestream velocity components
-    u = vx
-    v = vz
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
     # calculate loads
     L, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
-    # forces and moments per unit span
+    # loads per unit span
     f = SVector(0, 0, L)
     m = SVector(0, M, 0)
     # return inputs
-    return vcat(f, m)
+    return SVector(f..., m...)
 end
 
-function get_coupling_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection, s, p, t)
+# quasisteady without accelaration terms
+function get_coupling_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection, dx, x, p, t)
+    # extract rate variables
+    vx, vy, vz, ωx, ωy, ωz = dx
     # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
+    vx, vy, vz, ωx, ωy, ωz = x
     # extract parameters
     a, b, a0, α0, ρ = p
     # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
     # calculate aerodynamic loads
     L, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
-    # forces and moments per unit span
+    # loads per unit span
     f = SVector(0, 0, L)
     m = SVector(0, M, 0)
     # return inputs
-    return vcat(f, m)
+    return SVector(f..., m...)
 end
 
-function get_coupling_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection, s, p, t)
+# quasisteady with acceleration terms
+function get_coupling_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection, dx, x, p, t)
+    # extract rate variables
+    dvx, dvy, dvz, dωx, dωy, dωz = dx
     # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
+    vx, vy, vz, ωx, ωy, ωz = x
     # extract parameters
     a, b, a0, α0, ρ = p
     # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # calculate aerodynamic loads
-    L, M = quasisteady2_state_loads(a, b, ρ, a0, α0, u, v, ω)
-    # forces and moments per unit span
+    L, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    # loads per unit span
     f = SVector(0, 0, L)
     m = SVector(0, M, 0)
     # return inputs
-    return vcat(f, m)
+    return SVector(f..., m...)
 end
 
-function get_coupling_mass_matrix(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    s, p, t)
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # calculate loads
-    L_vx, M_vx = quasisteady2_udot()
-    L_vz, M_vz = quasisteady2_vdot(a, b, ρ)
-    L_ωy, M_ωy = quasisteady2_ωdot(a, b, ρ)
-    # return input mass matrix
-    return @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; -L_vx 0 -L_vz 0 -L_ωy 0; 0 0 0 0 0 0;
-        -M_vx 0 -M_vz 0 -M_ωy 0; 0 0 0 0 0 0]
-end
+# --- Performance Overloads --- #
 
-# --- performance overloads --- #
+# TODO: State rate, state, and parameter jacobians
 
-function get_coupling_state_jacobian(aero::QuasiSteady{0}, stru::LiftingLineSection, s, p, t)
-    # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    # calculate loads
-    L_u, M_u = quasisteady0_u(a, b, ρ, a0, v)
-    L_v, M_v = quasisteady0_v(a, b, ρ, a0, u)
-    # return inputs
-    return @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_u 0 L_v 0 0 0; 0 0 0 0 0 0;
-        M_u 0 M_v 0 0 0; 0 0 0 0 0 0]
-end
-
-function get_coupling_state_jacobian(aero::QuasiSteady{1}, stru::LiftingLineSection,
-    s, p, t)
-    # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    # calculate loads
-    L_u, M_u = quasisteady1_u(a, b, ρ, a0, α0, u, v, ω)
-    L_v, M_v = quasisteady1_v(a, b, ρ, a0, α0, u)
-    L_ω, M_ω = quasisteady1_ω(a, b, ρ, a0, u)
-    # return inputs
-    return @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_u 0 L_v 0 L_ω 0;
-        0 0 0 0 0 0; M_u 0 M_v 0 M_ω 0; 0 0 0 0 0 0]
-end
-
-function get_coupling_state_jacobian(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    s, p, t)
-    # extract state variables
-    vx, vy, vz, ωx, ωy, ωz = s
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    # calculate loads
-    L_u, M_u = quasisteady2_u(a, b, ρ, a0, α0, u, v, ω)
-    L_v, M_v = quasisteady2_v(a, b, ρ, a0, α0, u)
-    L_ω, M_ω = quasisteady2_ω(a, b, ρ, a0, u)
-    # return inputs
-    return @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; L_u 0 L_v 0 L_ω 0; 0 0 0 0 0 0;
-        M_u 0 M_v 0 M_ω 0; 0 0 0 0 0 0]
-end
-
-# --- unit testing methods --- #
-
-function get_coupling_inputs_using_state_rates(aero::QuasiSteady{0}, stru::LiftingLineSection,
-    ds, s, p, t)
-
-    return @SVector zeros(6)
-end
-
-function get_coupling_inputs_using_state_rates(aero::QuasiSteady{1}, stru::LiftingLineSection,
-    ds, s, p, t)
-
-    return @SVector zeros(6)
-end
-
-function get_coupling_inputs_using_state_rates(aero::QuasiSteady{2}, stru::LiftingLineSection,
-    ds, s, p, t)
-    # extract state rates
-    dvx, dvy, dvz, dωx, dωy, dωz = ds
-    # extract parameters
-    a, b, a0, α0, ρ = p
-    # local freestream velocity components
-    du = dvx
-    dv = dvz
-    dω = dωy
-    # calculate aerodynamic loads
-    L, M = quasisteady2_rate_loads(a, b, ρ, dv, dω)
-    # forces and moments per unit span
-    f = SVector(0, 0, L)
-    m = SVector(0, M, 0)
-    # return inputs
-    return vcat(f, m)
-end
-
-# --- convenience methods --- #
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::QuasiSteady, stru::LiftingLineSection; rho)
 

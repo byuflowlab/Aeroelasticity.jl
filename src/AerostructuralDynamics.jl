@@ -39,9 +39,12 @@ export get_additional_parameters, set_additional_parameters!
 export separate_states
 export separate_inputs
 export separate_parameters
-export get_rates, get_rates!
-export get_mass_matrix, get_mass_matrix!
+export get_residual, get_residual!
+export get_rate_jacobian, get_rate_jacobian!
 export get_state_jacobian, get_state_jacobian!
+export get_input_jacobian, get_input_jacobian!
+export get_parameter_jacobian, get_parameter_jacobian!
+export get_time_gradient, get_time_gradient!
 export get_coupling_inputs, get_coupling_inputs!
 export get_eigen
 export get_ode

@@ -15,12 +15,19 @@ Supertype for all models which contain no state variables.
 abstract type NoStateModel <: AbstractModel end
 
 """
+    InterfaceModel <: AbstractModel
+
+Supertype for all models which are used to extend 2D models to 3D models.
+"""
+abstract type InterfaceModel <: AbstractModel end
+
+"""
     ResidualModel <: AbstractModel
 
 Supertype for all models whose state variables may be defined by solving a set
 of residual equations.
 """
-abstract type ResidualModel <: AbstractModel
+abstract type ResidualModel <: AbstractModel end
 
 """
     UnsteadyModel <: AbstractModel
@@ -83,6 +90,61 @@ struct Linear <: MatrixType end
 struct Nonlinear <: MatrixType end
 
 """
+    rate_jacobian_type(::Type{T})
+
+Return
+ - `Empty()`, if the jacobian of the residual expression associated with model `T`
+    with respect to the state rates is an empty matrix
+ - `Zeros()`, if the jacobian of the residual expression associated with model `T`
+    with respect to the state rates is a zero matrix
+ - `Identity()`, if the jacobian of the residual expression associated with
+    model `T` with respect to the state rates is the identity matrix
+ - `Invariant()`, if the jacobian of the residual expression associated with
+    model `T` with respect to the state rates is independent of the state rates,
+    state variables, inputs, parameters, and time.
+ - `Constant()`, if the jacobian of the residual expression associated with
+    model `T` with respect to the state rates is independent of the state rates,
+    state variables, inputs, and time.
+ - `Linear()`, if the jacobian of the residual expression associated with model `T`
+    with respect to the state rates may vary with respect to time, and is
+    linear with respect to the state rates.
+ - `Nonlinear()`, if the jacobian of the residual expression associated with
+    model `T` with respect to the state rates may vary with respect to time,
+    and is nonlinear with respect to the state rates.
+
+If no method is defined for the specified type, return `Nonlinear()`.
+"""
+rate_jacobian_type(::Type{T}) where T = Nonlinear()
+
+# models with no state variables have no rate jacobian
+rate_jacobian_type(::Type{T}) where T <: NoStateModel = Empty()
+
+# definition for combinations of models
+function rate_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    if isempty(coupling_rate_jacobian_type(model_types...)) &&
+        all(isempty.(rate_jacobian_type.(model_types)))
+        return Empty()
+    elseif iszero(coupling_rate_jacobian_type(model_types...)) &&
+        all(iszero.(rate_jacobian_type.(model_types)))
+        return Zeros()
+    elseif iszero(coupling_rate_jacobian_type(model_types...)) &&
+        all(isidentity.(rate_jacobian_type.(model_types)))
+        return Identity()
+    elseif isinvariant(coupling_rate_jacobian_type(model_types...)) &&
+        all(isinvariant.(input_jacobian_type.(model_types))) &&
+        all(isinvariant.(rate_jacobian_type.(model_types)))
+        return Invariant()
+    elseif isconstant(coupling_rate_jacobian_type(model_types...)) &&
+        all(isconstant.(input_jacobian_type.(model_types))) &&
+        all(isconstant.(rate_jacobian_type.(model_types)))
+        return Constant()
+    else
+        return Linear()
+    end
+end
+
+"""
     state_jacobian_type(::Type{T})
 
 Return
@@ -138,61 +200,6 @@ function state_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
         return Linear()
     else
         return Nonlinear()
-    end
-end
-
-"""
-    rate_jacobian_type(::Type{T})
-
-Return
- - `Empty()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state rates is an empty matrix
- - `Zeros()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state rates is a zero matrix
- - `Identity()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates is the identity matrix
- - `Invariant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates is independent of the state rates,
-    state variables, inputs, parameters, and time.
- - `Constant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates is independent of the state rates,
-    state variables, inputs, and time.
- - `Linear()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state rates may vary with respect to time, and is
-    linear with respect to the state rates.
- - `Nonlinear()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates may vary with respect to time,
-    and is nonlinear with respect to the state rates.
-
-If no method is defined for the specified type, return `Nonlinear()`.
-"""
-rate_jacobian_type(::Type{T}) where T = Nonlinear()
-
-# models with no state variables have no rate jacobian
-rate_jacobian_type(::Type{T}) where T <: NoStateModel = Empty()
-
-# definition for combinations of models
-function rate_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if isempty(coupling_rate_jacobian_type(model_types...)) &&
-        all(isempty.(rate_jacobian_type.(model_types)))
-        return Empty()
-    elseif iszero(coupling_rate_jacobian_type(model_types...)) &&
-        all(iszero.(rate_jacobian_type.(model_types)))
-        return Zeros()
-    elseif iszero(coupling_rate_jacobian_type(model_types...)) &&
-        all(isidentity.(rate_jacobian_type.(model_types)))
-        return Identity()
-    elseif isinvariant(coupling_rate_jacobian_type(model_types...)) &&
-        all(isinvariant.(input_jacobian_type.(model_types))) &&
-        all(isinvariant.(rate_jacobian_type.(model_types)))
-        return Invariant()
-    elseif isconstant(coupling_rate_jacobian_type(model_types...)) &&
-        all(isconstant.(input_jacobian_type.(model_types))) &&
-        all(isconstant.(rate_jacobian_type.(model_types)))
-        return Constant()
-    else
-        return Linear()
     end
 end
 
@@ -295,6 +302,57 @@ function parameter_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} whe
         return Nonlinear()
     end
 end
+
+"""
+    time_gradient_type(::Type{T})
+
+Return
+ - `Empty()`, if the derivative of the residual expression associated with model `T`
+    with respect to time is an empty matrix
+ - `Zeros()`, if the derivative of the residual expression associated with model `T`
+    with respect to time is a zero matrix
+ - `Invariant()`, if the derivative of the residual expression associated with
+    model `T` with respect to time is independent of the state rates,
+    state variables, inputs, parameters, and time.
+ - `Constant()`, if the derivative of the residual expression associated with
+    model `T` with respect to time is independent of the state rates,
+    state variables, inputs, and time.
+ - `Linear()`, if the derivative of the residual expression associated with model `T`
+    with respect to time may vary with respect to time, and is
+    linear with respect to time.
+ - `Nonlinear()`, if the derivative of the residual expression associated with
+    model `T` with respect to time may vary with respect to time,
+    and is nonlinear with respect to time.
+
+If no method is defined for the specified type, return `Nonlinear()`.
+"""
+time_gradient_type(::Type{T}) where T = Nonlinear()
+
+# models with no state variables have no input jacobian
+time_gradient_type(::Type{T}) where T <: NoStateModel = Empty()
+
+# definition for combinations of models
+function time_gradient_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
+    model_types = (T.parameters...,)
+    if all(isempty.(time_gradient_type.(model_types)))
+        return Empty()
+    elseif all(iszero.(time_gradient_type.(model_types)))
+        return Zeros()
+    elseif all(isinvariant.(time_gradient_type.(model_types)))
+        return Invariant()
+    elseif all(isconstant.(time_gradient_type.(model_types)))
+        return Constant()
+    elseif all(islinear.(time_gradient_type.(model_types)))
+        return Linear()
+    else
+        return Nonlinear()
+    end
+end
+
+coupling_rate_jacobian_type(model_types...) = Nonlinear()
+coupling_state_jacobian_type(model_types...) = Nonlinear()
+coupling_parameter_jacobian_type(model_types...) = Nonlinear()
+coupling_time_gradient_type(model_types...) = Nonlinear()
 
 isempty(::MatrixType) = false
 isempty(::Empty) = true

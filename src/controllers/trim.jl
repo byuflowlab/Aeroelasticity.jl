@@ -26,20 +26,23 @@ Trim() = Trim((1,2,3,4,5,6), (1,2,3,4,5,6))
 number_of_states(::Type{Trim{N}}) where N = N
 number_of_inputs(::Type{Trim{N}}) where N = N
 number_of_parameters(::Type{<:Trim}) = 0
+
 inplaceness(::Type{<:Trim}) = OutOfPlace()
-mass_matrix_type(::Type{<:Trim}) = Zeros()
+
+rate_jacobian_type(::Type{<:Trim}) = Zeros()
 state_jacobian_type(::Type{<:Trim}) = Zeros()
 input_jacobian_type(::Type{<:Trim}) = Identity()
+parameter_jacobian_type(::Type{<:Trim}) = Empty()
+time_gradient_type(::Type{<:Trim}) = Zeros()
 
 # --- Methods --- #
 
-get_rates(::Trim, x, y, p, t) = y
+get_residual(::Trim, dx, x, y, p, t) = y
 
-# --- Unit Testing Methods --- #
+# --- Performance Overloads --- #
 
-get_lhs(::Trim, dx, x, y, p, t) = zero(y)
-
-# --- Convenience Methods --- #
+# NOTE: No performance overloads are needed since the jacobians are fully
+# defined by their provided types
 
 # --- Convenience Methods --- #
 
@@ -67,3 +70,5 @@ function separate_inputs(model::Trim, y)
 end
 
 separate_parameters(model::Trim, p) = ()
+
+# --- Internal Methods for Couplings --- #

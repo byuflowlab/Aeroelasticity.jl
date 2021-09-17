@@ -212,7 +212,24 @@ function wagner_loads_λ(a, b, ρ, a0, u)
 end
 wagner_loads_λdot() = @SMatrix [0 0; 0 0]
 
-function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ωdot, λ1, λ2)
+function wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    # circulatory load factor
+    tmp1 = a0*ρ*u*b
+    # non-circulatory load factor
+    tmp2 = pi*ρ*b^3
+    # constant based on geometry
+    d = b/2 - a*b
+    # Wagner's function at t = 0.0
+    ϕ0 = 1 - C1 - C2
+    # lift at reference point
+    L = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    # moment at reference point
+    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*L
+
+    return SVector(L, M)
+end
+
+function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
@@ -223,7 +240,7 @@ function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ωdot, λ1, λ2)
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
     # lift at reference point
-    L_u = tmp1_u*((v + d*ωdot - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ωdot
+    L_u = tmp1_u*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ω
     # moment at reference point
     M_u = -tmp2*ωdot + (b/2 + a*b)*L_u
 

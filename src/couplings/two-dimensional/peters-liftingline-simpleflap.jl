@@ -15,7 +15,7 @@ function couple_models(aero::Peters, stru::LiftingLineSection, flap::SimpleFlap,
     return (aero, stru, flap, ctrl)
 end
 
-# --- traits --- #
+# --- Traits --- #
 
 function number_of_additional_parameters(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
@@ -29,7 +29,7 @@ function coupling_inplaceness(::Type{<:Peters}, ::Type{LiftingLineSection},
     return OutOfPlace()
 end
 
-function coupling_mass_matrix_type(::Type{<:Peters}, ::Type{LiftingLineSection},
+function coupling_rate_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection},
     ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
 
     return Linear()
@@ -41,148 +41,62 @@ function coupling_state_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSectio
     return Nonlinear()
 end
 
-# --- methods --- #
+function coupling_parameter_jacobian_type(::Type{<:Peters}, ::Type{LiftingLineSection},
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
+
+    return Nonlinear()
+end
+
+function coupling_time_gradient_type(::Type{<:Peters}, ::Type{LiftingLineSection},
+    ::Type{SimpleFlap}, ::Type{LiftingLineSectionControl})
+
+    return Zeros()
+end
+
+# --- Methods --- #
 
 function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
-    # extract model constants
-    bbar = aero.b
-    # extract state variables
-    λ = x[SVector{N}(1:N)]
-    vx, vy, vz, ωx, ωy, ωz = x[SVector{6}(N+1:N+6)]
-    δ = x[end]
-    # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    # calculate aerodynamic loads
-    L, M = peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    # add loads due to flap deflections
-    L += ρ*u^2*b*clδ*δ
-    D = ρ*u^2*b*cdδ*δ
-    M += 2*ρ*u^2*b^2*cmδ*δ
-    # forces and moments per unit span
-    f = SVector(D, 0, L)
-    m = SVector(0, M, 0)
-    # return portion of inputs that is not dependent on the state rates
-    return SVector(u, ω, 0, 0, f..., m...)
-end
-
-function get_coupling_mass_matrix(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
-
-    # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-
-    # local freestream velocity components
-    vdot_dvz = 1
-    ωdot_dωy = 1
-
-    # calculate loads
-    L_dvx, M_dvx = peters_loads_udot()
-    L_dvz, M_dvz = peters_loads_vdot(a, b, ρ)
-    L_dωy, M_dωy = peters_loads_ωdot(a, b, ρ)
-
-    # construct submatrices
-    Maa = zeros(SMatrix{4,N,TF})
-    Mas = @SMatrix [
-        0 0 0 0 0 0;
-        0 0 0 0 0 0;
-        0 0 -vdot_dvz 0 0 0;
-        0 0 0 0 -ωdot_dωy 0]
-    Mac = zeros(SMatrix{4,1,TF})
-
-    Msa = zeros(SMatrix{6,N,TF})
-    Mss = @SMatrix [
-        0 0 0 0 0 0;
-        0 0 0 0 0 0;
-        -L_dvx 0 -L_dvz 0 -L_dωy 0;
-        0 0 0 0 0 0;
-        -M_dvx 0 -M_dvz 0 -M_dωy 0;
-        0 0 0 0 0 0]
-    Msc = zeros(SMatrix{6,1,TF})
-
-    # assemble mass matrix
-    return [Maa Mas Mac; Msa Mss Msc]
-end
-
-# --- performance overloads --- #
-
-function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
-    flap::SimpleFlap, ctrl::LiftingLineSectionControl, x, p, t) where {N,TF,SV,SA}
-
-    # extract model constants
-    bbar = aero.b
-
-    # extract state variables
-    λ = x[SVector{N}(1:N)]
-    vx, vy, vz, ωx, ωy, ωz = x[SVector{6}(N+1:N+6)]
-    δ = x[end]
-
-    # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-
-    # local freestream velocity components
-    u = vx
-    v = vz
-    ω = ωy
-    u_vx = 1
-    ω_ωy = 1
-
-    # compute loads
-    out = peters_loads_λ(a, b, ρ, a0, bbar, u)
-    L_λ, M_λ = out[1,:], out[2,:]
-    L_vx, M_vx = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    L_vz, M_vz = peters_loads_v(a, b, ρ, a0, u)
-    L_ωy, M_ωy = peters_loads_ω(a, b, ρ, a0, u)
-
-    # add loads due to flap deflections
-    L_vx += 2*ρ*u*b*clδ*δ
-    D_vx = 2*ρ*u*b*cdδ*δ
-    M_vx += 4*ρ*u*b^2*cmδ*δ
-    L_δ = ρ*u^2*b*clδ
-    D_δ = ρ*u^2*b*cdδ
-    M_δ = 2*ρ*u^2*b^2*cmδ
-
-    # construct submatrices
-    Jaa = zeros(SMatrix{4,N,TF})
-    Jas = @SMatrix [u_vx 0 0 0 0 0; 0 0 0 0 ω_ωy 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
-    Jac = zeros(SMatrix{4,1,TF})
-
-    Jsa = vcat(zero(L_λ'), zero(L_λ'), L_λ', zero(M_λ'), M_λ', zero(M_λ'))
-    Jss = @SMatrix [D_vx 0 0 0 0 0; 0 0 0 0 0 0; L_vx 0 L_vz 0 L_ωy 0;
-        0 0 0 0 0 0; M_vx 0 M_vz 0 M_ωy 0; 0 0 0 0 0 0]
-    Jsc = @SVector [D_δ, 0, L_δ, 0, M_δ, 0]
-
-    # assemble jacobian
-    return [Jaa Jas Jac; Jsa Jss Jsc]
-end
-
-# --- unit testing methods --- #
-
-function get_coupling_inputs_using_state_rates(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     flap::SimpleFlap, ctrl::LiftingLineSectionControl, dx, x, p, t) where {N,TF,SV,SA}
-    # extract state variables
+
+    # extract rate variables
     dλ = dx[SVector{N}(1:N)]
     dvx, dvy, dvz, dωx, dωy, dωz = dx[SVector{6}(N+1:N+6)]
     dδ = dx[end]
+
+    # extract state variables
+    λ = x[SVector{N}(1:N)]
+    vx, vy, vz, ωx, ωy, ωz = x[SVector{6}(N+1:N+6)]
+    δ = x[end]
+
     # extract parameters
     a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
-    # local freestream velocity components
-    vdot = dvz
-    ωdot = dωy
-    # calculate aerodynamic loads
-    L, M = peters_rate_loads(a, b, ρ, vdot, ωdot)
-    # forces and moments per unit span
-    f = SVector(0, 0, L)
-    m = SVector(0, M, 0)
-    # return inputs
-    return vcat(0, 0, vdot, ωdot, f, m)
+
+    # extract model constants
+    bbar = aero.b
+
+    # freestream velocity components
+    u, v, ω = liftingline_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
+
+    # aerodynamic loads
+    La, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+
+    # loads due to flap deflections
+    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+
+    # loads per unit span
+    f = SVector(Df, 0, La + Lf)
+    m = SVector(0, Ma + Mf, 0)
+
+    # return portion of inputs that is not dependent on the state rates
+    return SVector(u, ω, vdot, ωdot, f..., m...)
 end
 
-# --- convenience methods --- #
+# --- Performance Overloads --- #
+
+# TODO: state rate, state, and parameter jacobians
+
+# --- Convenience Methods --- #
 
 function set_additional_parameters!(padd, aero::Peters, stru::LiftingLineSection,
     flap::SimpleFlap, ctrl::LiftingLineSectionControl; rho)
