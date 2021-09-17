@@ -1,42 +1,54 @@
 """
-    LiftingLine{NA,TA} <: AbstractModel
+    LiftingLineFlaps{NF,NG,TF,TG} <: AbstractModel
 
-Lifting line model with `NA` cross sections, using the aerodynamic models in `TA`.
-State variables, inputs, and parameters correspond to the state variables, inputs,
-and parameters of each of the cross sections concatenated
+Lifting line control surface model with `NF` cross sections and `NG` independent
+control inputs, constructed by using the control surface models in `TF` and the
+gains for each control input in `TG`.  State variables, inputs, and parameters
+correspond to the state variables and parameters of each of the cross sections
+concatenated.
 """
-struct LiftingLine{NA,TA<:NTuple{NA,Any}} <: AbstractModel
-    models::TA
+struct LiftingLineFlaps{NF,NG,TF<:NTuple{NF,Any},TG<:NTuple{NG,Any}} <: AbstractModel
+    models::TF
+    gains::TG
 end
 
 # --- Constructors --- #
 
 """
-    LiftingLine(models)
+    LiftingLineFlaps(models::NTuple, gains::NTuple)
 
-Construct a lifting line aerodynamic model given a tuple of 2D aerodynamic models.
+Construct a lifting line control surface model given the control surface models for each
+section and the gains associated with each control input.
 """
-LiftingLine(models)
-
-LiftingLine{NA}(models::TA) where TA<:NTuple{NA,Any} where NA = LiftingLine{NA,TA}(models)
+LiftingLineFlaps(models, gains)
 
 """
-    LiftingLine{NA}(model)
+    LiftingLineFlaps{NF}(model, gains)
 
-Construct a lifting line aerodynamic model using `NA` instances of `model`.
+Construct a lifting line control surface model using `NF` instances of `model`
+and the gains in `gains` associated with each control input.
 """
-LiftingLine{NA}(model) where NA = LiftingLine(ntuple(i -> model, NA))
+function LiftingLineFlaps{NF}(model, gains) where NF
+    models = ntuple(i->model, NF)
+    return LiftingLineFlaps(models, gains)
+end
 
 # --- Traits --- #
 
-number_of_states(model::LiftingLine) = sum(number_of_states.(model.models))
-number_of_inputs(model::LiftingLine) = sum(number_of_inputs.(model.models))
-number_of_parameters(model::LiftingLine) = sum(number_of_parameters.(model.models))
+function number_of_states(model::LiftingLineFlaps)
+    return sum(number_of_states.(model.models))
+end
 
-inplaceness(::Type{<:LiftingLine}) = InPlace()
+function number_of_inputs(model::LiftingLineFlaps)
+    return sum(number_of_inputs.(model.models))
+end
 
-function rate_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
-    model_types = (TA.parameters...,)
+number_of_parameters(model::LiftingLineFlaps) = sum(number_of_parameters.(model.models))
+
+inplaceness(::Type{<:LiftingLineFlaps}) = InPlace()
+
+function rate_jacobian_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(rate_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(rate_jacobian_type.(model_types)))
@@ -54,8 +66,8 @@ function rate_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
     end
 end
 
-function state_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
-    model_types = (TA.parameters...,)
+function state_jacobian_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(state_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(state_jacobian_type.(model_types)))
@@ -73,8 +85,8 @@ function state_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
     end
 end
 
-function input_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
-    model_types = (TA.parameters...,)
+function input_jacobian_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(input_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(input_jacobian_type.(model_types)))
@@ -92,8 +104,8 @@ function input_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
     end
 end
 
-function parameter_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
-    model_types = (TA.parameters...,)
+function parameter_jacobian_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(parameter_jacobian_type.(model_types)))
         return Empty()
     elseif all(iszero.(parameter_jacobian_type.(model_types)))
@@ -111,8 +123,8 @@ function parameter_jacobian_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
     end
 end
 
-function time_gradient_type(::Type{LiftingLine{NA,TA}}) where {NA,TA}
-    model_types = (TA.parameters...,)
+function time_gradient_type(::Type{LiftingLineFlaps{NF,NG,TF,TG}}) where {NF,NG,TF,TG}
+    model_types = (TF.parameters...,)
     if all(isempty.(time_gradient_type.(model_types)))
         return Empty()
     elseif all(iszero.(time_gradient_type.(model_types)))
@@ -130,7 +142,7 @@ end
 
 # --- Methods --- #
 
-function get_residual!(resid, model::LiftingLine, dx, x, y, p, t)
+function get_residual!(resid, model::LiftingLineFlaps, dx, x, y, p, t)
 
     models = model.models
 
@@ -149,9 +161,9 @@ function get_residual!(resid, model::LiftingLine, dx, x, y, p, t)
     return resid
 end
 
-# --- Performance 0verloads --- #
+# --- Performance Overloads --- #
 
-function get_rate_jacobian!(J, model::LiftingLine)
+function get_rate_jacobian!(J, model::LiftingLineFlaps)
 
     J .= 0
 
@@ -166,7 +178,7 @@ function get_rate_jacobian!(J, model::LiftingLine)
     return J
 end
 
-function get_rate_jacobian!(J, model::LiftingLine, p)
+function get_rate_jacobian!(J, model::LiftingLineFlaps, p)
 
     J .= 0
 
@@ -183,7 +195,7 @@ function get_rate_jacobian!(J, model::LiftingLine, p)
     return J
 end
 
-function get_rate_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
+function get_rate_jacobian!(J, model::LiftingLineFlaps, dx, x, y, p, t)
 
     J .= 0
 
@@ -204,7 +216,7 @@ function get_rate_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
     return J
 end
 
-function get_state_jacobian!(J, model::LiftingLine)
+function get_state_jacobian!(J, model::LiftingLineFlaps)
 
     J .= 0
 
@@ -219,7 +231,7 @@ function get_state_jacobian!(J, model::LiftingLine)
     return J
 end
 
-function get_state_jacobian!(J, model::LiftingLine, p)
+function get_state_jacobian!(J, model::LiftingLineFlaps, p)
 
     J .= 0
 
@@ -236,7 +248,7 @@ function get_state_jacobian!(J, model::LiftingLine, p)
     return J
 end
 
-function get_state_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
+function get_state_jacobian!(J, model::LiftingLineFlaps, dx, x, y, p, t)
 
     J .= 0
 
@@ -257,13 +269,13 @@ function get_state_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
     return J
 end
 
-function get_input_jacobian!(J, model::LiftingLine)
+function get_input_jacobian!(J, model::LiftingLineFlaps)
 
     J .= 0
 
     models = model.models
 
-    ix = state_indices(models)
+    ix = state_indices(model.models)
     iy = input_indices(models)
 
     Js = view.(Ref(J), ix, iy)
@@ -273,7 +285,7 @@ function get_input_jacobian!(J, model::LiftingLine)
     return J
 end
 
-function get_input_jacobian!(J, model::LiftingLine, p)
+function get_input_jacobian!(J, model::LiftingLineFlaps, p)
 
     J .= 0
 
@@ -291,7 +303,7 @@ function get_input_jacobian!(J, model::LiftingLine, p)
     return J
 end
 
-function get_input_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
+function get_input_jacobian!(J, model::LiftingLineFlaps, dx, x, y, p, t)
 
     J .= 0
 
@@ -312,7 +324,7 @@ function get_input_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
     return J
 end
 
-function get_parameter_jacobian!(J, model::LiftingLine)
+function get_parameter_jacobian!(J, model::LiftingLineFlaps)
 
     J .= 0
 
@@ -328,7 +340,7 @@ function get_parameter_jacobian!(J, model::LiftingLine)
     return J
 end
 
-function get_parameter_jacobian!(J, model::LiftingLine, p)
+function get_parameter_jacobian!(J, model::LiftingLineFlaps, p)
 
     J .= 0
 
@@ -345,7 +357,7 @@ function get_parameter_jacobian!(J, model::LiftingLine, p)
     return J
 end
 
-function get_parameter_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
+function get_parameter_jacobian!(J, model::LiftingLineFlaps, dx, x, y, p, t)
 
     J .= 0
 
@@ -366,7 +378,7 @@ function get_parameter_jacobian!(J, model::LiftingLine, dx, x, y, p, t)
     return J
 end
 
-function get_time_gradient!(dT, model::LiftingLine)
+function get_time_gradient!(dT, model::LiftingLineFlaps)
 
     dT .= 0
 
@@ -381,7 +393,7 @@ function get_time_gradient!(dT, model::LiftingLine)
     return dT
 end
 
-function get_time_gradient!(dT, model::LiftingLine, p)
+function get_time_gradient!(dT, model::LiftingLineFlaps, p)
 
     dT .= 0
 
@@ -398,7 +410,7 @@ function get_time_gradient!(dT, model::LiftingLine, p)
     return dT
 end
 
-function get_time_gradient!(dT, model::LiftingLine, dx, x, y, p, t)
+function get_time_gradient!(dT, model::LiftingLineFlaps, dx, x, y, p, t)
 
     dT .= 0
 
@@ -421,7 +433,7 @@ end
 
 # --- Convenience Methods --- #
 
-function set_states!(x, model::LiftingLine; section_states)
+function set_states!(x, model::LiftingLineFlaps; section_states)
 
     section_models = model.models
 
@@ -436,7 +448,7 @@ function set_states!(x, model::LiftingLine; section_states)
     return x
 end
 
-function set_inputs!(y, model::LiftingLine; section_inputs)
+function set_inputs!(y, model::LiftingLineFlaps; section_inputs)
 
     section_models = model.models
 
@@ -451,7 +463,7 @@ function set_inputs!(y, model::LiftingLine; section_inputs)
     return y
 end
 
-function set_parameters!(p, model::LiftingLine; section_parameters)
+function set_parameters!(p, model::LiftingLineFlaps; section_parameters)
 
     section_models = model.models
 
@@ -466,7 +478,7 @@ function set_parameters!(p, model::LiftingLine; section_parameters)
     return p
 end
 
-function separate_states(model::LiftingLine, x)
+function separate_states(model::LiftingLineFlaps, x)
 
     section_models = model.models
 
@@ -477,7 +489,7 @@ function separate_states(model::LiftingLine, x)
     return (section_states = separate_states.(section_models, vxs),)
 end
 
-function separate_inputs(model::LiftingLine, y)
+function separate_inputs(model::LiftingLineFlaps, y)
 
     section_models = model.models
 
@@ -488,7 +500,7 @@ function separate_inputs(model::LiftingLine, y)
     return (section_inputs = separate_inputs.(section_models, vys),)
 end
 
-function separate_parameters(model::LiftingLine, p)
+function separate_parameters(model::LiftingLineFlaps, p)
 
     section_models = model.models
 

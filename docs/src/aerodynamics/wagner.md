@@ -42,7 +42,7 @@ The expression for the circulatory normal force then reduces to
 ```
 where the downwash at the three quarter's chord is given by
 ```math
-w(t) = -v + b \left( \frac{1}{2} - a \right) \omega - u\alpha_0
+w(t) = v + b \left( \frac{1}{2} - a \right) \omega - u\alpha_0
 ```
 and the aerodynamic states variables ``\lambda_1`` and ``\lambda_2`` are described by the ordinary differential equations
 ```math
@@ -52,7 +52,7 @@ and the aerodynamic states variables ``\lambda_1`` and ``\lambda_2`` are describ
 
 The same lift and moment expressions are used as in the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory), but with the following effective angle of attack
 ```math
-\alpha_\text{eff} = \left(-\frac{v}{u} + \frac{b}{u} \left( \frac{1}{2} - a \right) \omega - \alpha_0 \right) \phi(0) + \frac{\lambda_1}{u} + \frac{\lambda_2}{u}
+\alpha_\text{eff} = \left(\frac{v}{u} + \frac{b}{u} \left( \frac{1}{2} - a \right) \omega - \alpha_0 \right) \phi(0) + \frac{\lambda_1}{u} + \frac{\lambda_2}{u}
 ```
 
 ## Type Definition
@@ -67,10 +67,5 @@ Wagner
 Wagner()
 ```
 
-## Example Initialization
-
-```@example wagner
-using AerostructuralDynamics #hide
-model = Wagner()
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)

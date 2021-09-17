@@ -28,10 +28,5 @@ where ``\mathcal{N}`` is the normal force per unit span at the reference locatio
 couple_models(aero::Steady, stru::TypicalSection)
 ```
 
-## Example Initialization
-
-```@example steady-section
-using AerostructuralDynamics #hide
-model = couple_models(Steady(), TypicalSection())
-nothing #hide
-```
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref)
