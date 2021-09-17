@@ -24,9 +24,9 @@ This package is designed to be modular, so that models may be easily swapped out
 ```
 where ``f(\dot{x}, x, y, p, t)`` is a residual function, ``\dot{x}`` is a vector of state rates, ``x`` is a vector of state variables, ``y`` is a vector of time-varying parameters, ``p`` is a vector of time-independent parameters, and ``t`` is the current time.  For the purposes of this package we will refer to the time-varying parameters ``y`` as "inputs" and the time-independent parameters ``p`` as "parameters".
 
-Since the governing equations for all models in this package follow the same general form, the process for performing analyses using any standalone and/or coupled model provided by this package is the same.  First, the relevant standalone and/or coupled model must be initialized.  Then, the model's initial state rates, states, inputs, parameters, and time must be defined.  Finally, the chosen analysis may be performed.  We demonstrate how to perform these steps in the following sections.
+Since the governing equations for all models in this package follow the same general form, the process for performing analyses using any standalone and/or coupled model provided by this package is the same.  First, the relevant standalone and/or coupled model must be initialized.  Then, the model's initial state rates, states, inputs, parameters, and time must be defined.  Finally, the chosen analysis is performed.  We demonstrate how to perform these steps in the following sections.
 
-## Initializing a Model
+## Initializing Models
 
 If you haven't yet, now would be a good time to install AerostructuralDynamics.  It can be installed from the Julia REPL by typing `]` (to enter the package manager) and then running the following command.
 ```julia
@@ -46,7 +46,7 @@ For the purposes of this guide, we will be working with a two-degree-of-freedom 
 
 Our goal is to create an 2D aeroelastic model which we can use to simulate the behavior of this system.
 
-For the aerodynamic model, we will be using Peters' finite state model with four aerodynamic state variables (see [`Peters`](@ref)).  For the structural model, we will be using the typical section model (see [`TypicalSection`](@ref)).  To create a coupled model using these model, we use the [`couple_models`](@ref) function.  Details about how to initialize these models may be found in the model documentation.
+For the aerodynamic model, we will be using Peters' finite state model with four aerodynamic state variables (see [`Peters`](@ref)).  For the structural model, we will be using the typical section model (see [`TypicalSection`](@ref)).  To create a coupled model using these models, we use the [`couple_models`](@ref) function.  Details about how to initialize these models may be found in the model documentation.
 
 ```@example guide
 # initialize the aerodynamic model
@@ -85,16 +85,7 @@ In this package, we define the state variables and inputs of a coupled model as 
 x_\text{coupled} = \begin{bmatrix} \lambda_1 \\ \lambda_2 \\ \vdots \\ \lambda_N \\ h \\ \theta \\ \dot{h} \\ \dot{\theta} \end{bmatrix} \quad y_\text{coupled} = \begin{bmatrix} u \\ v \\ \omega \\ \mathcal{L} \\ \mathcal{M} \end{bmatrix} \quad p_\text{coupled} = \begin{bmatrix} a \\ b \\ a_0 \\ \alpha_0 \\ k_h \\ k_\theta \\ m \\ S_\theta \\ I_\theta \\ U_\infty \\ \rho \end{bmatrix}
 ```
 
-For standalone models, both inputs ``y`` parameters ``p`` are user-specified.  For coupled models, however, inputs to one model in the coupled system often correspond to outputs from another model in the coupled system.  For example, the lift and moment required by the typical section model are defined by Peter's finite state model.    correspond to 
-
-  For coupled models, inputs ``y`` are defined as a function of the state rates, states, and parameters of all the models in the coupled system and the current time.  
-
- function of the state rates, states, and Parameters
-only parameters ``p`` are user-specified while  inputs are defined as a function of the  assumes that the inputs to each of its subcomponent models may be defined as a function of the  
-
-however, inputs to a model can often be defined as a function of the state variables and parameters of the other models in the coupled system.  The interdependencies between models may therefore be captured by allowing the inputs to each model to be defined as a function of the state variables and parameters of the coupled system.  Each model in a coupled model is therefore coupled together through their inputs, which
-
-Rate, state, input, and parameter vectors may either be constructed directly or initialized using the [`get_states`](@ref), [`get_inputs`](@ref), and/or [`get_parameters`](@ref) convenience functions.  For coupled models, only the state and parameter vectors must be defined since the inputs for coupled models are defined as a function of the coupled model's state variables, parameters, and current time.
+Rate, state, input, and parameter vectors may either be constructed directly or initialized using the [`get_states`](@ref), [`get_inputs`](@ref), and/or [`get_parameters`](@ref) convenience functions.  In either case, refer to the model documentation for the proper variable order and/or argument names.  In the following block of code, we set the parameters for our coupled model directly.
 
 ```@example guide
 # non-dimensional parameters
@@ -122,29 +113,29 @@ kh = m*ωh^2
 kθ = Iθ*ωθ^2
 U = V*b*ωθ
 
-# initial rates
-dx_coupled = zeros(number_of_states(coupled_model))
-
-# initial states
-x_coupled = zeros(number_of_states(coupled_model))
-
-# initial parameters
+# parameters
 p_aero = [a, b, a0, α0]
 p_stru = [kh, kθ, m, Sθ, Iθ]
 p_additional = [U, ρ]
-p_coupled = vcat(p_aero, p_stru, p_additional)
-
-# initial time
-t = 0
+p = vcat(p_aero, p_stru, p_additional)
 
 nothing #hide
 ```
 
-To calculate the inputs corresponding to a given set of state variables and parameters for a coupled model the [`get_coupling_inputs`](@ref) function may be used.
+For standalone models, both inputs ``y`` parameters ``p`` are user-specified.  For coupled models, however, inputs to one model in the coupled system often correspond to outputs from another model in the coupled system.  For example, the lift and moment required by the typical section model are defined by Peter's finite state model and the velocities required by Peters' finite state model are defined as a function of the state variables of the typical section model.  To model these interdependencies, this package assumes that the inputs of a coupled model may be defined as a function of the state rates, states, and parameters of the coupled model as well as the current time.
+```math
+y = g(\dot{x}, x, p, t)
+```
+To evaluate this function to find the inputs for a coupled model, the [`get_coupling_inputs`](@ref) function may be used.
 
 ```@example guide
-# calculate input vector
-y_coupled = get_coupling_inputs(coupled_model, dx_coupled, x_coupled, p_coupled, t) # inputs
+# choose rates, state, and time at which to calculate the coupling inputs
+dx = zeros(number_of_states(coupled_model))
+x = zeros(number_of_states(coupled_model))
+t = 0
+
+# calculate the coupling inputs
+y = get_coupling_inputs(coupled_model, dx, x, p, t)
 
 nothing #hide
 ```
@@ -152,68 +143,128 @@ nothing #hide
 In order to more easily interpret the elements of the rate, state, input, and/or parameter vectors, the [`separate_states`](@ref), [`separate_inputs`](@ref), and/or [`separate_parameters`](@ref) functions may be used.  These functions separate and assign names to the elements of the state, input and/or parameter vectors so that the identity of each element in these vectors may be more easily understood.
 
 ```@example guide
-rates = separate_states(coupled_model, dx_coupled)
-states = separate_states(coupled_model, x_coupled)
-inputs = separate_inputs(coupled_model, y_coupled)
-parameters = separate_parameters(coupled_model, p_coupled)
+rates = separate_states(coupled_model, dx)
+states = separate_states(coupled_model, x)
+inputs = separate_inputs(coupled_model, y)
+parameters = separate_parameters(coupled_model, p)
 
 nothing #hide
 ```
 
+## Finding an Equilibrium Point
 
+To find equilibrium points, we first need to create an object of type `DifferentialEquations.ODEFunction` using the [`get_ode`](@ref) function.
 
+```@example guide
+# returns an ODEFunction
+f = get_ode(coupled_model)
 
+nothing #hide
+```
 
-  defined as a function of the state variables and parameters of the coupled system.
+Then a steady state solution may be found using DifferentialEquations.
 
-for each model often correspond to outputs from other models of the state variables and parameters of the coupled system.
+```@example guide
+using DifferentialEquations
 
+# initial guess for state variables
+x0 = zeros(number_of_states(coupled_model))
 
-When models are coupled together, this package defines the inputs ``y`` using output functions corresponding to other models.  For example, applied loads may be considered an input to a structural
+# steady state problem
+prob = SteadyStateProblem(f, x0, p)
 
-to each model as a function of the outputs from other models.
-In couple models together, this package assumes that the inputs ``y`` to each model correspond to outputs from other models.  The outputs  which may be defined as a function of the state rates, states, and parameters of any and/or all of the coupled models as well as the current time.
+# steady state solution
+x_ss = solve(prob, SSRootfind())
 
+nothing #hide
+```
 
+Since our system is linear with respect to the state variables it has one equilibrium point at the origin.
 
-
+Note that the coupling inputs are calculated automatically as a function of the state variables and parameters for coupled models.  For standalone model evaluation, the inputs are appended to the end of the parameter vector.
 
 ## Performing a Stability Analysis
 
-The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the [`get_eigen`](@ref) function, which returns eigenvalues, left eigenvectors, and right eigenvectors.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  In our case, our aeroelastic system is linear with respect to the state variables, so any set of state variables will yield the same result.
+The stability of a model for a given set of state variables, inputs, and parameters may be determined by calling the [`get_eigen`](@ref) function, which returns eigenvalues, left eigenvectors, and right eigenvectors.  For nonlinear systems, the provided state variables must correspond to an equilibrium point for the stability analysis to be theoretically valid.  Since our aeroelastic system is linear with respect to the state variables, any set of state variables will yield the same result.
 
 ```@example guide
-λ, U, V = get_eigen(coupled_model, dx_coupled, x_coupled, y_coupled, p_coupled, t)
+λ, U, V = get_eigen(coupled_model, x_ss, p)
+
 nothing #hide
 ```
 
 A positive real part corresponding to any eigenvalue returned from the [`get_eigen`](@ref) function indicates that the system is unstable for the provided set of state variables, inputs, and parameters.
 
-## Performing a Simulation
+For some models, we can visualize the mode shapes with the help of custom plot recipes provided by this package.
 
-To simulate the behavior of our model we first need to create an object of type `DifferentialEquations.ODEFunction` using the [`get_ode`](@ref) function.  Then the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package may be used to solve the ordinary differential equation corresponding to the model.
+```@example guide
+using Plots
+pyplot()
+
+# Plot Recipes:
+# - plot(model, dx, x, p, t)
+# - plot(model, x, p, t) # assumes `dx = zero(x)`
+# - plot(model, sol, t) # plots the solution geometry at time `t`
+# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
+
+# visualize least stable eigenmode
+iλ = argmax(real.(λ))
+λi = imag(λ[iλ])*1im # don't include damping
+vi = V[:,iλ]
+
+# animation time
+t1 = -pi/abs(imag(λi))
+t2 = pi/abs(imag(λi))
+
+# eigenvector scaling
+scaling = 0.5
+
+# create animation
+anim = @animate for t in range(t1, t2, length=100)
+
+    xi = x_ss + scaling*real.(vi*exp(λi*t))
+
+    plot(coupled_model, xi, p, t)
+
+end
+
+# save animation
+gif(anim, "guide-eigenmode.gif")
+
+nothing #hide
+```
+
+![](guide-eigenmode.gif)
+
+## Performing a Time Domain Simulation
+
+To simulate the behavior of our model we first need to create an object of type `DifferentialEquations.ODEFunction` using the [`get_ode`](@ref) function.  
+
+```@example guide
+f = get_ode(coupled_model)
+
+nothing #hide
+```
+
+Then the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package may be used to solve the ordinary differential equation corresponding to the model.
 
 ```@example guide
 using DifferentialEquations
 
 # non-zero plunge degree of freedom
-u0 = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+x0 = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
 
-# simulate for 10 seconds
+# simulate for 100 seconds
 tspan = (0.0, 100.0)
 
-# construct ODE function
-f = get_ode(coupled_model)
-
 # construct ODE problem
-prob = DifferentialEquations.ODEProblem(f, u0, tspan, p_coupled)
+prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
 
 # solve ODE
 sol = DifferentialEquations.solve(prob)
 
+nothing #hide
 ```
-
-# Visualizing Simulation Results
 
 We can use DifferentialEquations' built-in interface with the [Plots](https://github.com/JuliaPlots/Plots.jl) package to plot the simulation results.
 
@@ -247,8 +298,9 @@ For some models, we can also visualize the solution geometry and/or create anima
 ```@example typical-section-stability
 # Plot Recipes:
 # - plot(model, dx, x, p, t)
-# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
+# - plot(model, x, p, t) # assumes `dx = zero(x)`
 # - plot(model, sol, t) # plots the solution geometry at time `t`
+# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
 
 # create animation
 anim = @animate for t in range(tspan[1], tspan[2], length=200)

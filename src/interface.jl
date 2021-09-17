@@ -3639,21 +3639,32 @@ function _get_coupling_time_gradient!(dT, ::Union{Linear,Nonlinear}, ::InPlace,
 end
 
 """
-    get_eigen(model::TM; kwargs...)
-    get_eigen(model::TM, p; kwargs...)
-    get_eigen(model::TM, x, y, p, t; kwargs...)
+    get_eigen(model::TM, x, p; kwargs...)
 
 Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
-corresponding to the model for state variables `x`, inputs `y`, parameters `p`,
-and time `t`.
+corresponding to the model for state variables `x` and parameters `p`.
 
 For in-place models, the number of eigenvalues to compute may be specified using
 the `nev` keyword argument.
 """
 get_eigen
 
-function get_eigen(model::TM, args...; kwargs...) where TM
-    return _get_eigen(inplaceness(TM), model, args...; kwargs...)
+function get_eigen(model::TM, x, p; dx = FillArrays.Zeros(x), t = 0,
+    kwargs...) where TM <: AbstractModel
+
+    Np = number_of_parameters(model)
+    Ny = number_of_inputs(model)
+
+    ip = 1 : Np
+    iy = Np + 1 : Np + Ny
+
+    return _get_eigen(inplaceness(TM), model, dx, x, view(p,ip), view(p,iy), t; kwargs...)
+end
+
+function get_eigen(model::TM, x, p; dx = FillArrays.Zeros(x), t = 0,
+    y = get_coupling_inputs(model, dx, x, p, t), kwargs...) where TM <: NTuple{N,AbstractModel} where N
+
+    return _get_eigen(inplaceness(TM), model, dx, x, y, p, t; kwargs...)
 end
 
 function _get_eigen(::OutOfPlace, model, args...)
@@ -3736,7 +3747,6 @@ function _get_ode(::Identity, ::OutOfPlace, model::AbstractModel, p=nothing)
 
     return ODEFunction{true,true}(f; mass_matrix, tgrad, jac, paramjac)
 end
-
 
 function _get_ode(::Identity, ::OutOfPlace, model::NTuple{N,AbstractModel}, p=nothing) where N
 
@@ -4399,7 +4409,66 @@ end
     return models..., dx, x, p[iy], p[ip], t
 end
 
+@recipe function f(models::AbstractModel, x, p, t) where N
+
+    return models, FillArrays.Zeros(x), x, p, t
+end
+
+@recipe function f(models::AbstractModel, sol, t)
+
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    ip = 1 : Np
+    iy = Np + 1 : Np + Ny
+
+    x = sol(t)
+    y = sol.prob.p[iy]
+    p = sol.prob.p[ip]
+
+    dx = sol(t, Val{1})
+
+    return models..., dx, x, y, p, t
+end
+
+@recipe function f(model::AbstractModel, sol)
+
+    it = sol.tslocation
+
+    Ny = number_of_inputs(model)
+    Np = number_of_parameters(model)
+
+    ip = 1 : Np
+    iy = Np + 1 : Np + Ny
+
+    x = sol.x[it]
+    y = sol.prob.p[iy]
+    p = sol.prob.p[ip]
+    t = sol.t[it]
+
+    dx = sol(t, Val{1})
+
+    return model, dx, x, y, p, t
+end
+
 @recipe function f(models::NTuple{N,AbstractModel}, dx, x, p, t) where N
+
+    y = get_coupling_inputs(models, dx, x, p, t)
+
+    return models..., dx, x, y, p, t
+end
+
+@recipe function f(models::NTuple{N,AbstractModel}, x, p, t) where N
+
+    return models, FillArrays.Zeros(x), x, p, t
+end
+
+@recipe function f(models::NTuple{N,AbstractModel}, sol, t) where N
+
+    x = sol(t)
+    p = sol.prob.p
+
+    dx = sol(t, Val{1})
 
     y = get_coupling_inputs(models, dx, x, p, t)
 
@@ -4413,18 +4482,6 @@ end
     x = sol.x[it]
     p = sol.prob.p
     t = sol.t[it]
-
-    dx = sol(t, Val{1})
-
-    y = get_coupling_inputs(models, dx, x, p, t)
-
-    return models..., dx, x, y, p, t
-end
-
-@recipe function f(models::NTuple{N,AbstractModel}, sol, t) where N
-
-    x = sol(t)
-    p = sol.prob.p
 
     dx = sol(t, Val{1})
 
