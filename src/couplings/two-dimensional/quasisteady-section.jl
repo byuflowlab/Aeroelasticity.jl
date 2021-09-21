@@ -49,7 +49,9 @@ function get_coupling_inputs(aero::QuasiSteady{0}, stru::TypicalSection, dx, x, 
     # local freestream velocity components
     u, v = section_steady_velocities(U, θ)
     # calculate aerodynamic loads
-    L, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
+    N, A, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
+    # lift is approximately equal to the normal force
+    L = N
     # return inputs
     return SVector(L, M)
 end
@@ -62,7 +64,9 @@ function get_coupling_inputs(aero::QuasiSteady{1}, stru::TypicalSection, dx, x, 
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     # calculate aerodynamic loads
-    L, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
+    N, A, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
+    # lift is approximately equal to the normal force
+    L = N
     # return inputs
     return SVector(L, M)
 end
@@ -79,7 +83,9 @@ function get_coupling_inputs(aero::QuasiSteady{2}, stru::TypicalSection, dx, x, 
     # local freestream accelerations
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate aerodynamic loads
-    L, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    N, A, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    # lift is approximately equal to the normal force
+    L = N
     # return inputs
     return SVector(L, M)
 end
@@ -103,27 +109,27 @@ function get_coupling_parameter_jacobian(aero::QuasiSteady{0}, stru::TypicalSect
     u, v = section_steady_velocities(U, θ)
     u_U, v_U = section_steady_velocities_U(θ)
     # calculate loads
-    L_a, M_a = quasisteady0_loads_a(a, b, ρ, a0, α0, u, v)
-    L_b, M_b = quasisteady0_loads_b(a, b, ρ, a0, α0, u, v)
-    L_a0, M_a0 = quasisteady0_loads_a0(a, b, ρ, α0, u, v)
-    L_α0, M_α0 = quasisteady0_loads_α0(a, b, ρ, a0, α0, u, v)
+    N_a, A_a, M_a = quasisteady0_loads_a(a, b, ρ, a0, α0, u, v)
+    N_b, A_b, M_b = quasisteady0_loads_b(a, b, ρ, a0, α0, u, v)
+    N_a0, A_a0, M_a0 = quasisteady0_loads_a0(a, b, ρ, α0, u, v)
+    N_α0, A_α0, M_α0 = quasisteady0_loads_α0(a, b, ρ, a0, α0, u, v)
 
-    L_kh, M_kh = 0, 0
-    L_kθ, M_kθ = 0, 0
-    L_m, M_m = 0, 0
-    L_Sθ, M_Sθ = 0, 0
-    L_Iθ, M_Iθ = 0, 0
+    N_kh, A_kh, M_kh = 0, 0, 0
+    N_kθ, A_kθ, M_kθ = 0, 0, 0
+    N_m, A_m, M_m = 0, 0, 0
+    N_Sθ, A_Sθ, M_Sθ = 0, 0, 0
+    N_Iθ, A_Iθ, M_Iθ = 0, 0, 0
 
-    L_u, M_u = quasisteady0_loads_u(a, b, ρ, a0, α0, u, v)
-    L_v, M_v = quasisteady0_loads_v(a, b, ρ, a0, u)
-    L_U = L_u * u_U + L_v * v_U
+    N_u, A_u, M_u = quasisteady0_loads_u(a, b, ρ, a0, α0, u, v)
+    N_v, A_v, M_v = quasisteady0_loads_v(a, b, ρ, a0, α0, u, v)
+    N_U = N_u * u_U + N_v * v_U
     M_U = M_u * u_U + M_v * v_U
 
-    L_ρ, M_ρ = quasisteady0_loads_ρ(a, b, ρ, a0, α0, u, v)
+    N_ρ, A_ρ, M_ρ = quasisteady0_loads_ρ(a, b, ρ, a0, α0, u, v)
 
     # return jacobian
     return @SMatrix [
-        L_a L_b L_a0 L_α0 L_kh L_kθ L_m L_Sθ L_Iθ L_U L_ρ;
+        N_a N_b N_a0 N_α0 N_kh N_kθ N_m N_Sθ N_Iθ N_U N_ρ;
         M_a M_b M_a0 M_α0 M_kh M_kθ M_m M_Sθ M_Iθ M_U M_ρ
         ]
 end
@@ -147,27 +153,27 @@ function get_coupling_parameter_jacobian(aero::QuasiSteady{1}, stru::TypicalSect
     u_U, v_U, ω_U = section_velocities_U(θ)
 
     # calculate loads
-    L_a, M_a = quasisteady1_loads_a(a, b, ρ, a0, α0, u, v, ω)
-    L_b, M_b = quasisteady1_loads_b(a, b, ρ, a0, α0, u, v, ω)
-    L_a0, M_a0 = quasisteady1_loads_a0(a, b, ρ, a0, α0, u, v, ω)
-    L_α0, M_α0 = quasisteady1_loads_α0(a, b, ρ, a0, u)
+    N_a, A_a, M_a = quasisteady1_loads_a(a, b, ρ, a0, α0, u, v, ω)
+    N_b, A_b, M_b = quasisteady1_loads_b(a, b, ρ, a0, α0, u, v, ω)
+    N_a0, A_a0, M_a0 = quasisteady1_loads_a0(a, b, ρ, a0, α0, u, v, ω)
+    N_α0, A_α0, M_α0 = quasisteady1_loads_α0(a, b, ρ, a0, α0, u, v, ω)
 
-    L_kh, M_kh = 0, 0
-    L_kθ, M_kθ = 0, 0
-    L_m, M_m = 0, 0
-    L_Sθ, M_Sθ = 0, 0
-    L_Iθ, M_Iθ = 0, 0
+    N_kh, A_kh, M_kh = 0, 0, 0
+    N_kθ, A_kθ, M_kθ = 0, 0, 0
+    N_m, A_m, M_m = 0, 0, 0
+    N_Sθ, A_Sθ, M_Sθ = 0, 0, 0
+    N_Iθ, A_Iθ, M_Iθ = 0, 0, 0
 
-    L_u, M_u = quasisteady1_loads_u(a, b, ρ, a0, α0, u, v, ω)
-    L_v, M_v = quasisteady1_loads_v(a, b, ρ, a0, α0, u)
-    L_U = L_u * u_U + L_v * v_U# + L_ω * ω_U
+    N_u, A_u, M_u = quasisteady1_loads_u(a, b, ρ, a0, α0, u, v, ω)
+    N_v, A_v, M_v = quasisteady1_loads_v(a, b, ρ, a0, α0, u, v, ω)
+    N_U = N_u * u_U + N_v * v_U# + L_ω * ω_U
     M_U = M_u * u_U + M_v * v_U# + M_ω * ω_U
 
-    L_ρ, M_ρ = quasisteady1_loads_ρ(a, b, ρ, a0, α0, u, v, ω)
+    N_ρ, A_ρ, M_ρ = quasisteady1_loads_ρ(a, b, ρ, a0, α0, u, v, ω)
 
     # return jacobian
     return @SMatrix [
-        L_a L_b L_a0 L_α0 L_kh L_kθ L_m L_Sθ L_Iθ L_U L_ρ;
+        N_a N_b N_a0 N_α0 N_kh N_kθ N_m N_Sθ N_Iθ N_U N_ρ;
         M_a M_b M_a0 M_α0 M_kh M_kθ M_m M_Sθ M_Iθ M_U M_ρ
         ]
 end
@@ -200,27 +206,27 @@ function get_coupling_parameter_jacobian(aero::QuasiSteady{2}, stru::TypicalSect
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
 
     # calculate loads
-    L_a, M_a = quasisteady2_loads_a(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
-    L_b, M_b = quasisteady2_loads_b(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
-    L_a0, M_a0 = quasisteady2_loads_a0(a, b, ρ, a0, α0, u, v, ω)
-    L_α0, M_α0 = quasisteady2_loads_α0(a, b, ρ, a0, u)
+    N_a, A_a, M_a = quasisteady2_loads_a(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    N_b, A_b, M_b = quasisteady2_loads_b(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    N_a0, A_a0, M_a0 = quasisteady2_loads_a0(a, b, ρ, a0, α0, u, v, ω)
+    N_α0, A_α0, M_α0 = quasisteady2_loads_α0(a, b, ρ, a0, α0, u, v, ω)
 
-    L_kh, M_kh = 0, 0
-    L_kθ, M_kθ = 0, 0
-    L_m, M_m = 0, 0
-    L_Sθ, M_Sθ = 0, 0
-    L_Iθ, M_Iθ = 0, 0
+    N_kh, A_kh, M_kh = 0, 0, 0
+    N_kθ, A_kθ, M_kθ = 0, 0, 0
+    N_m, A_m, M_m = 0, 0, 0
+    N_Sθ, A_Sθ, M_Sθ = 0, 0, 0
+    N_Iθ, A_Iθ, M_Iθ = 0, 0, 0
 
-    L_u, M_u = quasisteady2_loads_u(a, b, ρ, a0, α0, u, v, ω)
-    L_v, M_v = quasisteady2_loads_v(a, b, ρ, a0, α0, u)
-    L_U = L_u * u_U + L_v * v_U# + L_ω * ω_U
+    N_u, A_u, M_u = quasisteady2_loads_u(a, b, ρ, a0, α0, u, v, ω)
+    N_v, A_v, M_v = quasisteady2_loads_v(a, b, ρ, a0, α0, u, v, ω)
+    N_U = N_u * u_U + N_v * v_U# + L_ω * ω_U
     M_U = M_u * u_U + M_v * v_U# + M_ω * ω_U
 
-    L_ρ, M_ρ = quasisteady2_loads_ρ(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    N_ρ, A_ρ, M_ρ = quasisteady2_loads_ρ(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
 
     # return jacobian
     return @SMatrix [
-        L_a L_b L_a0 L_α0 L_kh L_kθ L_m L_Sθ L_Iθ L_U L_ρ;
+        N_a N_b N_a0 N_α0 N_kh N_kθ N_m N_Sθ N_Iθ N_U N_ρ;
         M_a M_b M_a0 M_α0 M_kh M_kθ M_m M_Sθ M_Iθ M_U M_ρ
         ]
 end
@@ -312,7 +318,7 @@ end
 quasisteady2_section_state_jacobian(a, b, ρ, a0, U) = quasisteady1_section_state_jacobian(a, b, ρ, a0, U)
 
 function quasisteady2_section_rate_jacobian(a, b, ρ)
-    L_hddot, M_hddot = quasisteady2_loads_vdot(a, b, ρ)
-    L_θddot, M_θddot = quasisteady2_loads_ωdot(a, b, ρ)
-    return @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
+    N_hddot, A_hddot, M_hddot = quasisteady2_loads_vdot(a, b, ρ)
+    N_θddot, A_θddot, M_θddot = quasisteady2_loads_ωdot(a, b, ρ)
+    return @SMatrix [0 0 N_hddot N_θddot; 0 0 M_hddot M_θddot]
 end

@@ -43,10 +43,10 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
 
     # aerodynamic loads
-    La, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    Na, Aa, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
 
     # loads per unit span
-    f = SVector(0, 0, La)
+    f = SVector(Aa, 0, Na)
     m = SVector(0, Ma, 0)
 
     # return inputs

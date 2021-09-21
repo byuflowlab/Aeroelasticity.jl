@@ -47,9 +47,9 @@ function get_coupling_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection, dx,
     # local freestream velocity components
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     # calculate loads
-    L, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
+    N, A, M = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # loads per unit span
-    f = SVector(0, 0, L)
+    f = SVector(A, 0, N)
     m = SVector(0, M, 0)
     # return inputs
     return SVector(f..., m...)
@@ -66,9 +66,9 @@ function get_coupling_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection, dx,
     # local freestream velocity components
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     # calculate aerodynamic loads
-    L, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
+    N, A, M = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
     # loads per unit span
-    f = SVector(0, 0, L)
+    f = SVector(A, 0, N)
     m = SVector(0, M, 0)
     # return inputs
     return SVector(f..., m...)
@@ -86,9 +86,9 @@ function get_coupling_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection, dx,
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # calculate aerodynamic loads
-    L, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    N, A, M = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
     # loads per unit span
-    f = SVector(0, 0, L)
+    f = SVector(A, 0, N)
     m = SVector(0, M, 0)
     # return inputs
     return SVector(f..., m...)

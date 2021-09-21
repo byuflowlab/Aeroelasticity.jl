@@ -194,43 +194,52 @@ function wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2
     d = b/2 - a*b
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
-    # lift at reference point
-    L = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    # normal force at reference point
+    N = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    # axial force at reference point
+    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
     # moment at reference point
-    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*L
+    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N
 
-    return SVector(L, M)
+    return SVector(N, A, M)
 end
 
-function wagner_loads_λ(a, b, ρ, a0, u)
-    tmp1 = a0*ρ*u*b
-    tmp2 = (b/2 + a*b)*tmp1
-    return @SMatrix [tmp1 tmp1; tmp2 tmp2]
+function wagner_loads_λ(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    d = b/2 - a*b
+    ϕ0 = 1 - C1 - C2
+    N_λ = a0*ρ*u*b
+    A_λ = -2*a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
+    M_λ = (b/2 + a*b)*N_λ
+    return @SMatrix [N_λ N_λ; A_λ A_λ; M_λ M_λ]
 end
-wagner_loads_λdot() = @SMatrix [0 0; 0 0]
+wagner_loads_λdot() = @SMatrix [0 0; 0 0; 0 0]
 
-wagner_loads_udot() = SVector(0, 0)
+wagner_loads_udot() = SVector(0, 0, 0)
 
 function wagner_loads_vdot(a, b, ρ)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
-    # lift at reference point
-    L_vdot = tmp/b
+    # normal force at reference point
+    N_vdot = tmp/b
+    # axial force at reference point
+    A_vdot = 0
     # moment at reference point
-    M_vdot = -tmp/2 + (b/2 + a*b)*L_vdot
+    M_vdot = -tmp/2 + (b/2 + a*b)*N_vdot
 
-    return SVector(L_vdot, M_vdot)
+    return SVector(N_vdot, A_vdot, M_vdot)
 end
 
 function wagner_loads_ωdot(a, b, ρ)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
-    # lift at reference point
-    L_ωdot = -a*tmp
+    # normal force at reference point
+    N_ωdot = -a*tmp
+    # axial force at reference point
+    A_ωdot = 0.0
     # moment at reference point
-    M_ωdot = -tmp*(b/8 - a*b/2) + (b/2 + a*b)*L_ωdot
+    M_ωdot = -tmp*(b/8 - a*b/2) + (b/2 + a*b)*N_ωdot
 
-    return SVector(L_ωdot, M_ωdot)
+    return SVector(N_ωdot, A_ωdot, M_ωdot)
 end
 
 function wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
@@ -240,12 +249,14 @@ function wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, �
 
     ϕ0 = 1 - C1 - C2
 
-    L = tmp1*((v + (b/2 - a*b)*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
-    L_a = -tmp1*b*ω*ϕ0 - tmp2*ωdot
+    N = tmp1*((v + (b/2 - a*b)*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    N_a = -tmp1*b*ω*ϕ0 - tmp2*ωdot
 
-    M_a = tmp2*b/2*ωdot + b*L + (b/2 + a*b)*L_a
+    A_a = 2*a0*ρ*b^2*ω*ϕ0*((v + (b/2 - a*b)*ω - u*α0)*ϕ0 + λ1 + λ2)
 
-    return SVector(L_a, M_a)
+    M_a = tmp2*b/2*ωdot + b*N + (b/2 + a*b)*N_a
+
+    return SVector(N_a, A_a, M_a)
 end
 
 function wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
@@ -261,14 +272,15 @@ function wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, �
 
     ϕ0 = 1 - C1 - C2
 
-    L = tmp1*((v + (b/2 - a*b)*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
+    N = tmp1*((v + (b/2 - a*b)*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
 
-    L_b = tmp1_b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp1*d_b*ω*ϕ0 +
+    N_b = tmp1_b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp1*d_b*ω*ϕ0 +
         tmp2_b*(vdot/b + u/b*ω - a*ωdot) + tmp2*(-vdot/b^2 - u/b^2*ω)
+    A_b = -a0*ρ*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2 - 2*a0*ρ*b*d_b*ω*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
     M_b = -tmp2_b*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) - tmp2*(1/8 - a/2)*ωdot +
-        (1/2 + a)*L + (b/2 + a*b)*L_b
+        (1/2 + a)*N + (b/2 + a*b)*N_b
 
-    return SVector(L_b, M_b)
+    return SVector(N_b, A_b, M_b)
 end
 
 function wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
@@ -281,11 +293,11 @@ function wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
 
     ϕ0 = 1 - C1 - C2
 
-    L_ρ = tmp1_ρ*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2_ρ*(vdot/b + u/b*ω - a*ωdot)
+    N_ρ = tmp1_ρ*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2_ρ*(vdot/b + u/b*ω - a*ωdot)
+    A_ρ = -a0*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
+    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N_ρ
 
-    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*L_ρ
-
-    return SVector(L_ρ, M_ρ)
+    return SVector(N_ρ, A_ρ, M_ρ)
 end
 
 function wagner_loads_a0(a, b, ρ, α0, C1, C2, u, v, ω, λ1, λ2)
@@ -298,69 +310,60 @@ function wagner_loads_a0(a, b, ρ, α0, C1, C2, u, v, ω, λ1, λ2)
 
     ϕ0 = 1 - C1 - C2
 
-    L_a0 = tmp1_a0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
-    M_a0 = (b/2 + a*b)*L_a0
+    N_a0 = tmp1_a0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
+    A_a0 = -ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
+    M_a0 = (b/2 + a*b)*N_a0
 
-    return SVector(L_a0, M_a0)
+    return SVector(N_a0, A_a0, M_a0)
 end
 
-function wagner_loads_α0(a, b, ρ, a0, C1, C2, u)
+function wagner_loads_α0(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
 
     tmp1 = a0*ρ*u*b
 
+    d = b/2 - a*b
+
     ϕ0 = 1 - C1 - C2
 
-    L_α0 = -tmp1*u*ϕ0
+    N_α0 = -tmp1*u*ϕ0
+    A_α0 = 2*a0*ρ*b*u*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
+    M_α0 = (b/2 + a*b)*N_α0
 
-    M_α0 = (b/2 + a*b)*L_α0
-
-    return SVector(L_α0, M_α0)
+    return SVector(N_α0, A_α0, M_α0)
 end
 
 function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
-    # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
-    # non-circulatory load factor
     tmp2 = pi*ρ*b^3
-    # constant based on geometry
     d = b/2 - a*b
-    # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
-    # lift at reference point
-    L_u = tmp1_u*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ω
-    # moment at reference point
-    M_u = -tmp2*ω + (b/2 + a*b)*L_u
-
-    return SVector(L_u, M_u)
+    N_u = tmp1_u*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ω
+    A_u = 2*a0*ρ*b*α0*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
+    M_u = -tmp2*ω + (b/2 + a*b)*N_u
+    return SVector(N_u, A_u, M_u)
 end
 
-function wagner_loads_v(a, b, ρ, a0, C1, C2, u)
-    # Wagner's function at t = 0.0
+function wagner_loads_v(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     ϕ0 = 1 - C1 - C2
-    # lift at reference point
-    L_v = a0*ρ*u*b*ϕ0
-    # moment at reference point
-    M_v = (b/2 + a*b)*L_v
+    d = b/2 - a*b
+    N_v = a0*ρ*u*b*ϕ0
+    A_v = -2*a0*ρ*b*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
+    M_v = (b/2 + a*b)*N_v
 
-    return SVector(L_v, M_v)
+    return SVector(N_v, A_v, M_v)
 end
 
-function wagner_loads_ω(a, b, ρ, a0, C1, C2, u)
-    # circulatory load factor
+function wagner_loads_ω(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     tmp1 = a0*ρ*u*b
-    # non-circulatory load factor
     tmp2 = pi*ρ*b^3
-    # constant based on geometry
     d = b/2 - a*b
-    # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
-    # lift at reference point
-    L_ω = tmp1*d*ϕ0 + tmp2*u/b
-    # moment at reference point
-    M_ω = -tmp2*u + (b/2 + a*b)*L_ω
+    N_ω = tmp1*d*ϕ0 + tmp2*u/b
+    A_ω = -2*a0*ρ*b*d*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
+    M_ω = -tmp2*u + (b/2 + a*b)*N_ω
 
-    return SVector(L_ω, M_ω)
+    return SVector(N_ω, A_ω, M_ω)
 end
 
 function wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
@@ -372,21 +375,25 @@ function wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     d = b/2 - a*b
     # Wagner's function at t = 0.0
     ϕ0 = 1 - C1 - C2
-    # lift at reference point
-    L = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*u/b*ω
+    # normal force at reference point
+    N = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*u/b*ω
+    # axial force at reference point
+    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
     # moment at reference point
-    M = -tmp2*u*ω + (b/2 + a*b)*L
+    M = -tmp2*u*ω + (b/2 + a*b)*N
 
-    return SVector(L, M)
+    return SVector(N, A, M)
 end
 
 function wagner_rate_loads(a, b, ρ, vdot, ωdot)
     # non-circulatory load factor
     tmp = pi*ρ*b^3
-    # lift at reference point
-    L = tmp*(vdot/b - a*ωdot)
+    # normal force at reference point
+    N = tmp*(vdot/b - a*ωdot)
+    # axial force at reference point
+    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
     # moment at reference point
-    M = -tmp*(vdot/2 + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*L
+    M = -tmp*(vdot/2 + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N
 
-    return SVector(L, M)
+    return SVector(N, A, M)
 end

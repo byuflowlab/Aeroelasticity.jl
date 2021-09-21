@@ -69,7 +69,7 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     δ = x[end]
 
     # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
+    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
 
     # extract model constants
     bbar = aero.b
@@ -79,13 +79,13 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
 
     # aerodynamic loads
-    La, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    Na, Aa, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
 
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
 
     # loads per unit span
-    f = SVector(Df, 0, La + Lf)
+    f = SVector(Aa + Af, 0, Na + Nf)
     m = SVector(0, Ma + Mf, 0)
 
     # return portion of inputs that is not dependent on the state rates

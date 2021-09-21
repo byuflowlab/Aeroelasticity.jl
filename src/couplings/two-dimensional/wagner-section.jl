@@ -15,7 +15,7 @@ number_of_additional_parameters(::Type{<:Wagner}, ::Type{TypicalSection}) = 2
 coupling_inplaceness(::Type{<:Wagner}, ::Type{TypicalSection}) = OutOfPlace()
 
 coupling_rate_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Constant()
-coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Constant()
+coupling_state_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Linear()
 coupling_parameter_jacobian_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Nonlinear()
 coupling_time_gradient_type(::Type{<:Wagner}, ::Type{TypicalSection}) = Zeros()
 
@@ -35,7 +35,9 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, dx, x, p, t)
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate loads
-    L, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N, A, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    # lift is approximately normal force
+    L = N
     # return inputs
     return SVector(u, v, ω, L, M)
 end
@@ -46,37 +48,41 @@ function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection, p)
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # calculate loads
-    L_hddot, M_hddot = wagner_loads_vdot(a, b, ρ)
-    L_θddot, M_θddot = wagner_loads_ωdot(a, b, ρ)
+    N_hddot, A_hddot, M_hddot = wagner_loads_vdot(a, b, ρ)
+    N_θddot, A_θddot, M_θddot = wagner_loads_ωdot(a, b, ρ)
     # construct submatrices
     Jyaa = @SMatrix [0 0; 0 0; 0 0]
     Jyas = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
     Jysa = @SMatrix [0 0; 0 0]
-    Jyss = @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
+    Jyss = @SMatrix [0 0 N_hddot N_θddot; 0 0 M_hddot M_θddot]
     # assemble rate jacobian
     return [Jyaa Jyas; Jysa Jyss]
 end
 
-function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, p)
+function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, dx, x, p, t)
+    # extract state variables
+    λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
     # local freestream velocity components
+    u, v, ω = section_velocities(U, θ, hdot, θdot)
     u_θ, v_θ, ω_θ = section_velocities_θ(U)
     u_hdot, v_hdot, ω_hdot = section_velocities_hdot()
     u_θdot, v_θdot, ω_θdot = section_velocities_θdot()
     # calculate loads
-    r_λ = wagner_loads_λ(a, b, ρ, a0, U)
-    L_θ, M_θ = wagner_loads_θ(a, b, ρ, a0, C1, C2, U)
-    L_hdot, M_hdot = wagner_loads_v(a, b, ρ, a0, C1, C2, U)
-    L_θdot, M_θdot = wagner_loads_ω(a, b, ρ, a0, C1, C2, U)
+    r_λ = wagner_loads_λ(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_λ, A_λ, M_λ = r_λ[1,:], r_λ[2,:], r_λ[3,:]
+    N_θ, M_θ = wagner_loads_θ(a, b, ρ, a0, C1, C2, U)
+    N_hdot, A_hdot, M_hdot = wagner_loads_v(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_θdot, A_θdot, M_θdot = wagner_loads_ω(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     # compute jacobian sub-matrices
     Jyaa = @SMatrix [0 0; 0 0; 0 0]
     Jyas = @SMatrix [0 u_θ u_hdot u_θdot; 0 v_θ v_hdot v_θdot; 0 ω_θ ω_hdot ω_θdot]
-    Jysa = r_λ
-    Jyss = @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
+    Jysa = vcat(N_λ', M_λ')
+    Jyss = @SMatrix [0 N_θ N_hdot N_θdot; 0 M_θ M_hdot M_θdot]
     # return jacobian
     return [Jyaa Jyas; Jysa Jyss]
 end
@@ -96,24 +102,24 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     u_U, v_U, ω_U = section_velocities_U(θ)
     # calculate loads
-    L_a, M_a = wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
-    L_b, M_b = wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
-    L_a0, M_a0 = wagner_loads_a0(a, b, ρ, α0, C1, C2, u, v, ω, λ1, λ2)
-    L_α0, M_α0 = wagner_loads_α0(a, b, ρ, a0, C1, C2, u)
+    N_a, A_a, M_a = wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N_b, A_b, M_b = wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N_a0, A_a0, M_a0 = wagner_loads_a0(a, b, ρ, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_α0, A_α0, M_α0 = wagner_loads_α0(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
 
-    L_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
-    L_v, M_v = wagner_loads_v(a, b, ρ, a0, C1, C2, u)
-    L_U = L_u * u_U + L_v * v_U
+    N_u, A_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_v, A_v, M_v = wagner_loads_v(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_U = N_u * u_U + N_v * v_U
     M_U = M_u * u_U + M_v * v_U
 
-    L_ρ, M_ρ = wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N_ρ, A_ρ, M_ρ = wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
         # compute jacobian sub-matrices
     Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
     Jyas = @SMatrix [0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0]
     Jyap = @SMatrix [u_U 0; v_U 0; ω_U 0]
-    Jysa = @SMatrix [L_a L_b L_a0 L_α0; M_a M_b M_a0 M_α0]
+    Jysa = @SMatrix [N_a N_b N_a0 N_α0; M_a M_b M_a0 M_α0]
     Jyss = @SMatrix [0 0 0 0 0; 0 0 0 0 0]
-    Jysp = @SMatrix [L_U L_ρ; M_U M_ρ]
+    Jysp = @SMatrix [N_U N_ρ; M_U M_ρ]
     # return jacobian
     return [Jyaa Jyas Jyap; Jysa Jyss Jysp]
 end
@@ -159,7 +165,7 @@ end
 
 function wagner_loads_θ(a, b, ρ, a0, C1, C2, U)
     ϕ0 = 1 - C1 - C2
-    L_θ = a0*ρ*b*U^2*ϕ0
-    M_θ = (b/2 + a*b)*L_θ
-    return SVector(L_θ, M_θ)
+    N_θ = a0*ρ*b*U^2*ϕ0
+    M_θ = (b/2 + a*b)*N_θ
+    return SVector(N_θ, M_θ)
 end

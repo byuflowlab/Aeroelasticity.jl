@@ -62,7 +62,7 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection,
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
+    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -70,11 +70,11 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection,
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # aerodynamic loads
-    La, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    Na, Aa, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
-    f = SVector(Df, 0, La + Lf)
+    f = SVector(Aa + Af, 0, Na + Nf)
     m = SVector(0, Ma + Mf, 0)
     # return portion of inputs that is not dependent on the state rates
     return SVector(u, v, ω, f..., m...)
@@ -89,19 +89,19 @@ function get_coupling_rate_jacobian(aero::Wagner, stru::LiftingLineSection,
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
+    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
     # calculate loads
-    L_dvx, M_dvx = wagner_loads_udot()
-    L_dvz, M_dvz = wagner_loads_vdot(a, b, ρ)
-    L_dωy, M_dωy = wagner_loads_ωdot(a, b, ρ)
+    N_dvx, A_dvx, M_dvx = wagner_loads_udot()
+    N_dvz, A_dvz, M_dvz = wagner_loads_vdot(a, b, ρ)
+    N_dωy, A_dωy, M_dωy = wagner_loads_ωdot(a, b, ρ)
     # assemble mass matrix
     return @SMatrix [
         0 0      0   0    0   0   0    0   0;
         0 0      0   0    0   0   0    0   0;
         0 0      0   0    0   0   0    0   0;
+        0 0    A_dvx 0  A_dvz 0  A_dωy 0   0;
         0 0      0   0    0   0   0    0   0;
-        0 0      0   0    0   0   0    0   0;
-        0 0    L_dvx 0  L_dvz 0  L_dωy 0   0;
+        0 0    N_dvx 0  N_dvz 0  N_dωy 0   0;
         0 0      0   0    0   0   0    0   0;
         0 0    M_dvx 0  M_dvz 0  M_dωy 0   0;
         0 0      0   0    0   0   0    0   0

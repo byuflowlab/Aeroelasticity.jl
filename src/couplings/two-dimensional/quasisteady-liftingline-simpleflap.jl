@@ -136,16 +136,16 @@ function get_coupling_inputs(aero::QuasiSteady{0}, stru::LiftingLineSection,
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
+    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
     # local freestream velocity components
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     # calculate loads
-    La, Ma = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
+    Na, Aa, Ma = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
-    f = SVector(Df, 0, La+Lf)
-    m = SVector(0, Ma+Lf, 0)
+    f = SVector(Aa+Af, 0, Na+Nf)
+    m = SVector(0, Ma+Mf, 0)
     # return inputs
     return SVector(f..., m...)
 end
@@ -158,16 +158,16 @@ function get_coupling_inputs(aero::QuasiSteady{1}, stru::LiftingLineSection,
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
+    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
     # local freestream velocity components
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     # calculate aerodynamic loads
-    La, Ma = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
+    Na, Aa, Ma = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
-    f = SVector(Df, 0, La+Lf)
-    m = SVector(0, Ma+Lf, 0)
+    f = SVector(Aa+Af, 0, Na+Nf)
+    m = SVector(0, Ma+Mf, 0)
     # return inputs
     return SVector(f..., m...)
 end
@@ -180,17 +180,17 @@ function get_coupling_inputs(aero::QuasiSteady{2}, stru::LiftingLineSection,
     # extract state variables
     vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, clδ, cdδ, cmδ, ρ = p
+    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
     # local freestream velocity components
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # calculate aerodynamic loads
-    La, Ma = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    Na, Aa, Ma = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
-    f = SVector(Df, 0, La+Lf)
-    m = SVector(0, Ma+Lf, 0)
+    f = SVector(Aa+Af, 0, Na+Nf)
+    m = SVector(0, Ma+Mf, 0)
     # return inputs
     return SVector(f..., m...)
 end

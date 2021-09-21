@@ -6,7 +6,7 @@ makedocs(;
         "Home" => "index.md",
         "Getting Started" => "guide.md",
         "Examples" => "examples.md",
-        "Models" => [
+        "Model Documentation" => [
             "Aerodynamic Models" => [
                 "Steady Thin Airfoil Theory" => joinpath("aerodynamics", "steady.md"),
                 "Quasi-Steady Thin Airfoil Theory" => joinpath("aerodynamics", "quasisteady.md"),

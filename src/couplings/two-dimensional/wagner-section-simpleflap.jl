@@ -28,7 +28,7 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, flap::SimpleFla
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -36,11 +36,11 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, flap::SimpleFla
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate aerodynamic loads (except contribution from state rates)
-    La, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    Na, Aa, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
-    L = La + Lf
+    L = Na + Nf
     M = Ma + Mf
     # return inputs
     return SVector(u, v, ω, L, M)
@@ -51,40 +51,44 @@ end
 function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection,
     flap::SimpleFlap, dx, x, p, t)
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # calculate loads
-    L_hddot, M_hddot = wagner_loads_vdot(a, b, ρ)
-    L_θddot, M_θddot = wagner_loads_ωdot(a, b, ρ)
+    N_hddot, A_hddot, M_hddot = wagner_loads_vdot(a, b, ρ)
+    N_θddot, A_θddot, M_θddot = wagner_loads_ωdot(a, b, ρ)
     # construct submatrices
     Mda = @SMatrix [0 0; 0 0; 0 0]
     Mds = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
     Mra = @SMatrix [0 0; 0 0]
-    Mrs = @SMatrix [0 0 L_hddot L_θddot; 0 0 M_hddot M_θddot]
+    Mrs = @SMatrix [0 0 N_hddot N_θddot; 0 0 M_hddot M_θddot]
     # assemble mass matrix
     return [Mda Mds; Mra Mrs]
 end
 
 function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection,
     flap::SimpleFlap, dx, x, p, t) where {N,TF,SV,SA}
+    # extract state variables
+    λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
     # local freestream velocity components
+    u, v, ω = section_velocities(U, θ, hdot, θdot)
     u_θ, v_θ, ω_θ = section_velocities_θ(U)
     u_hdot, v_hdot, ω_hdot = section_velocities_hdot()
     u_θdot, v_θdot, ω_θdot = section_velocities_θdot()
     # calculate loads
-    r_λ = wagner_loads_λ(a, b, ρ, a0, U)
-    L_θ, M_θ = wagner_loads_θ(a, b, ρ, a0, C1, C2, U)
-    L_hdot, M_hdot = wagner_loads_v(a, b, ρ, a0, C1, C2, U)
-    L_θdot, M_θdot = wagner_loads_ω(a, b, ρ, a0, C1, C2, U)
+    r_λ = wagner_loads_λ(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_λ, A_λ, M_λ = r_λ[1,:], r_λ[2,:], r_λ[3,:]
+    N_θ, M_θ = wagner_loads_θ(a, b, ρ, a0, C1, C2, U)
+    N_hdot, A_hdot, M_hdot = wagner_loads_v(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_θdot, A_θdot, M_θdot = wagner_loads_ω(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     # compute jacobian sub-matrices
     Jda = @SMatrix [0 0; 0 0; 0 0]
     Jds = @SMatrix [0 0 0 0; 0 v_θ v_hdot 0; 0 0 0 ω_θdot]
-    Jra = r_λ
-    Jrs = @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
+    Jra = vcat(N_λ', M_λ')
+    Jrs = @SMatrix [0 N_θ N_hdot N_θdot; 0 M_θ M_hdot M_θdot]
     # return jacobian
     return [Jda Jds; Jra Jrs]
 end
@@ -123,7 +127,7 @@ end
     λ1, λ2, h, θ, hdot, θdot = x
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
 
     xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
     yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]

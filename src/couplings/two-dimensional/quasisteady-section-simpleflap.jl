@@ -52,15 +52,15 @@ function get_coupling_inputs(aero::QuasiSteady{0}, stru::TypicalSection, flap::S
     # extract state variables
     h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # local freestream velocity components
     u, v = section_steady_velocities(U, θ)
     # calculate aerodynamic loads
-    La, Ma = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
+    Na, Aa, Ma = quasisteady0_loads(a, b, ρ, a0, α0, u, v)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # total loads
-    L = La + Lf
+    L = Na + Nf
     M = Ma + Mf
     # return inputs
     return SVector(L, M)
@@ -71,15 +71,15 @@ function get_coupling_inputs(aero::QuasiSteady{1}, stru::TypicalSection, flap::S
     # extract state variables
     h, θ, hdot, θdot = x
     # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     # calculate aerodynamic loads
-    La, Ma = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
+    Na, Aa, Ma = quasisteady1_loads(a, b, ρ, a0, α0, u, v, ω)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # total loads
-    L = La + Lf
+    L = Na + Nf
     M = Ma + Mf
     # return inputs
     return SVector(L, M)
@@ -92,16 +92,16 @@ function get_coupling_inputs(aero::QuasiSteady{2}, stru::TypicalSection, flap::S
     # extract state variables
     h, θ, hdot, θdot = x
     # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # aerodynamic loads
-    La, Ma = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
+    Na, Aa, Ma = quasisteady2_loads(a, b, ρ, a0, α0, u, v, ω, vdot, ωdot)
     # loads due to flap deflections
-    Lf, Df, Mf = simpleflap_loads(b, u, ρ, clδ, cdδ, cmδ, δ)
+    Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # total loads
-    L = La + Lf
+    L = Na + Nf
     M = Ma + Mf
     # return inputs
     return SVector(L, M)
@@ -112,7 +112,7 @@ end
 function get_coupling_state_jacobian(aero::QuasiSteady{0}, stru::TypicalSection,
     flap::SimpleFlap, dx, x, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # return jacobian
     return quasisteady0_section_state_jacobian(a, b, ρ, a0, U)
 end
@@ -120,7 +120,7 @@ end
 function get_coupling_state_jacobian(aero::QuasiSteady{1}, stru::TypicalSection,
     flap::SimpleFlap, dx, x, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # return jacobian
     return quasisteady1_section_state_jacobian(a, b, ρ, a0, U)
 end
@@ -128,7 +128,7 @@ end
 function get_coupling_state_jacobian(aero::QuasiSteady{2}, stru::TypicalSection,
     flap::SimpleFlap, dx, x, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # return jacobian
     return quasisteady2_section_state_jacobian(a, b, ρ, a0, U)
 end
@@ -168,7 +168,7 @@ end
     h, θ, hdot, θdot = x
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, clδ, cdδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
 
     xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
     yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]

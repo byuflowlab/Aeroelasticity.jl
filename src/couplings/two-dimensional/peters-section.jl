@@ -21,14 +21,14 @@ coupling_time_gradient_type(::Type{<:Peters}, ::Type{TypicalSection}) = Zeros()
 
 # --- Methods --- #
 
-function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    dx, x, p, t) where {N,TF,SV,SA}
+function get_coupling_inputs(aero::Peters{Nλ,TF,SV,SA}, stru::TypicalSection,
+    dx, x, p, t) where {Nλ,TF,SV,SA}
     # extract rate variables
-    dλ = dx[SVector{N}(1:N)]
-    dh, dθ, dhdot, dθdot = dx[SVector{4}(N+1:N+4)]
+    dλ = dx[SVector{Nλ}(1:Nλ)]
+    dh, dθ, dhdot, dθdot = dx[SVector{4}(Nλ+1:Nλ+4)]
     # extract state variables
-    λ = x[SVector{N}(1:N)]
-    h, θ, hdot, θdot = x[SVector{4}(N+1:N+4)]
+    λ = x[SVector{Nλ}(1:Nλ)]
+    h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
@@ -37,69 +37,76 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate loads
-    L, M = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N, A, M = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    # lift is approximately equal to the normal force
+    L = N
     # return inputs
     return SVector(u, ω, vdot, ωdot, L, M)
 end
 
 # --- Performance Overloads --- #
 
-function get_coupling_rate_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, dx, x, p, t) where {N,TF,SV,SA}
+function get_coupling_rate_jacobian(aero::Peters{Nλ,TF,SV,SA},
+    stru::TypicalSection, dx, x, p, t) where {Nλ,TF,SV,SA}
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # local freestream velocity components
     udot_dhdot, vdot_dhdot, ωdot_dhdot = section_accelerations_dhdot()
     udot_dθdot, vdot_dθdot, ωdot_dθdot = section_accelerations_dθdot()
     # calculate aerodynamic loads
-    L_vdot, M_vdot = peters_loads_vdot(a, b, ρ)
-    L_ωdot, M_ωdot = peters_loads_ωdot(a, b, ρ)
+    N_vdot, A_vdot, M_vdot = peters_loads_vdot(a, b, ρ)
+    N_ωdot, A_ωdot, M_ωdot = peters_loads_ωdot(a, b, ρ)
     # propagate derivatives
-    L_dhdot = L_vdot * vdot_dhdot + L_ωdot * ωdot_dhdot
-    L_dθdot = L_vdot * vdot_dθdot + L_ωdot * ωdot_dθdot
+    N_dhdot = N_vdot * vdot_dhdot + N_ωdot * ωdot_dhdot
+    N_dθdot = N_vdot * vdot_dθdot + N_ωdot * ωdot_dθdot
     M_dhdot = M_vdot * vdot_dhdot + M_ωdot * ωdot_dhdot
     M_dθdot = M_vdot * vdot_dθdot + M_ωdot * ωdot_dθdot
     # construct submatrices
-    Jyaa = zeros(SMatrix{4,N,TF})
+    Jyaa = zeros(SMatrix{4,Nλ,TF})
     Jyas = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 vdot_dhdot vdot_dθdot; 0 0 ωdot_dhdot ωdot_dθdot]
-    Jysa = zeros(SMatrix{2,N,TF})
-    Jyss = @SMatrix [0 0 L_dhdot L_dθdot; 0 0 M_dhdot M_dθdot]
+    Jysa = zeros(SMatrix{2,Nλ,TF})
+    Jyss = @SMatrix [0 0 N_dhdot N_dθdot; 0 0 M_dhdot M_dθdot]
     # return jacobian
     return [Jyaa Jyas; Jysa Jyss]
 end
 
-function get_coupling_state_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, dx, x, p, t) where {N,TF,SV,SA}
+function get_coupling_state_jacobian(aero::Peters{Nλ,TF,SV,SA},
+    stru::TypicalSection, dx, x, p, t) where {Nλ,TF,SV,SA}
+    # extract state variables
+    λ = x[SVector{Nλ}(1:Nλ)]
+    h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     bbar = aero.b
     # local freestream velocity components
+    u, v, ω = section_velocities(U, θ, hdot, θdot)
     u_θ, v_θ, ω_θ = section_velocities_θ(U)
     u_hdot, v_hdot, ω_hdot = section_velocities_hdot()
     u_θdot, v_θdot, ω_θdot = section_velocities_θdot()
     # calculate aerodynamic loads
-    r_λ = peters_loads_λ(a, b, ρ, a0, bbar, U)
-    L_θ, M_θ = peters_loads_θ(a, b, ρ, a0, U)
-    L_hdot, M_hdot = peters_loads_v(a, b, ρ, a0, U)
-    L_θdot, M_θdot = peters_loads_ω(a, b, ρ, a0, U)
+    r_λ = peters_loads_λ(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_λ, A_λ, M_λ = r_λ[1,:], r_λ[2,:], r_λ[3,:]
+    N_θ, M_θ = peters_loads_θ(a, b, ρ, a0, U)
+    N_hdot, A_hdot, M_hdot = peters_loads_v(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_θdot, A_θdot, M_θdot = peters_loads_ω(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     # construct sub-matrices
-    Jyaa = zeros(SMatrix{4,N,TF}) # d(d)/d(dλ)
+    Jyaa = zeros(SMatrix{4,Nλ,TF}) # d(d)/d(dλ)
     Jyas = @SMatrix [0 0 0 0; 0 ω_θ ω_hdot ω_θdot; 0 0 0 0; 0 0 0 0]
-    Jysa = r_λ
-    Jyss = @SMatrix [0 L_θ L_hdot L_θdot; 0 M_θ M_hdot M_θdot]
+    Jysa = vcat(N_λ', M_λ')
+    Jyss = @SMatrix [0 N_θ N_hdot N_θdot; 0 M_θ M_hdot M_θdot]
     # return jacobian
     return [Jyaa Jyas; Jysa Jyss]
 end
 
-function get_coupling_parameter_jacobian(aero::Peters{N,TF,SV,SA},
-    stru::TypicalSection, dx, x, p, t) where {N,TF,SV,SA}
+function get_coupling_parameter_jacobian(aero::Peters{Nλ,TF,SV,SA},
+    stru::TypicalSection, dx, x, p, t) where {Nλ,TF,SV,SA}
     # extract rate variables
-    dλ = dx[SVector{N}(1:N)]
-    dh, dθ, dhdot, dθdot = dx[SVector{4}(N+1:N+4)]
+    dλ = dx[SVector{Nλ}(1:Nλ)]
+    dh, dθ, dhdot, dθdot = dx[SVector{4}(Nλ+1:Nλ+4)]
     # extract state variables
-    λ = x[SVector{N}(1:N)]
-    h, θ, hdot, θdot = x[SVector{4}(N+1:N+4)]
+    λ = x[SVector{Nλ}(1:Nλ)]
+    h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
@@ -109,24 +116,24 @@ function get_coupling_parameter_jacobian(aero::Peters{N,TF,SV,SA},
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     u_U, v_U, ω_U = section_velocities_U(θ)
     # calculate loads
-    L_a, M_a = peters_loads_a(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
-    L_b, M_b = peters_loads_b(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
-    L_a0, M_a0 = peters_loads_a0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    L_α0, M_α0 = peters_loads_α0(a, b, ρ, a0, u)
+    N_a, A_a, M_a = peters_loads_a(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N_b, A_b, M_b = peters_loads_b(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N_a0, A_a0, M_a0 = peters_loads_a0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_α0, A_α0, M_α0 = peters_loads_α0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
 
-    L_u, M_u = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    L_v, M_v = peters_loads_v(a, b, ρ, a0, U)
-    L_U = L_u * u_U + L_v * v_U
+    N_u, A_u, M_u = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_v, A_v, M_v = peters_loads_v(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_U = N_u * u_U + N_v * v_U
     M_U = M_u * u_U + M_v * v_U
 
-    L_ρ, M_ρ = peters_loads_ρ(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N_ρ, A_ρ, M_ρ = peters_loads_ρ(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
         # compute jacobian sub-matrices
     Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 0]
     Jyas = @SMatrix [0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0]
     Jyap = @SMatrix [u_U 0; ω_U 0; 0 0; 0 0]
-    Jysa = @SMatrix [L_a L_b L_a0 L_α0; M_a M_b M_a0 M_α0]
+    Jysa = @SMatrix [N_a N_b N_a0 N_α0; M_a M_b M_a0 M_α0]
     Jyss = @SMatrix [0 0 0 0 0; 0 0 0 0 0]
-    Jysp = @SMatrix [L_U L_ρ; M_U M_ρ]
+    Jysp = @SMatrix [N_U N_ρ; M_U M_ρ]
     # return jacobian
     return [Jyaa Jyas Jyap; Jysa Jyss Jysp]
 end
@@ -148,8 +155,8 @@ end
 
 # --- Plotting --- #
 
-@recipe function f(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
-    dx, x, y, p, t) where {N,TF,SV,SA}
+@recipe function f(aero::Peters{Nλ,TF,SV,SA}, stru::TypicalSection,
+    dx, x, y, p, t) where {Nλ,TF,SV,SA}
 
     framestyle --> :origin
     grid --> false
@@ -158,8 +165,8 @@ end
     label --> @sprintf("t = %6.3f", t)
 
     # extract state variables
-    λ = x[SVector{N}(1:N)]
-    h, θ, hdot, θdot = x[SVector{4}(N+1:N+4)]
+    λ = x[SVector{Nλ}(1:Nλ)]
+    h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
 
     # extract parameters
     a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
@@ -173,7 +180,7 @@ end
 # --- Internal Methods --- #
 
 function peters_loads_θ(a, b, ρ, a0, u)
-    L_θ = a0*ρ*u^2*b
-    M_θ = (b/2 + a*b)*L_θ
-    return SVector(L_θ, M_θ)
+    N_θ = a0*ρ*u^2*b
+    M_θ = (b/2 + a*b)*N_θ
+    return SVector(N_θ, M_θ)
 end

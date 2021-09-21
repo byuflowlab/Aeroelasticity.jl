@@ -35,9 +35,9 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, dx, x, p, t
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # aerodynamic loads
-    L, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N, A, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # forces and moments per unit span
-    f = SVector(0, 0, L)
+    f = SVector(A, 0, N)
     m = SVector(0, M, 0)
     # return portion of inputs that is not dependent on the state rates
     return vcat(u, v, ω, f, m)
