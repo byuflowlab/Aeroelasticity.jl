@@ -110,8 +110,9 @@ function deformable_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
 
     L = 2*pi*ρ*b*f*u*(v - λ0 - u*α0) - pi*ρ*b*u*ω - pi*ρ*b^2*vdot
 
-    pi*ρ*b^2*(1 - 2*a)*u*ω + pi*ρ*b^2*u*ω
-    L = a0*ρ*u*b*(v + (b/2 - a*b)*ω - λ0 - u*α0) + pi*ρ*b^2*(vdot - 1/2*ddh2) + pi*ρ*b*udot*h0*h1 + 2*pi*ρ*u^2*sum(1:N .* hn)
+    2*pi*ρ*b^2*u*ω
+
+    L = a0*ρ*u*b*(v + (b/2 - a*b)*ω - λ0 - u*α0) + pi*ρ*b^2*(vdot) + pi*ρ*b*udot*h0*h1 + 2*pi*ρ*u^2*sum(1:N .* hn)
     L = a0*ρ*u*b*(v + (b/2 - a*b)*ω - λ0 - u*α0) + pi*ρ*b^3*(vdot/b + u/b*ω - a*ωdot)
 
 

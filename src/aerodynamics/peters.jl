@@ -209,7 +209,7 @@ end
 
 function peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     # circulatory load factor
-    tmp1 = a0*ρ*u*b
+    tmp1 = a0*f*ρ*u*b
     # non-circulatory load factor
     tmp2 = pi*ρ*b^3
     # constant based on geometry
