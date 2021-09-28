@@ -16,6 +16,8 @@ r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 xθ = e - a
 a0 = 2*pi # lift curve slope
 α0 = 0 # zero lift angle
+cd0 = 0
+cm0 = 0
 
 # chosen dimensional parameters
 b = 1
@@ -72,7 +74,7 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
     for i = 1:length(V)
 
         # set parameters
-        p_aero = [a, b, a0, α0]
+        p_aero = [a, b, a0, α0, cd0, cm0]
         p_stru = [kh, kθ, m, Sθ, Iθ]
         p_input = [U[i], ρ]
         p = vcat(p_aero, p_stru, p_input)
@@ -217,7 +219,7 @@ dxf = zeros(number_of_states(model))
 xf = zeros(number_of_states(model))
 
 # flutter mode parameters
-p_aero = [a, b, a0, α0]
+p_aero = [a, b, a0, α0, cd0, cm0]
 p_stru = [kh, kθ, m, Sθ, Iθ]
 p_input = [Vf*b*ωθ, ρ]
 pf = vcat(p_aero, p_stru, p_input)
@@ -241,7 +243,7 @@ end
 # save animation
 gif(anim, &quot;typical-section-flutter-mode.gif&quot;)
 
-nothing #hide</code></pre><p>The non-dimensional parameters we use for this example match those used by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;.  Hodges and Pierce performed the analysis using a steady state model and Peter&#39;s finite state model with six state variables.   The results presented here for the steady-state and Peters&#39; finite state models match the results presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;, which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters&#39; models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.</p><p>Time domain simulations may also be used in order to determine a system&#39;s stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the <a href="../library/public/#AerostructuralDynamics.get_ode"><code>get_ode</code></a> function and then solved using the <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations</a> package.</p><pre><code class="language- hljs">using DifferentialEquations
+nothing #hide</code></pre><p>The non-dimensional parameters we use for this example match those used by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;.  Hodges and Pierce performed the analysis using a steady state model and Peter&#39;s finite state model with six state variables.   The results presented here for the steady-state and Peters&#39; finite state models match the results presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;, which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters&#39; models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.</p><p>Time domain simulations may also be used in order to determine a system&#39;s stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the <a href="../library/public/#AerostructuralDynamics.get_ode"><code>get_ode</code></a> function and then solved using the <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations</a> package.</p><pre><code class="language-julia hljs">using DifferentialEquations
 
 # models
 aerodynamic_model = Peters{6}()
@@ -257,6 +259,8 @@ r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 xθ = e - a
 a0 = 2*pi # lift curve slope
 α0 = 0 # zero lift angle
+cd0 = 0
+cm0 = 0
 V = 1.0 # = U/(b*ωθ) (reduced velocity)
 
 # chosen dimensional parameters
@@ -274,7 +278,7 @@ kθ = Iθ*ωθ^2
 U = V*b*ωθ
 
 # parameters
-p_aero = [a, b, a0, α0]
+p_aero = [a, b, a0, α0, cd0, cm0]
 p_stru = [kh, kθ, m, Sθ, Iθ]
 p_additional = [U, ρ]
 p = vcat(p_aero, p_stru, p_additional)
@@ -294,9 +298,7 @@ f = get_ode(coupled_model)
 prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
 
 # solve ODE
-sol = DifferentialEquations.solve(prob)
-
-nothing #hide</code></pre><p>We can then plot the solution using DifferentialEquations&#39; built-in interface with the <a href="https://github.com/JuliaPlots/Plots.jl">Plots</a> package.</p><pre><code class="language- hljs">using Plots
+sol = DifferentialEquations.solve(prob)</code></pre><p>We can then plot the solution using DifferentialEquations&#39; built-in interface with the <a href="https://github.com/JuliaPlots/Plots.jl">Plots</a> package.</p><pre><code class="language-julia hljs">using Plots
 pyplot()
 
 plot(sol,
@@ -311,11 +313,7 @@ plot(sol,
     label = &quot;&quot;,
     layout = (4, 1),
     size = (600,1200)
-    )
-
-savefig(&quot;typical-section-solution.svg&quot;) #hide
-
-nothing #hide</code></pre><p><img src="typical-section-solution.svg" alt/></p><p>We can also visualize and/or create animations of the solution geometry with the help of custom plot recipes.</p><pre><code class="language- hljs"># Plot Recipes:
+    )</code></pre><p><img src="../typical-section-solution.svg" alt/></p><p>We can also visualize and/or create animations of the solution geometry with the help of custom plot recipes.</p><pre><code class="language-julia hljs"># Plot Recipes:
 # - plot(model, dx, x, p, t)
 # - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
 # - plot(model, sol, t) # plots the solution geometry at time `t`
@@ -326,9 +324,8 @@ anim = @animate for t in range(tspan[1], tspan[2], length=200)
 end
 
 # save animation
-gif(anim, &quot;typical-section-simulation.gif&quot;)
-
-nothing #hide</code></pre><p><img src="typical-section-simulation.gif" alt/></p><p>Visualizing the solution geometry is especially helpful for identifying mode shapes.  For example, we can visualize the mode shape of the flutter mode for this system.</p><pre><code class="language- hljs"># Plot Recipes:
+gif(anim, &quot;typical-section-simulation.gif&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Saved animation to
+└   fn = &quot;/home/runner/work/AerostructuralDynamics.jl/AerostructuralDynamics.jl/docs/build/typical-section-simulation.gif&quot;</code></pre><p><img src="../typical-section-simulation.gif" alt/></p><p>Visualizing the solution geometry is especially helpful for identifying mode shapes.  For example, we can visualize the mode shape of the flutter mode for this system.</p><pre><code class="language-julia hljs"># Plot Recipes:
 # - plot(model, dx, x, p, t)
 # - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
 # - plot(model, sol, t) # plots the solution geometry at time `t`
@@ -339,9 +336,8 @@ anim = @animate for t in range(tspan[1], tspan[2], length=200)
 end
 
 # save animation
-gif(anim, &quot;typical-section-flutter-mode.gif&quot;)
-
-nothing #hide</code></pre><p><img src="typical-section-flutter-mode.gif" alt/></p><h2 id="Aeroelastic-Analysis-of-the-Goland-Wing"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-the-Goland-Wing">Aeroelastic Analysis of the Goland Wing</a><a id="Aeroelastic-Analysis-of-the-Goland-Wing-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-the-Goland-Wing" title="Permalink"></a></h2><p><img src="goland-wing.png" alt/></p><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been extensively used for validation.</p><p>The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its airfoil consists of a 4% thick parabolic arc.  There are two configurations for this wing, one with a tip store and one without.  The configuration we consider in this example is the configuration without a tip store.</p><p>The deflections of Goland wing are relatively small, so linear structural models are sufficient for modeling the wing&#39;s structure.  However, to demonstrate the capabilities of this package, we will use a nonlinear geometrically exact beam theory model.  </p><p>For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is inappropriate for this wing due to the wing&#39;s low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.</p><pre><code class="language- hljs">using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
+gif(anim, &quot;typical-section-flutter-mode.gif&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Saved animation to
+└   fn = &quot;/home/runner/work/AerostructuralDynamics.jl/AerostructuralDynamics.jl/docs/build/typical-section-flutter-mode.gif&quot;</code></pre><p><img src="../typical-section-flutter-mode.gif" alt/></p><h2 id="Aeroelastic-Analysis-of-the-Goland-Wing"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-the-Goland-Wing">Aeroelastic Analysis of the Goland Wing</a><a id="Aeroelastic-Analysis-of-the-Goland-Wing-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-the-Goland-Wing" title="Permalink"></a></h2><p><img src="goland-wing.png" alt/></p><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been extensively used for validation.</p><p>The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its airfoil consists of a 4% thick parabolic arc.  There are two configurations for this wing, one with a tip store and one without.  The configuration we consider in this example is the configuration without a tip store.</p><p>The deflections of Goland wing are relatively small, so linear structural models are sufficient for modeling the wing&#39;s structure.  However, to demonstrate the capabilities of this package, we will use a nonlinear geometrically exact beam theory model.  </p><p>For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is inappropriate for this wing due to the wing&#39;s low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.</p><pre><code class="language- hljs">using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
 
 # discretization
 N = 8 # number of elements
@@ -987,4 +983,4 @@ for i = 1:size(λ, 1)
 end
 
 p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)
-</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../guide/">« Getting Started</a><a class="docs-footer-nextpage" href="../aerodynamics/steady/">Steady Thin Airfoil Theory »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.6 on <span class="colophon-date" title="Thursday 23 September 2021 21:25">Thursday 23 September 2021</span>. Using Julia version 1.6.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../guide/">« Getting Started</a><a class="docs-footer-nextpage" href="../aerodynamics/steady/">Steady Thin Airfoil Theory »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.7 on <span class="colophon-date" title="Tuesday 28 September 2021 21:21">Tuesday 28 September 2021</span>. Using Julia version 1.6.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
