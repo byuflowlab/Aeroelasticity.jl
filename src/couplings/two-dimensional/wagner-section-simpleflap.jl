@@ -28,7 +28,7 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, flap::SimpleFla
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -36,7 +36,7 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, flap::SimpleFla
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate aerodynamic loads (except contribution from state rates)
-    Na, Aa, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    Na, Aa, Ma = wagner_loads(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # loads due to flap deflections
     Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
@@ -51,7 +51,7 @@ end
 function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection,
     flap::SimpleFlap, dx, x, p, t)
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # calculate loads
     N_hddot, A_hddot, M_hddot = wagner_loads_vdot(a, b, ρ)
     N_θddot, A_θddot, M_θddot = wagner_loads_ωdot(a, b, ρ)
@@ -69,7 +69,7 @@ function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection,
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -127,7 +127,7 @@ end
     λ1, λ2, h, θ, hdot, θdot = x
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
 
     xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
     yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]

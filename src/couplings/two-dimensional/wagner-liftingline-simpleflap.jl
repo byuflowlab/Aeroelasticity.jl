@@ -62,7 +62,7 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection,
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
+    a, b, a0, α0, cd0, cm0, cnδ, caδ, cmδ, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -70,7 +70,7 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection,
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # aerodynamic loads
-    Na, Aa, Ma = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    Na, Aa, Ma = wagner_loads(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # loads due to flap deflections
     Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
     # loads per unit span
@@ -89,7 +89,7 @@ function get_coupling_rate_jacobian(aero::Wagner, stru::LiftingLineSection,
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz, δ = x
     # extract parameters
-    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
+    a, b, a0, α0, cd0, cm0, cnδ, caδ, cmδ, ρ = p
     # calculate loads
     N_dvx, A_dvx, M_dvx = wagner_loads_udot()
     N_dvz, A_dvz, M_dvz = wagner_loads_vdot(a, b, ρ)

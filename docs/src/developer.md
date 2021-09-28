@@ -348,7 +348,7 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = s
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -374,7 +374,7 @@ end
 
 function get_coupling_mass_matrix(aero::Wagner, stru::TypicalSection, s, p, t)
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # non-circulatory load factor
     tmp = pi*ρ*b^3
     # lift at reference point
@@ -402,7 +402,7 @@ For the [`Wagner`](@ref) model coupled with the [`TypicalSection`](@ref) model, 
 ```julia
 function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, u, p, t) where {N,TF,SV,SA}
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -481,7 +481,7 @@ function get_inputs_using_state_rates(aero::Wagner, stru::TypicalSection,
     # extract state rates
     dλ1, dλ2, dh, dθ, dhdot, dθdot = ds
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # local freestream velocity components
     udot = 0
     vdot = dhdot

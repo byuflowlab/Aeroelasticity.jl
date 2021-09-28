@@ -56,7 +56,7 @@ end
 
 number_of_states(::Type{Peters{N,TF,SV,SA}}) where {N,TF,SV,SA} = N
 number_of_inputs(::Type{<:Peters}) = 4
-number_of_parameters(::Type{<:Peters}) = 4
+number_of_parameters(::Type{<:Peters}) = 6
 
 inplaceness(::Type{<:Peters}) = OutOfPlace()
 
@@ -76,7 +76,7 @@ function get_residual(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where {N,TF,SV,
     # extract inputs
     u, ω, vdot, ωdot = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     Abar = model.A
     cbar = model.c
@@ -97,7 +97,7 @@ function get_state_jacobian(model::Peters, dx, x, y, p, t)
     # extract inputs
     u, ω, vdot, ωdot = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     Abar = model.A
     cbar = model.c
@@ -111,7 +111,7 @@ function get_input_jacobian(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where {N,
     # extract inputs
     u, ω, vdot, ωdot = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     Abar = model.A
     cbar = model.c
@@ -125,7 +125,7 @@ function get_parameter_jacobian(model::Peters{N,TF,SV,SA}, dx, x, y, p, t) where
     # extract inputs
     u, ω, vdot, ωdot = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     Abar = model.A
     cbar = model.c
@@ -152,12 +152,14 @@ function set_inputs!(y, model::Peters; u, omega, vdot, omegadot)
     return y
 end
 
-function set_parameters!(p, model::Peters; a, b, a0, alpha0)
+function set_parameters!(p, model::Peters; a, b, a0, alpha0, cd0, cm0)
 
     p[1] = a
     p[2] = b
     p[3] = a0
     p[4] = alpha0
+    p[5] = cd0
+    p[6] = cm0
 
     return p
 end
@@ -171,7 +173,7 @@ end
 
 function separate_parameters(model::Peters, p)
 
-    return (a = p[1], b = p[2], a0 = p[3], alpha0 = p[4])
+    return (a = p[1], b = p[2], a0 = p[3], alpha0 = p[4], cd0 = p[5], cm0 = p[6])
 end
 
 # --- Internal Methods for Model --- #
@@ -201,15 +203,17 @@ function peters_parameter_jacobian(λ, u, ω, ωdot, a, b, Abar, cbar)
     dλ_b = -cbar*(1/2-a)*ωdot - u/b^2*λ
     dλ_a0 = zero(cbar)
     dλ_α0 = zero(cbar)
+    dλ_cd0 = zero(cbar)
+    dλ_cm0 = zero(cbar)
 
-    return hcat(dλ_a, dλ_b, dλ_a0, dλ_α0)
+    return hcat(dλ_a, dλ_b, dλ_a0, dλ_α0, dλ_cd0, dλ_cm0)
 end
 
 # --- Internal Methods for Couplings --- #
 
-function peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+function peters_loads(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
     # circulatory load factor
-    tmp1 = a0*f*ρ*u*b
+    tmp1 = a0*ρ*u*b
     # non-circulatory load factor
     tmp2 = pi*ρ*b^3
     # constant based on geometry
@@ -219,9 +223,9 @@ function peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     # normal force at the reference point
     N = tmp1*(v + d*ω - λ0 - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
     # axial force at the reference point
-    A = -a0*ρ*b*(v + d*ω - λ0 - u*α0)^2
+    A = -a0*ρ*b*(v + d*ω - λ0 - u*α0)^2 + ρ*b*u^2*cd0
     # moment at reference point
-    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N
+    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + 2*ρ*b^2*u^2*cm0 + (b/2 + a*b)*N
     # calculate loads
     return SVector(N, A, M)
 end
@@ -241,7 +245,7 @@ function peters_loads_a(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     return SVector(N_a, A_a, M_a)
 end
 
-function peters_loads_b(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+function peters_loads_b(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
 
     tmp1 = a0*ρ*u*b
     tmp1_b = a0*ρ*u
@@ -258,14 +262,15 @@ function peters_loads_b(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
 
     N_b = tmp1_b*(v + d*ω - λ0 - u*α0) + tmp1*d_b*ω +
         tmp2_b*(vdot/b + u/b*ω - a*ωdot) + tmp2*(-vdot/b^2 - u/b^2*ω)
-    A_b = -2*a0*ρ*b*(v + d*ω - λ0 - u*α0)*d_b - a0*ρ*(v + d*ω - λ0 - u*α0)^2
+    A_b = -2*a0*ρ*b*(v + d*ω - λ0 - u*α0)*d_b - a0*ρ*(v + d*ω - λ0 - u*α0)^2 + 
+        ρ*u^2*cd0
     M_b = -tmp2_b*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) - tmp2*(1/8 - a/2)*ωdot +
-        (1/2 + a)*N + (b/2 + a*b)*N_b
+        4*ρ*b*u^2*cm0 + (1/2 + a)*N + (b/2 + a*b)*N_b
 
     return SVector(N_b, A_b, M_b)
 end
 
-function peters_loads_ρ(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+function peters_loads_ρ(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
 
     tmp1_ρ = a0*u*b
 
@@ -276,8 +281,8 @@ function peters_loads_ρ(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
     λ0 = 1/2 * bbar'*λ
 
     N_ρ = tmp1_ρ*(v + d*ω - λ0 - u*α0) + tmp2_ρ*(vdot/b + u/b*ω - a*ωdot)
-    A_ρ = -a0*b*(v + d*ω - λ0 - u*α0)^2
-    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + (b/8 - a*b/2)*ωdot) + (b/2 + a*b)*N_ρ
+    A_ρ = -a0*b*(v + d*ω - λ0 - u*α0)^2 + b*u^2*cd0
+    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + (b/8 - a*b/2)*ωdot) + 2*b^2*u^2*cm0 + (b/2 + a*b)*N_ρ
 
     return SVector(N_ρ, A_ρ, M_ρ)
 end
@@ -309,7 +314,21 @@ function peters_loads_α0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     return SVector(N_α0, A_α0, M_α0)
 end
 
-function peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+function peters_loads_cd0(b, ρ, u)
+    N_cd0 = 0
+    A_cd0 = ρ*b*u^2
+    M_cd0 = 0
+    return SVector(N_cd0, A_cd0, M_cd0)
+end
+
+function peters_loads_cm0(b, ρ, u)
+    N_cm0 = 0
+    A_cm0 = 0
+    M_cm0 = 2*ρ*b^2*u^2
+    return SVector(N_cm0, A_cm0, M_cm0)
+end
+
+function peters_loads_u(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, λ)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
@@ -322,9 +341,9 @@ function peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     # normal force at reference point
     N_u = tmp1_u*(v + d*ω - λ0 - u*α0) - tmp1*α0 + tmp2/b*ω
     # axial force at reference point
-    A_u = 2*a0*ρ*b*α0*(v + d*ω - λ0 - u*α0)
+    A_u = 2*a0*ρ*b*α0*(v + d*ω - λ0 - u*α0) + 2*ρ*b*u*cd0
     # moment at reference point
-    M_u = -tmp2*ω + (b/2 + a*b)*N_u
+    M_u = -tmp2*ω + 4*ρ*b^2*u*cm0 + (b/2 + a*b)*N_u
 
     return SVector(N_u, A_u, M_u)
 end
@@ -372,36 +391,4 @@ function peters_loads_λ(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     A_λ = a0*ρ*b*(v + d*ω - λ0 - u*α0)*bbar'
     M_λ = (b/2 + a*b)*N_λ
     return vcat(N_λ, A_λ, M_λ)
-end
-
-function peters_state_loads(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
-    # circulatory load factor
-    tmp1 = a0*ρ*u*b
-    # non-circulatory load factor
-    tmp2 = pi*ρ*b^3
-    # constant based on geometry
-    d = b/2 - a*b
-    # induced flow velocity
-    λ0 = 1/2 * bbar'*λ
-    # normal force at reference point
-    N = tmp1*(v + d*ω - λ0 - u*α0) + tmp2*u/b*ω
-    # axial force at reference point
-    A = -a0*ρ*b*(v + d*ω - λ0 - u*α0)^2
-    # moment at reference point
-    M = -tmp2*u*ω + (b/2 + a*b)*N
-
-    return SVector(N, A, M)
-end
-
-function peters_rate_loads(a, b, ρ, vdot, ωdot)
-    # non-circulatory load factor
-    tmp = pi*ρ*b^3
-    # normal force at reference point
-    N = tmp*(vdot/b - a*ωdot)
-    # axial force at reference point
-    A = 0
-    # moment at reference point
-    M = -tmp*(vdot/2 + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N
-
-    return SVector(N, A, M)
 end

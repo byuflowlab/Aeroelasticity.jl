@@ -51,7 +51,7 @@ function get_rates(model::Wagner, λ, d, p, t) where {N,TF,SV,SA}
     # extract inputs
     u, v, ω = d
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     C1 = model.C1
     C2 = model.C2
@@ -67,7 +67,7 @@ function get_state_jacobian(model::Wagner, λ, d, p, t)
     # extract inputs
     u, v, ω = d
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     ε1 = model.eps1
     ε2 = model.eps2
@@ -81,7 +81,7 @@ function get_input_jacobian(model::Wagner, λ, d, p, t)
     # extract inputs
     u, v, ω = d
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     C1 = model.C1
     C2 = model.C2

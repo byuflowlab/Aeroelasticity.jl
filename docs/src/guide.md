@@ -97,6 +97,8 @@ r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 xθ = e - a
 a0 = 2*pi # lift curve slope
 α0 = 0 # zero lift angle
+cd0 = 0
+cm0 = 0
 V = 1.0 # = U/(b*ωθ) (reduced velocity)
 
 # chosen dimensional parameters
@@ -114,7 +116,7 @@ kθ = Iθ*ωθ^2
 U = V*b*ωθ
 
 # parameters
-p_aero = [a, b, a0, α0]
+p_aero = [a, b, a0, α0, cd0, cm0]
 p_stru = [kh, kθ, m, Sθ, Iθ]
 p_additional = [U, ρ]
 p = vcat(p_aero, p_stru, p_additional)

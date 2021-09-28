@@ -69,7 +69,7 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     δ = x[end]
 
     # extract parameters
-    a, b, a0, α0, cnδ, caδ, cmδ, ρ = p
+    a, b, a0, α0, cd0, cm0, cnδ, caδ, cmδ, ρ = p
 
     # extract model constants
     bbar = aero.b
@@ -79,7 +79,7 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::LiftingLineSection,
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
 
     # aerodynamic loads
-    Na, Aa, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    Na, Aa, Ma = peters_loads(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
 
     # loads due to flap deflections
     Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)

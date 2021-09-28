@@ -2,7 +2,8 @@
     Wagner{TF} <: AbstractModel
 
 Aerodynamic model based on Wagner's function with state variables ``\\lambda_1,
-\\lambda_2``, inputs ``u, v, \\omega``, and parameters ``a, b, a_0, \\alpha_0``
+\\lambda_2``, inputs ``u, v, \\omega``, and parameters ``a, b, a_0, \\alpha_0, 
+c_{d0}, c_{m0}``
 """
 struct Wagner{TF} <: AbstractModel
     C1::TF
@@ -26,7 +27,7 @@ end
 
 number_of_states(::Type{<:Wagner}) = 2
 number_of_inputs(::Type{<:Wagner}) = 3
-number_of_parameters(::Type{<:Wagner}) = 4
+number_of_parameters(::Type{<:Wagner}) = 6
 
 inplaceness(::Type{<:Wagner}) = OutOfPlace()
 
@@ -46,7 +47,7 @@ function get_residual(model::Wagner, dx, x, y, p, t)
     # extract inputs
     u, v, ω = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     C1 = model.C1
     C2 = model.C2
@@ -62,7 +63,7 @@ function get_state_jacobian(model::Wagner, dx, x, y, p, t)
     # extract inputs
     u, v, ω = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     ε1 = model.eps1
     ε2 = model.eps2
@@ -76,7 +77,7 @@ function get_input_jacobian(model::Wagner, dx, x, y, p, t)
     # extract inputs
     u, v, ω = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     C1 = model.C1
     C2 = model.C2
@@ -92,7 +93,7 @@ function get_parameter_jacobian(model::Wagner, dx, x, y, p, t)
     # extract inputs
     u, v, ω = y
     # extract parameters
-    a, b, a0, α0 = p
+    a, b, a0, α0, cd0, cm0 = p
     # extract model constants
     C1 = model.C1
     C2 = model.C2
@@ -115,12 +116,14 @@ function set_inputs!(y, model::Wagner; u, v, omega)
     return y
 end
 
-function set_parameters!(p, model::Wagner; a, b, a0, alpha0)
+function set_parameters!(p, model::Wagner; a, b, a0, alpha0, cd0, cm0)
 
     p[1] = a
     p[2] = b
     p[3] = a0
     p[4] = alpha0
+    p[5] = cd0
+    p[6] = cm0
 
     return p
 end
@@ -137,7 +140,7 @@ end
 
 function separate_parameters(model::Wagner, p)
 
-    return (a=p[1], b=p[2], a0=p[3], alpha0=p[4])
+    return (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
 end
 
 # --- Internal Methods --- #
@@ -173,19 +176,23 @@ function wagner_parameter_jacobian(λ1, λ2, u, v, ω, b, α0, C1, C2, ε1, ε2)
     λ1dot_b = -ε1*u/b^2*λ1 + C1*ε1/b^2*(u*v - u^2*α0)
     λ1dot_a0 = 0
     λ1dot_α0 = C1*ε1*u^2/b
+    λ1dot_cd0 = 0
+    λ1dot_cm0 = 0
 
     λ2dot_a = C2*ε2*u*ω
     λ2dot_b = -ε2*u/b^2*λ2 + C2*ε2/b^2*(u*v - u^2*α0)
     λ2dot_a0 = 0
     λ2dot_α0 = C2*ε2*u^2/b
+    λ2dot_cd0 = 0
+    λ2dot_cm0 = 0
 
     return @SMatrix [
-        λ1dot_a λ1dot_b λ1dot_a0 λ1dot_α0;
-        λ2dot_a λ2dot_b λ2dot_a0 λ2dot_α0;
+        λ1dot_a λ1dot_b λ1dot_a0 λ1dot_α0 λ1dot_cd0 λ1dot_cm0;
+        λ2dot_a λ2dot_b λ2dot_a0 λ2dot_α0 λ2dot_cd0 λ2dot_cm0;
         ]
 end
 
-function wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+function wagner_loads(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # circulatory load factor
     tmp1 = a0*ρ*u*b
     # non-circulatory load factor
@@ -197,9 +204,9 @@ function wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2
     # normal force at reference point
     N = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*(vdot/b + u/b*ω - a*ωdot)
     # axial force at reference point
-    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
+    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2 + ρ*b*u^2*cd0
     # moment at reference point
-    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N
+    M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + 2*ρ*b^2*u^2*cm0 + (b/2 + a*b)*N
 
     return SVector(N, A, M)
 end
@@ -259,7 +266,7 @@ function wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, �
     return SVector(N_a, A_a, M_a)
 end
 
-function wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+function wagner_loads_b(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
 
     tmp1 = a0*ρ*u*b
     tmp1_b = a0*ρ*u
@@ -276,14 +283,15 @@ function wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, �
 
     N_b = tmp1_b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp1*d_b*ω*ϕ0 +
         tmp2_b*(vdot/b + u/b*ω - a*ωdot) + tmp2*(-vdot/b^2 - u/b^2*ω)
-    A_b = -a0*ρ*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2 - 2*a0*ρ*b*d_b*ω*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
-    M_b = -tmp2_b*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) - tmp2*(1/8 - a/2)*ωdot +
-        (1/2 + a)*N + (b/2 + a*b)*N_b
+    A_b = -a0*ρ*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2 - 
+        2*a0*ρ*b*d_b*ω*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + ρ*u^2*cd0
+    M_b = -tmp2_b*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) - tmp2*(1/8 - a/2)*ωdot + 
+        4*ρ*b*u^2*cm0 + (1/2 + a)*N + (b/2 + a*b)*N_b
 
     return SVector(N_b, A_b, M_b)
 end
 
-function wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+function wagner_loads_ρ(a, b, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
 
     tmp1_ρ = a0*u*b
 
@@ -294,8 +302,8 @@ function wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     ϕ0 = 1 - C1 - C2
 
     N_ρ = tmp1_ρ*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2_ρ*(vdot/b + u/b*ω - a*ωdot)
-    A_ρ = -a0*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
-    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N_ρ
+    A_ρ = -a0*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2 + b*u^2*cd0
+    M_ρ = -tmp2_ρ*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + 2*b^2*u^2*cm0 + (b/2 + a*b)*N_ρ
 
     return SVector(N_ρ, A_ρ, M_ρ)
 end
@@ -332,15 +340,29 @@ function wagner_loads_α0(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     return SVector(N_α0, A_α0, M_α0)
 end
 
-function wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+function wagner_loads_cd0(b, ρ, u)
+    N_cd0 = 0
+    A_cd0 = ρ*b*u^2
+    M_cd0 = 0
+    return SVector(N_cd0, A_cd0, M_cd0)
+end
+
+function wagner_loads_cm0(b, ρ, u)
+    N_cm0 = 0
+    A_cm0 = 0
+    M_cm0 = 2*ρ*b^2*u^2
+    return SVector(N_cm0, A_cm0, M_cm0)
+end
+
+function wagner_loads_u(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, λ1, λ2)
     tmp1 = a0*ρ*u*b
     tmp1_u = a0*ρ*b
     tmp2 = pi*ρ*b^3
     d = b/2 - a*b
     ϕ0 = 1 - C1 - C2
     N_u = tmp1_u*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) - tmp1*α0*ϕ0 + tmp2/b*ω
-    A_u = 2*a0*ρ*b*α0*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)
-    M_u = -tmp2*ω + (b/2 + a*b)*N_u
+    A_u = 2*a0*ρ*b*α0*ϕ0*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + 2*ρ*b*u*cd0
+    M_u = -tmp2*ω + 4*ρ*b^2*u*cm0 + (b/2 + a*b)*N_u
     return SVector(N_u, A_u, M_u)
 end
 
@@ -364,36 +386,4 @@ function wagner_loads_ω(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     M_ω = -tmp2*u + (b/2 + a*b)*N_ω
 
     return SVector(N_ω, A_ω, M_ω)
-end
-
-function wagner_state_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
-    # circulatory load factor
-    tmp1 = a0*ρ*u*b
-    # non-circulatory load factor
-    tmp2 = pi*ρ*b^3
-    # constant based on geometry
-    d = b/2 - a*b
-    # Wagner's function at t = 0.0
-    ϕ0 = 1 - C1 - C2
-    # normal force at reference point
-    N = tmp1*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2) + tmp2*u/b*ω
-    # axial force at reference point
-    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
-    # moment at reference point
-    M = -tmp2*u*ω + (b/2 + a*b)*N
-
-    return SVector(N, A, M)
-end
-
-function wagner_rate_loads(a, b, ρ, vdot, ωdot)
-    # non-circulatory load factor
-    tmp = pi*ρ*b^3
-    # normal force at reference point
-    N = tmp*(vdot/b - a*ωdot)
-    # axial force at reference point
-    A = -a0*ρ*b*((v + d*ω - u*α0)*ϕ0 + λ1 + λ2)^2
-    # moment at reference point
-    M = -tmp*(vdot/2 + b*(1/8 - a/2)*ωdot) + (b/2 + a*b)*N
-
-    return SVector(N, A, M)
 end

@@ -16,10 +16,10 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-ArnoldiMethod = "0.2"
+ArnoldiMethod = "0.0.4, 0.2"
 DiffEqBase = "6"
 ForwardDiff = "0.10"
 GXBeam = "0.2.3, 0.2.4"
-LinearMaps = "3"
+LinearMaps = "2, 3"
 StaticArrays = "0.12, 1"
 julia = "1.6"

@@ -30,14 +30,14 @@ function get_coupling_inputs(aero::Peters{Nλ,TF,SV,SA}, stru::TypicalSection,
     λ = x[SVector{Nλ}(1:Nλ)]
     h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     bbar = aero.b
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate loads
-    N, A, M = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N, A, M = peters_loads(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
     # lift is approximately equal to the normal force
     L = N
     # return inputs
@@ -49,7 +49,7 @@ end
 function get_coupling_rate_jacobian(aero::Peters{Nλ,TF,SV,SA},
     stru::TypicalSection, dx, x, p, t) where {Nλ,TF,SV,SA}
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # local freestream velocity components
     udot_dhdot, vdot_dhdot, ωdot_dhdot = section_accelerations_dhdot()
     udot_dθdot, vdot_dθdot, ωdot_dθdot = section_accelerations_dθdot()
@@ -76,7 +76,7 @@ function get_coupling_state_jacobian(aero::Peters{Nλ,TF,SV,SA},
     λ = x[SVector{Nλ}(1:Nλ)]
     h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     bbar = aero.b
     # local freestream velocity components
@@ -108,7 +108,7 @@ function get_coupling_parameter_jacobian(aero::Peters{Nλ,TF,SV,SA},
     λ = x[SVector{Nλ}(1:Nλ)]
     h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     bbar = aero.b
     # local freestream velocity components
@@ -117,21 +117,23 @@ function get_coupling_parameter_jacobian(aero::Peters{Nλ,TF,SV,SA},
     u_U, v_U, ω_U = section_velocities_U(θ)
     # calculate loads
     N_a, A_a, M_a = peters_loads_a(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
-    N_b, A_b, M_b = peters_loads_b(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N_b, A_b, M_b = peters_loads_b(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
     N_a0, A_a0, M_a0 = peters_loads_a0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     N_α0, A_α0, M_α0 = peters_loads_α0(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_cd0, A_cd0, M_cd0 = peters_loads_cd0(b, ρ, u)
+    N_cm0, A_cm0, M_cm0 = peters_loads_cm0(b, ρ, u)
 
-    N_u, A_u, M_u = peters_loads_u(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
+    N_u, A_u, M_u = peters_loads_u(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, λ)
     N_v, A_v, M_v = peters_loads_v(a, b, ρ, a0, α0, bbar, u, v, ω, λ)
     N_U = N_u * u_U + N_v * v_U
     M_U = M_u * u_U + M_v * v_U
 
-    N_ρ, A_ρ, M_ρ = peters_loads_ρ(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    N_ρ, A_ρ, M_ρ = peters_loads_ρ(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
         # compute jacobian sub-matrices
-    Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 0]
+    Jyaa = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
     Jyas = @SMatrix [0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0]
     Jyap = @SMatrix [u_U 0; ω_U 0; 0 0; 0 0]
-    Jysa = @SMatrix [N_a N_b N_a0 N_α0; M_a M_b M_a0 M_α0]
+    Jysa = @SMatrix [N_a N_b N_a0 N_α0 N_cd0 N_cm0; M_a M_b M_a0 M_α0 M_cd0 M_cm0]
     Jyss = @SMatrix [0 0 0 0 0; 0 0 0 0 0]
     Jysp = @SMatrix [N_U N_ρ; M_U M_ρ]
     # return jacobian
@@ -169,7 +171,7 @@ end
     h, θ, hdot, θdot = x[SVector{4}(Nλ+1:Nλ+4)]
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
 
     xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
     yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]

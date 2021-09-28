@@ -27,7 +27,7 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, dx, x, p, t
     # extract state variables
     λ1, λ2, vx, vy, vz, ωx, ωy, ωz = x
     # extract parameters
-    a, b, a0, α0, ρ = p
+    a, b, a0, α0, cd0, cm0, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -35,7 +35,7 @@ function get_coupling_inputs(aero::Wagner, stru::LiftingLineSection, dx, x, p, t
     u, v, ω = liftingline_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_accelerations(dvx, dvz, dωy)
     # aerodynamic loads
-    N, A, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N, A, M = wagner_loads(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # forces and moments per unit span
     f = SVector(A, 0, N)
     m = SVector(0, M, 0)

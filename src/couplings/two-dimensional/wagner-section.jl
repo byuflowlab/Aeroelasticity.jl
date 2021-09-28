@@ -27,7 +27,7 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, dx, x, p, t)
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -35,7 +35,7 @@ function get_coupling_inputs(aero::Wagner, stru::TypicalSection, dx, x, p, t)
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate loads
-    N, A, M = wagner_loads(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N, A, M = wagner_loads(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # lift is approximately normal force
     L = N
     # return inputs
@@ -46,7 +46,7 @@ end
 
 function get_coupling_rate_jacobian(aero::Wagner, stru::TypicalSection, p)
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # calculate loads
     N_hddot, A_hddot, M_hddot = wagner_loads_vdot(a, b, ρ)
     N_θddot, A_θddot, M_θddot = wagner_loads_ωdot(a, b, ρ)
@@ -63,7 +63,7 @@ function get_coupling_state_jacobian(aero::Wagner, stru::TypicalSection, dx, x, 
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -93,7 +93,7 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     # extract state variables
     λ1, λ2, h, θ, hdot, θdot = x
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
     # extract model constants
     C1 = aero.C1
     C2 = aero.C2
@@ -103,21 +103,23 @@ function get_coupling_parameter_jacobian(aero::Wagner, stru::TypicalSection, dx,
     u_U, v_U, ω_U = section_velocities_U(θ)
     # calculate loads
     N_a, A_a, M_a = wagner_loads_a(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
-    N_b, A_b, M_b = wagner_loads_b(a, b, ρ, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N_b, A_b, M_b = wagner_loads_b(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     N_a0, A_a0, M_a0 = wagner_loads_a0(a, b, ρ, α0, C1, C2, u, v, ω, λ1, λ2)
     N_α0, A_α0, M_α0 = wagner_loads_α0(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_cd0, A_cd0, M_cd0 = wagner_loads_cd0(b, ρ, u)
+    N_cm0, A_cm0, M_cm0 = wagner_loads_cm0(b, ρ, u)
 
-    N_u, A_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
+    N_u, A_u, M_u = wagner_loads_u(a, b, ρ, a0, α0, cd0, cm0, C1, C2, u, v, ω, λ1, λ2)
     N_v, A_v, M_v = wagner_loads_v(a, b, ρ, a0, α0, C1, C2, u, v, ω, λ1, λ2)
     N_U = N_u * u_U + N_v * v_U
     M_U = M_u * u_U + M_v * v_U
 
-    N_ρ, A_ρ, M_ρ = wagner_loads_ρ(a, b, a0, α0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N_ρ, A_ρ, M_ρ = wagner_loads_ρ(a, b, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
         # compute jacobian sub-matrices
-    Jyaa = @SMatrix [0 0 0 0; 0 0 0 0; 0 0 0 0]
+    Jyaa = @SMatrix [0 0 0 0 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0]
     Jyas = @SMatrix [0 0 0 0 0; 0 0 0 0 0; 0 0 0 0 0]
     Jyap = @SMatrix [u_U 0; v_U 0; ω_U 0]
-    Jysa = @SMatrix [N_a N_b N_a0 N_α0; M_a M_b M_a0 M_α0]
+    Jysa = @SMatrix [N_a N_b N_a0 N_α0 N_cd0 N_cm0; M_a M_b M_a0 M_α0 M_cd0 M_cm0]
     Jyss = @SMatrix [0 0 0 0 0; 0 0 0 0 0]
     Jysp = @SMatrix [N_U N_ρ; M_U M_ρ]
     # return jacobian
@@ -153,7 +155,7 @@ end
     λ1, λ2, h, θ, hdot, θdot = x
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, U, ρ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ = p
 
     xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
     yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]

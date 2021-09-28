@@ -34,7 +34,7 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     h, θ, hdot, θdot = x[SVector{4}(N+1:N+4)]
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
 
     # extract model constants
     bbar = aero.b
@@ -44,7 +44,7 @@ function get_coupling_inputs(aero::Peters{N,TF,SV,SA}, stru::TypicalSection,
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
 
     # aerodynamic loads
-    Na, Aa, Ma = peters_loads(a, b, ρ, a0, α0, bbar, u, v, ω, vdot, ωdot, λ)
+    Na, Aa, Ma = peters_loads(a, b, ρ, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
 
     # loads due to flap deflections
     Nf, Af, Mf = simpleflap_loads(b, u, ρ, cnδ, caδ, cmδ, δ)
@@ -95,7 +95,7 @@ end
     h, θ, hdot, θdot = x[SVector{4}(N+1:N+4)]
 
     # extract parameters
-    a, b, a0, α0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
+    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, cnδ, caδ, cmδ, U, ρ, δ = p
 
     xplot = [-(0.5 + a*b)*cos(θ),    (0.5 - a*b)*cos(θ)]
     yplot = [ (0.5 + a*b)*sin(θ)-h, -(0.5 - a*b)*sin(θ)-h]
