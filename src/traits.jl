@@ -1,384 +1,486 @@
-# --- Models --- #
-
-"""
-    AbstractModel
-
-Supertype for all models.
-"""
-abstract type AbstractModel end
-
-"""
-    NoStateModel <: AbstractModel
-
-Supertype for all models which contain no state variables.
-"""
-abstract type NoStateModel <: AbstractModel end
-
-"""
-    InterfaceModel <: AbstractModel
-
-Supertype for all models which are used to extend 2D models to 3D models.
-"""
-abstract type InterfaceModel <: AbstractModel end
-
-"""
-    ResidualModel <: AbstractModel
-
-Supertype for all models whose state variables may be defined by solving a set
-of residual equations.
-"""
-abstract type ResidualModel <: AbstractModel end
-
-"""
-    UnsteadyModel <: AbstractModel
-
-Supertype for all models which represent dynamic systems of equations.
-"""
-abstract type UnsteadyModel <: AbstractModel end
-
 # --- Inplaceness Trait --- #
 
 abstract type InPlaceness end
 struct InPlace <: InPlaceness end
 struct OutOfPlace <: InPlaceness end
 
-"""
-    inplaceness(::Type{T})
+inplaceness(model::Model{true}) = InPlace()
+inplaceness(model::Model{false}) = OutOfPlace()
 
-Return `InPlace()` if functions associated with model `T` are in-place
-or `OutOfPlace()` if functions associated with model `T` are out-of-place.
-"""
-inplaceness(::Type{T}) where T
+inplaceness(coupling::Coupling{true}) = InPlace()
+inplaceness(coupling::Coupling{false}) = OutOfPlace()
 
-# default definition for models with no state variables
-inplaceness(::Type{T}) where T<:NoStateModel = OutOfPlace()
-
-# default definition for coupled models
-function inplaceness(::Type{T}) where T <: NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if isinplace(coupling_inplaceness(model_types...)) || any(isinplace.(model_types))
+function inplaceness(model::CoupledModel)
+    if any(isinplace.(model.models)) || isinplace(model.coupling)
         return InPlace()
     else
         return OutOfPlace()
     end
 end
 
-"""
-    coupling_inplaceness(::Type{T1}, ::Type{T2}, ..., ::Type{TN})
-
-Return `InPlace()` if the functions associated with the coupling function
-for coupled models `T1`, `T2`, ... `TN` are in-place or `OutOfPlace()`
-if the functions associated with the coupling function for coupled models `T1`,
-`T2`, ... `TN` are out-of-place.
-"""
-coupling_inplaceness(::Vararg{Type,N}) where N
-
-isinplace(model::T) where T = isinplace(inplaceness(T))
-isinplace(::Type{T}) where T = isinplace(inplaceness(T))
+isinplace(x) = isinplace(inplaceness(x))
 isinplace(::InPlace) = true
 isinplace(::OutOfPlace) = false
 
-# --- Matrix Type Trait --- #
+# --- Jacobian Types --- #
 
-abstract type MatrixType end
-struct Empty <: MatrixType end
-struct Zeros <: MatrixType end
-struct Identity <: MatrixType end
-struct Constant <: MatrixType end
-struct Invariant <: MatrixType end
-struct Linear <: MatrixType end
-struct Nonlinear <: MatrixType end
+abstract type JacobianType end
 
-"""
-    rate_jacobian_type(::Type{T})
+struct Empty <: JacobianType end
+struct Zeros <: JacobianType end
+struct Identity <: JacobianType end
+struct Invariant{T} <: JacobianType; value::T; end
+struct Constant{T} <: JacobianType; func::T; end
+struct Linear{T} <: JacobianType; func::T; end
+struct Nonlinear{T} <: JacobianType; func::T; end
 
-Return
- - `Empty()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state rates is an empty matrix
- - `Zeros()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state rates is a zero matrix
- - `Identity()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates is the identity matrix
- - `Invariant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates is independent of the state rates,
-    state variables, inputs, parameters, and time.
- - `Constant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates is independent of the state rates,
-    state variables, inputs, and time.
- - `Linear()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state rates may vary with respect to time, and is
-    linear with respect to the state rates.
- - `Nonlinear()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state rates may vary with respect to time,
-    and is nonlinear with respect to the state rates.
+# default constructors set jacobian (function) later
+Invariant() = Invariant(nothing)
+Constant() = Constant(nothing)
+Linear() = Linear(nothing)
+Nonlinear() = Nonlinear(nothing)
 
-If no method is defined for the specified type, return `Nonlinear()`.
-"""
-rate_jacobian_type(::Type{T}) where T = Nonlinear()
-
-# models with no state variables have no rate jacobian
-rate_jacobian_type(::Type{T}) where T <: NoStateModel = Empty()
-
-# definition for combinations of models
-function rate_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if isempty(coupling_rate_jacobian_type(model_types...)) &&
-        all(isempty.(rate_jacobian_type.(model_types)))
-        return Empty()
-    elseif iszero(coupling_rate_jacobian_type(model_types...)) &&
-        all(iszero.(rate_jacobian_type.(model_types)))
-        return Zeros()
-    elseif iszero(coupling_rate_jacobian_type(model_types...)) &&
-        all(isidentity.(rate_jacobian_type.(model_types)))
-        return Identity()
-    elseif isinvariant(coupling_rate_jacobian_type(model_types...)) &&
-        all(isinvariant.(input_jacobian_type.(model_types))) &&
-        all(isinvariant.(rate_jacobian_type.(model_types)))
-        return Invariant()
-    elseif isconstant(coupling_rate_jacobian_type(model_types...)) &&
-        all(isconstant.(input_jacobian_type.(model_types))) &&
-        all(isconstant.(rate_jacobian_type.(model_types)))
-        return Constant()
-    else
-        return Linear()
-    end
-end
-
-"""
-    state_jacobian_type(::Type{T})
-
-Return
- - `Empty()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state variables is an empty matrix
- - `Zeros()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state variables is a zero matrix
- - `Identity()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state variables is the identity matrix
- - `Invariant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state variables is independent of the state rates,
-    state variables, inputs, parameters, and time.
- - `Constant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state variables is independent of the state rates,
-    state variables, inputs, and time.
- - `Linear()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the state variables may vary with respect to time, and is
-    linear with respect to the states.
- - `Nonlinear()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the state variables may vary with respect to time,
-    and is nonlinear with respect to the states.
-
-If no method is defined for the specified type, return `Nonlinear()`.
-"""
-state_jacobian_type(::Type{T}) where T = Nonlinear()
-
-# models with no state variables have no state jacobian
-state_jacobian_type(::Type{T}) where T <: NoStateModel = Empty()
-
-# definition for combinations of models
-function state_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if isempty(coupling_state_jacobian_type(model_types...)) &&
-        all(isempty.(state_jacobian_type.(model_types)))
-        return Empty()
-    elseif iszero(coupling_state_jacobian_type(model_types...)) &&
-        all(iszero.(state_jacobian_type.(model_types)))
-        return Zeros()
-    elseif iszero(coupling_state_jacobian_type(model_types...)) &&
-        all(isidentity.(state_jacobian_type.(model_types)))
-        return Identity()
-    elseif isinvariant(coupling_state_jacobian_type(model_types...)) &&
-        all(isinvariant.(input_jacobian_type.(model_types))) &&
-        all(isinvariant.(state_jacobian_type.(model_types)))
-        return Constant()
-    elseif isconstant(coupling_state_jacobian_type(model_types...)) &&
-        all(isconstant.(input_jacobian_type.(model_types))) &&
-        all(isconstant.(state_jacobian_type.(model_types)))
-        return Constant()
-    elseif islinear(coupling_state_jacobian_type(model_types...)) &&
-        all(islinear.(input_jacobian_type.(model_types))) &&
-        all(islinear.(state_jacobian_type.(model_types)))
-        return Linear()
-    else
-        return Nonlinear()
-    end
-end
-
-"""
-    input_jacobian_type(::Type{T})
-
-Return
- - `Empty()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the inputs is an empty matrix
- - `Zeros()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the inputs is a zero matrix
- - `Identity()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the inputs is the identity matrix
- - `Invariant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the inputs is independent of the state rates,
-    state variables, inputs, parameters, and time.
- - `Constant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the inputs is independent of the state rates,
-    state variables, inputs, and time.
- - `Linear()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the inputs may vary with respect to time, and is
-    linear with respect to the inputs.
- - `Nonlinear()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the inputs may vary with respect to time,
-    and is nonlinear with respect to the inputs.
-
-If no method is defined for the specified type, return `Nonlinear()`.
-"""
-input_jacobian_type(::Type{T}) where T = Nonlinear()
-
-# models with no state variables have no input jacobian
-input_jacobian_type(::Type{T}) where T<:NoStateModel = Empty()
-
-# definition for combinations of models
-function input_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if all(isempty.(input_jacobian_type.(model_types)))
-        return Empty()
-    elseif all(iszero.(input_jacobian_type.(model_types)))
-        return Zeros()
-    elseif all(isidentity.(input_jacobian_type.(model_types)))
-        return Identity()
-    elseif all(isinvariant.(input_jacobian_type.(model_types)))
-        return Invariant()
-    elseif all(isconstant.(input_jacobian_type.(model_types)))
-        return Constant()
-    elseif all(islinear.(input_jacobian_type.(model_types)))
-        return Linear()
-    else
-        return Nonlinear()
-    end
-end
-
-"""
-    parameter_jacobian_type(::Type{T})
-
-Return
- - `Empty()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the parameters is an empty matrix
- - `Zeros()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the parameters is a zero matrix
- - `Identity()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the parameters is the identity matrix
- - `Invariant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the parameters is independent of the state rates,
-    state variables, inputs, parameters, and time.
- - `Constant()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the parameters is independent of the state rates,
-    state variables, inputs, and time.
- - `Linear()`, if the jacobian of the residual expression associated with model `T`
-    with respect to the parameters may vary with respect to time, and is
-    linear with respect to the parameters.
- - `Nonlinear()`, if the jacobian of the residual expression associated with
-    model `T` with respect to the parameters may vary with respect to time,
-    and is nonlinear with respect to the parameters.
-
-If no method is defined for the specified type, return `Nonlinear()`.
-"""
-parameter_jacobian_type(::Type{T}) where T = Nonlinear()
-
-# models with no state variables have no input jacobian
-parameter_jacobian_type(::Type{T}) where T <: NoStateModel = Empty()
-
-# definition for combinations of models
-function parameter_jacobian_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if all(isempty.(parameter_jacobian_type.(model_types)))
-        return Empty()
-    elseif all(iszero.(parameter_jacobian_type.(model_types)))
-        return Zeros()
-    elseif all(isidentity.(parameter_jacobian_type.(model_types)))
-        return Identity()
-    elseif all(isinvariant.(parameter_jacobian_type.(model_types)))
-        return Invariant()
-    elseif all(isconstant.(parameter_jacobian_type.(model_types)))
-        return Constant()
-    elseif all(islinear.(parameter_jacobian_type.(model_types)))
-        return Linear()
-    else
-        return Nonlinear()
-    end
-end
-
-"""
-    time_gradient_type(::Type{T})
-
-Return
- - `Empty()`, if the derivative of the residual expression associated with model `T`
-    with respect to time is an empty matrix
- - `Zeros()`, if the derivative of the residual expression associated with model `T`
-    with respect to time is a zero matrix
- - `Invariant()`, if the derivative of the residual expression associated with
-    model `T` with respect to time is independent of the state rates,
-    state variables, inputs, parameters, and time.
- - `Constant()`, if the derivative of the residual expression associated with
-    model `T` with respect to time is independent of the state rates,
-    state variables, inputs, and time.
- - `Linear()`, if the derivative of the residual expression associated with model `T`
-    with respect to time may vary with respect to time, and is
-    linear with respect to time.
- - `Nonlinear()`, if the derivative of the residual expression associated with
-    model `T` with respect to time may vary with respect to time,
-    and is nonlinear with respect to time.
-
-If no method is defined for the specified type, return `Nonlinear()`.
-"""
-time_gradient_type(::Type{T}) where T = Nonlinear()
-
-# models with no state variables have no input jacobian
-time_gradient_type(::Type{T}) where T <: NoStateModel = Empty()
-
-# definition for combinations of models
-function time_gradient_type(::Type{T}) where T<:NTuple{N,AbstractModel} where N
-    model_types = (T.parameters...,)
-    if all(isempty.(time_gradient_type.(model_types)))
-        return Empty()
-    elseif all(iszero.(time_gradient_type.(model_types)))
-        return Zeros()
-    elseif all(isinvariant.(time_gradient_type.(model_types)))
-        return Invariant()
-    elseif all(isconstant.(time_gradient_type.(model_types)))
-        return Constant()
-    elseif all(islinear.(time_gradient_type.(model_types)))
-        return Linear()
-    else
-        return Nonlinear()
-    end
-end
-
-coupling_rate_jacobian_type(model_types...) = Nonlinear()
-coupling_state_jacobian_type(model_types...) = Nonlinear()
-coupling_parameter_jacobian_type(model_types...) = Nonlinear()
-coupling_time_gradient_type(model_types...) = Nonlinear()
-
-isempty(::MatrixType) = false
+# trait dispatch
+isempty(::JacobianType) = false
 isempty(::Empty) = true
 
-iszero(::MatrixType) = false
+iszero(::JacobianType) = false
 iszero(::Zeros) = true
 
-isidentity(::MatrixType) = false
+isidentity(::JacobianType) = false
 isidentity(::Identity) = true
 
-isinvariant(::MatrixType) = false
+isinvariant(::JacobianType) = false
 isinvariant(::Empty) = true
 isinvariant(::Zeros) = true
 isinvariant(::Identity) = true
+isinvariant(::Invariant) = true
 
-isconstant(::MatrixType) = false
+isconstant(::JacobianType) = false
 isconstant(::Empty) = true
 isconstant(::Zeros) = true
 isconstant(::Identity) = true
 isconstant(::Invariant) = true
 isconstant(::Constant) = true
 
-islinear(::MatrixType) = false
+islinear(::JacobianType) = false
 islinear(::Empty) = true
 islinear(::Zeros) = true
 islinear(::Identity) = true
 islinear(::Invariant) = true
 islinear(::Constant) = true
 islinear(::Linear) = true
+
+# --- Jacobian Update Functions --- #
+
+for iarg = (1, 2, 3, 4, 5)
+
+    if iarg == 1
+        fname = :add_rate_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :nx
+    elseif iarg == 2
+        fname = :add_state_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :nx
+    elseif iarg == 3
+        fname = :add_input_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :ny
+    elseif iarg == 4
+        fname = :add_parameter_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :np
+    elseif iarg == 5
+        fname = :add_time_gradient
+        adfunc = :autodiff_derivative_func
+        ncol = 1
+    end
+
+    @eval begin
+        # by default, return original rate jacobian
+        $(fname)(jac, f, iip, nx, ny, np) = jac
+
+        # invariant jacobian
+        function $(fname)(::Invariant{Nothing}, f, iip, nx, ny, np)
+               
+            # set values arbitrarily
+            dx = zeros(val(nx))
+            x = zeros(val(nx))
+            y = zeros(val(ny))
+            p = zeros(val(np))
+            t = 0.0
+
+            if iip
+                # initialize jacobian
+                J = zeros(nx, $ncol)
+                # get in-place function
+                fJ = $(adfunc)(f, val(nx), $iarg)
+                # calculate in-place jacobian
+                fJ(J, dx, x, y, p, t)
+            else # out-of-place
+                # get out-of-place function
+                fJ = $(adfunc)(f, $iarg)
+                # calculate out-of-place jacobian 
+                J = fJ(dx, x, y, p, t)
+            end
+
+            return Invariant(J)
+        end
+
+        # constant jacobian
+        function $(fname)(::Constant{Nothing}, f, iip, nx, ny, np)
+    
+            # set values arbitrarily
+            dx = zeros(nx)
+            x = zeros(nx)
+            y = zeros(ny)
+            t = 0.0
+
+            if iip
+                # get in-place function
+                fJ = $(adfunc)(f, val(nx), $iarg)
+                # get in-place jacobian function
+                fJ = (J, p) -> fJ(J, dx, x, y, p, t)
+            else
+                # get out-of-place function
+                fJ = $(adfunc)(f, $iarg)
+                # get out-of-place jacobian function
+                fJ = (p) -> fJ(dx, x, y, p, t)
+
+            end
+        
+            return Constant(fJ)
+        end
+
+        # out-of-place or in-place linear rate jacobian
+        function $(fname)(::Linear{Nothing}, f, iip, nx, ny, np)
+            if iip
+                fJ = $(adfunc)(f, nx, $iarg)
+            else
+                fJ = $(adfunc)(f, $iarg)
+            end
+            return Linear(fJ)
+        end
+
+        # out-of-place or in-place nonlinear rate jacobian
+        function $(fname)(::Nonlinear{Nothing}, f, iip, nx, ny, np)
+            if iip
+                fJ = $(adfunc)(f, nx, $iarg)
+            else
+                fJ = $(adfunc)(f, $iarg)
+            end
+            return Nonlinear(fJ)
+        end
+
+    end
+end
+
+for iarg = (1, 2, 3, 4)
+
+    if iarg == 1
+        fname = :add_coupling_rate_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :nx
+    elseif iarg == 2
+        fname = :add_coupling_state_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :nx
+    elseif iarg == 3
+        fname = :add_coupling_parameter_jacobian
+        adfunc = :autodiff_jacobian_func
+        ncol = :np
+    elseif iarg == 4
+        fname = :add_coupling_time_gradient
+        adfunc = :autodiff_derivative_func
+        ncol = 1
+    end
+
+    @eval begin
+        # by default, return original rate jacobian
+        $(fname)(jac, f, iip, nx, np) = jac
+
+        # invariant jacobian
+        function $(fname)(::Invariant{Nothing}, f, iip, nx, np)
+               
+            # set values arbitrarily
+            dx = zeros(val(nx))
+            x = zeros(val(nx))
+            p = zeros(val(np))
+            t = 0.0
+
+            if iip
+                # initialize jacobian
+                J = zeros(nx, $ncol)
+                # get in-place function
+                fJ = $(adfunc)(f, val(nx), $iarg)
+                # calculate in-place jacobian
+                fJ(J, dx, x, p, t)
+            else # out-of-place
+                # get out-of-place function
+                fJ = $(adfunc)(f, $iarg)
+                # calculate out-of-place jacobian 
+                J = fJ(dx, x, p, t)
+            end
+
+            return Invariant(J)
+        end
+
+        # constant jacobian
+        function $(fname)(::Constant{Nothing}, f, iip, nx, np)
+    
+            # set values arbitrarily
+            dx = zeros(nx)
+            x = zeros(nx)
+            t = 0.0
+
+            if iip
+                # get in-place function
+                fJ = $(adfunc)(f, val(nx), $iarg)
+                # get in-place jacobian function
+                fJ = (J, p) -> fJ(J, dx, x, p, t)
+            else
+                # get out-of-place function
+                fJ = $(adfunc)(f, $iarg)
+                # get out-of-place jacobian function
+                fJ = (p) -> fJ(dx, x, p, t)
+
+            end
+        
+            return Constant(fJ)
+        end
+
+        # out-of-place or in-place linear rate jacobian
+        function $(fname)(::Linear{Nothing}, f, iip, nx, np)
+            if iip
+                fJ = $(adfunc)(f, nx, $iarg)
+            else
+                fJ = $(adfunc)(f, $iarg)
+            end
+            return Linear(fJ)
+        end
+
+        # out-of-place or in-place nonlinear rate jacobian
+        function $(fname)(::Nonlinear{Nothing}, f, iip, nx, np)
+            if iip
+                fJ = $(adfunc)(f, nx, $iarg)
+            else
+                fJ = $(adfunc)(f, $iarg)
+            end
+            return Nonlinear(fJ)
+        end
+
+    end
+end
+
+# --- Jacobian Evaluation --- #
+
+# out-of-place, statically sized
+
+function jacobian(::Empty, ::Val{NX}, ::Val{NY}, args...) where {NX, NY}
+    return SMatrix{NX, NY, Float64}()
+end
+
+function jacobian(::Zeros, ::Val{NX}, ::Val{NY}, args...) where {NX, NY}
+    return zeros(SMatrix{NX, NY, Float64})
+end
+
+function jacobian(::Identity, ::Val{NX}, ::Val{NY}, args...) where {NX, NY}
+    return SMatrix{NX, NY}(I)
+end
+
+function jacobian(jac::Invariant, ::Val{NX}, ::Val{NY}, args...) where {NX, NY}
+    return SMatrix{NX, NY}(jac.value)
+end
+
+function jacobian(jac::Constant, ::Val{NX}, ::Val{NY}, p) where {NX, NY}
+    return SMatrix{NX, NY}(jac.func(p))
+end
+
+function jacobian(jac::Constant, ::Val{NX}, ::Val{NY}, dx, x, p, t) where {NX, NY}
+    return SMatrix{NX, NY}(jac.func(p))
+end
+
+function jacobian(jac::Constant, ::Val{NX}, ::Val{NY}, dx, x, y, p, t) where {NX, NY}
+    return SMatrix{NX, NY}(jac.func(p))
+end
+
+function jacobian(jac::Union{Linear, Nonlinear}, ::Val{NX}, ::Val{NY}, args...) where {NX, NY}
+    return SMatrix{NX, NY}(jac.func(args...))
+end
+
+# out-of-place, dynamically sized
+
+function jacobian(::Empty, nx, ny, args...)
+    return Matrix{Float64}(nx, ny)
+end
+
+function jacobian(::Zeros, nx, ny, args...)
+    return zeros(nx, ny)
+end
+
+function jacobian(::Identity, nx, ny, args...)
+    return I(min(nx, ny))
+end
+
+function jacobian(jac::Invariant, nx, ny, args...)
+    return jac.value
+end
+
+function jacobian(jac::Constant, nx, ny, p)
+    return jac.func(p)
+end
+
+function jacobian(jac::Constant, nx, ny, dx, x, p, t)
+    return jac.func(p)
+end
+
+function jacobian(jac::Constant, nx, ny, dx, x, y, p, t)
+    return jac.func(p)
+end
+
+function jacobian(jac::Union{Linear, Nonlinear}, nx, ny, args...)
+    return jac.func(args...)
+end
+
+# in-place
+
+function jacobian!(J, ::Empty, args...)
+    return J
+end
+
+function jacobian!(J, ::Zeros, args...)
+    return J .= 0
+end
+
+function jacobian!(J, ::Identity, args...)
+    J .= 0
+    for i = 1:size(J,1)
+        J[i,i] = 1
+    end
+    return J
+end
+
+function jacobian!(J, jac::Invariant, args...)
+    return J .= jac.value
+end
+
+function jacobian!(J, jac::Constant, p)
+    return jac.func(J, p)
+end
+
+function jacobian!(J, jac::Constant, dx, x, p, t)
+    return jac.func(J, p)
+end
+
+function jacobian!(J, jac::Constant, dx, x, y, p, t)
+    return jac.func(J, p)
+end
+
+function jacobian!(J, jac::Union{Linear, Nonlinear}, args...)
+    return jac.func(J, args...)
+end
+
+# --- Gradient Evaluation --- #
+
+# out-of-place, statically sized
+
+function gradient(::Empty, ::Val{NX}, args...) where NX
+    return SVector{0, Float64}()
+end
+
+function gradient(::Zeros, ::Val{NX}, args...) where NX
+    return zeros(SVector{NX, Float64})
+end
+
+function gradient(jac::Invariant, ::Val{NX}, args...) where NX
+    return SVector{NX}(jac.value)
+end
+
+function gradient(jac::Constant, ::Val{NX}, p) where NX
+    return SVector{NX}(jac.func(p))
+end
+
+function gradient(jac::Constant, ::Val{NX}, dx, x, p, t) where NX
+    return SVector{NX}(jac.func(p))
+end
+
+function gradient(jac::Constant, ::Val{NX}, dx, x, y, p, t) where NX
+    return SVector{NX}(jac.func(p))
+end
+
+function gradient(jac::Union{Linear, Nonlinear}, ::Val{NX}, args...) where NX
+    return SVector{NX}(jac.func(args...))
+end
+
+# out-of-place, dynamically sized
+
+function gradient(::Empty, nx, ny, args...)
+    return Matrix{Float64}(val(nx), val(ny))
+end
+
+function gradient(::Zeros, nx, ny, args...)
+    return zeros(val(nx), val(ny))
+end
+
+function gradient(::Identity, nx, ny, args...)
+    return I(min(val(nx), val(ny)))
+end
+
+function gradient(grad::Invariant, nx, ny, args...)
+    return grad.value
+end
+
+function gradient(grad::Constant, nx, ny, p)
+    return grad.func(p)
+end
+
+function gradient(grad::Constant, nx, ny, dx, x, p, t)
+    return grad.func(p)
+end
+
+function gradient(grad::Constant, nx, ny, dx, x, y, p, t)
+    return grad.func(p)
+end
+
+function gradient(grad::Union{Linear, Nonlinear}, nx, ny, args...)
+    return grad.func(args...)
+end
+
+# in-place
+
+function gradient!(J, ::Empty, args...)
+    return J
+end
+
+function gradient!(J, ::Zeros, args...)
+    return J .= 0
+end
+
+function gradient!(J, ::Identity, args...)
+    J .= 0
+    for i = 1:size(J,1)
+        J[i] = 1
+    end
+    return J
+end
+
+function gradient!(J, grad::Invariant, args...)
+    return J .= grad.grad
+end
+
+function gradient!(J, grad::Constant, p)
+    return grad.func(J, p)
+end
+
+function gradient!(J, grad::Constant, dx, x, p, t)
+    return grad.func(J, p)
+end
+
+function gradient!(J, grad::Constant, dx, x, y, p, t)
+    return grad.func(J, p)
+end
+
+function gradient!(J, grad::Union{Linear, Nonlinear}, args...)
+    return grad.func(J, args...)
+end

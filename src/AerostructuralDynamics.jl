@@ -11,34 +11,12 @@ using DiffEqBase
 using RecipesBase
 using Printf
 
-# Models
-export Steady
-export QuasiSteady
-export Wagner
-export Peters
-export LiftingLine
-export TypicalSection
-export RigidBody
-export GEBT
-export SimpleFlap
-export LiftingLineFlaps
-export Trim
-
 # Interface
-export couple_models
-export number_of_states
-export number_of_inputs
-export number_of_parameters
-export state_indices
-export input_indices
-export parameter_indices
-export get_states, set_states!
-export get_inputs, set_inputs!
-export get_parameters, set_parameters!
-export get_additional_parameters, set_additional_parameters!
-export separate_states
-export separate_inputs
-export separate_parameters
+export number_of_states, number_of_inputs, number_of_parameters
+export state_indices, input_indices, parameter_indices
+export get_states, get_inputs, get_parameters, get_additional_parameters
+export set_states!, set_inputs!, set_parameters!, set_additional_parameters!
+export separate_states, separate_inputs, separate_parameters
 export get_residual, get_residual!
 export get_rate_jacobian, get_rate_jacobian!
 export get_state_jacobian, get_state_jacobian!
@@ -46,81 +24,57 @@ export get_input_jacobian, get_input_jacobian!
 export get_parameter_jacobian, get_parameter_jacobian!
 export get_time_gradient, get_time_gradient!
 export get_coupling_inputs, get_coupling_inputs!
-export get_eigen
-export get_ode
+export linearize, get_eigen, get_ode, get_dae
 export correlate_eigenmodes
 
 # needed for traits
 import Base.isempty
 import Base.iszero
 
-# Interface Functions
-include("traits.jl")
-include("interface.jl")
-include("mode-tracking.jl")
-
-# Two-Dimensional Models
-
 # Aerodynamic Models
-include(joinpath("aerodynamics", "quasisteady.jl"))
-include(joinpath("aerodynamics", "wagner.jl"))
-include(joinpath("aerodynamics", "peters.jl"))
+export Steady, QuasiSteady, Wagner, Peters, LiftingLine
 
 # Structural Models
-include(joinpath("structures", "section.jl"))
-include(joinpath("structures", "liftingline-section.jl"))
-
-# Control Surface Models
-include(joinpath("control-surfaces", "simpleflap.jl"))
-
-# Controller Models
-include(joinpath("controllers", "liftingline-section-control.jl"))
-
-# Coupled Models
-include(joinpath("couplings", "two-dimensional", "quasisteady-section.jl"))
-include(joinpath("couplings", "two-dimensional", "wagner-section.jl"))
-include(joinpath("couplings", "two-dimensional", "peters-section.jl"))
-
-include(joinpath("couplings", "two-dimensional", "quasisteady-section-simpleflap.jl"))
-include(joinpath("couplings", "two-dimensional", "wagner-section-simpleflap.jl"))
-include(joinpath("couplings", "two-dimensional", "peters-section-simpleflap.jl"))
-
-include(joinpath("couplings", "two-dimensional", "quasisteady-liftingline.jl"))
-include(joinpath("couplings", "two-dimensional", "wagner-liftingline.jl"))
-include(joinpath("couplings", "two-dimensional", "peters-liftingline.jl"))
-
-include(joinpath("couplings", "two-dimensional", "quasisteady-liftingline-simpleflap.jl"))
-include(joinpath("couplings", "two-dimensional", "wagner-liftingline-simpleflap.jl"))
-include(joinpath("couplings", "two-dimensional", "peters-liftingline-simpleflap.jl"))
-
-# Three-Dimensional Models
-
-# Aerodynamic Models
-include(joinpath("aerodynamics", "liftingline.jl"))
-
-# Structural Models
-include(joinpath("structures", "gxbeam.jl"))
+export Section, LiftingLineSection, GEBT
 
 # Dynamics Models
-include(joinpath("dynamics", "rigidbody.jl"))
-
-# Control Surface Models
-include(joinpath("control-surfaces", "liftinglineflaps.jl"))
-
-# Controller Models
-include(joinpath("controllers", "trim.jl"))
+export RigidBody
 
 # Coupled Models
-include(joinpath("couplings", "three-dimensional", "liftingline-rigidbody.jl"))
-include(joinpath("couplings", "three-dimensional", "liftingline-gxbeam.jl"))
-include(joinpath("couplings", "three-dimensional", "liftingline-gxbeam-rigidbody.jl"))
+export SteadySection, QuasiSteadySection, WagnerSection, PetersSection
+export SteadyLiftingLine, QuasiSteadyLiftingLine, WagnerLiftingLine, PetersLiftingLine
+export LiftingLineBeam, LiftingLineRigidBody, LiftingLineBeamRigidBody
 
-include(joinpath("couplings", "three-dimensional", "liftingline-rigidbody-liftinglineflaps.jl"))
-include(joinpath("couplings", "three-dimensional", "liftingline-gxbeam-liftinglineflaps.jl"))
-include(joinpath("couplings", "three-dimensional", "liftingline-gxbeam-rigidbody-liftinglineflaps.jl"))
+# Helper Functions
+include("util.jl")
 
-include(joinpath("couplings", "three-dimensional", "liftingline-rigidbody-liftinglineflaps-trim.jl"))
-include(joinpath("couplings", "three-dimensional", "liftingline-gxbeam-liftinglineflaps-trim.jl"))
-include(joinpath("couplings", "three-dimensional", "liftingline-gxbeam-rigidbody-liftinglineflaps-trim.jl"))
+# Model Types
+include("models.jl")
+
+# Traits
+include("traits.jl")
+
+# Interface Functions
+include("interface.jl")
+
+# Model Definitions
+include(joinpath("models", "aerodynamics", "steady.jl"))
+include(joinpath("models", "aerodynamics", "quasisteady.jl"))
+include(joinpath("models", "aerodynamics", "wagner.jl"))
+include(joinpath("models", "aerodynamics", "peters.jl"))
+include(joinpath("models", "aerodynamics", "liftingline.jl"))
+include(joinpath("models", "structures", "section.jl"))
+include(joinpath("models", "structures", "liftingline.jl"))
+include(joinpath("models", "structures", "gxbeam.jl"))
+include(joinpath("models", "dynamics", "rigidbody.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "steady-section.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "quasisteady-section.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "wagner-section.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "peters-section.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "steady-liftingline.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "quasisteady-liftingline.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "wagner-liftingline.jl"))
+include(joinpath("models", "coupled", "two-dimensional", "peters-liftingline.jl"))
+# include(joinpath("models", "coupled", "liftingline-rigidbody.jl"))
 
 end

@@ -6,6 +6,28 @@ A geometrically exact beam model implemented using the [GXBeam](https://github.c
 
 ## Type Definition
 
+"""
+GEBT
+
+Construct a geometrically exact beam theory model, as implemented by the GXBeam package.
+State variables are as defined by GXBeam.  Inputs correspond to the external
+forces ``F_{x,i}, F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or
+displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i},
+\\theta_{z,i}`` applied to each node, followed by the distributed loads
+``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}`` applied to each beam
+element, followed by the properties of point masses attached to each beam element ``m, p, 
+I_{11}, I_{22}, I_{33}, I_{12}, I_{13}, I_{23}``, followed by the linear and angular 
+velocity and accelearation of the system. Parameters correspond to the location ``p_{x}, 
+p_{y}, p_{z}`` of each node followed by each beam element's properties. Each beam element's 
+properties are defined by a triad which defines the orientation of the beam element 
+``e_{1,x}, e_{1,y}, e_{1,z}, e_{2,x}, e_{2,y}, e_{2,z}, e_{3,x}, e_{3,y}, e_{3,z}``, 
+followed by the 21 independent entries of the compliance matrix ``C_{11}, C_{12}, C_{13}, 
+C_{14}, C_{15}, C_{16}, C_{22}, C_{23}, C_{24}, C_{25}, C_{26}, C_{33}, C_{34}, C_{35}, 
+C_{36}, C_{44}, C_{45}, C_{46}, C_{55}, C_{56}, C_{66}``, followed by the beam element's 
+inertial properties ``\\mu, x_{m,2}, x_{m,3}, i_{22}, i_{33}, i_{23}``.
+"""
+GEBT
+
 ```@docs
 GEBT
 ```
