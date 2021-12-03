@@ -1,11 +1,11 @@
 """
-    Section()
+    typical_section_model()
 
 Construct a typical section structural model with state variables ``h, \\theta, \\dot{h},
 \\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
 k_\\theta, m, S_\\theta, I_\\theta``
 """
-function Section()
+function typical_section_model()
 
     # residual function
     fresid = section_residual

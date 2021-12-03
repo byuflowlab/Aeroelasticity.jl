@@ -176,10 +176,10 @@ function Coupling{iip}(g, nx, ny, np, npc;
     sepparam = (p) -> (p = p,)) where {iip}
 
     # add jacobian definitions, if necessary
-    ratejac = add_coupling_rate_jacobian(ratejac, g, iip, nx, np)
-    statejac = add_coupling_state_jacobian(statejac, g, iip, nx, np)
-    paramjac = add_coupling_parameter_jacobian(paramjac, g, iip, nx, np)
-    tgrad = add_coupling_time_gradient(tgrad, g, iip, nx, np)
+    ratejac = add_coupling_rate_jacobian(ratejac, g, iip, nx, ny, np)
+    statejac = add_coupling_state_jacobian(statejac, g, iip, nx, ny, np)
+    paramjac = add_coupling_parameter_jacobian(paramjac, g, iip, nx, ny, np)
+    tgrad = add_coupling_time_gradient(tgrad, g, iip, nx, ny, np)
 
     return Coupling{iip, 
         typeof(g), typeof(nx), typeof(ny), typeof(np), typeof(npc),

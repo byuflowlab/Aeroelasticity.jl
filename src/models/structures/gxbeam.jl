@@ -1,5 +1,5 @@
 """
-    GEBT(start, stop, displacement; kwargs...)
+    gxbeam_model(start, stop, displacement; kwargs...)
 
 Construct a geometrically exact beam theory structural model with beam elements
 which extend from the point indices in `start` to the point indices in
@@ -18,7 +18,7 @@ which extend from the point indices in `start` to the point indices in
 # Keyword Arguments
  - `force_scaling = 1.0`: Factor used to scale system forces/moments internally
 """
-function GEBT(start, stop, displacement; force_scaling = 1.0)
+function gxbeam_model(start, stop, displacement; force_scaling = 1.0)
 
     # initialize system pointers
     N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
@@ -29,8 +29,10 @@ function GEBT(start, stop, displacement; force_scaling = 1.0)
     nelem = length(icol_elem)
 
     # define constants
-    constants = (irow_point=irow_point, irow_elem=irow_elem, irow_elem1=irow_elem1, 
-        irow_elem2=irow_elem2, icol_point=icol_point, icol_elem=icol_elem)
+    constants = (start=start, stop=stop, displacement=displacement, 
+        force_scaling=force_scaling, irow_point=irow_point, irow_elem=irow_elem, 
+        irow_elem1=irow_elem1, irow_elem2=irow_elem2, icol_point=icol_point, 
+        icol_elem=icol_elem)
 
     # residual function
     fresid = (resid, dx, x, y, p, t) -> gxbeam_residual!(resid, dx, x, y, p, t; 
@@ -326,7 +328,7 @@ function gxbeam_setinput!(y, displacement, icol_point, icol_elem;
     u_p = nothing, theta_p = nothing, F_p = nothing, M_p = nothing, 
     f_d = nothing, m_d = nothing, 
     m_m = nothing, p_m = nothing, I_m = nothing,
-    gvec = nothing, V = nothing, omega = nothing, a = nothing, alpha = nothing)
+    gvec = nothing, v = nothing, omega = nothing, a = nothing, alpha = nothing)
 
     np = length(icol_point)
     ne = length(icol_elem)
@@ -395,10 +397,10 @@ function gxbeam_setinput!(y, displacement, icol_point, icol_elem;
         y[6*np + 6*ne + 10*ne + 3] = gvec[3]
     end
 
-    if !isnothing(V)
-        y[6*np + 6*ne + 10*ne + 4] = V[1]
-        y[6*np + 6*ne + 10*ne + 5] = V[2]
-        y[6*np + 6*ne + 10*ne + 6] = V[3]
+    if !isnothing(v)
+        y[6*np + 6*ne + 10*ne + 4] = v[1]
+        y[6*np + 6*ne + 10*ne + 5] = v[2]
+        y[6*np + 6*ne + 10*ne + 6] = v[3]
     end
 
     if !isnothing(omega)
@@ -620,7 +622,7 @@ function gxbeam_sepinput(y, displacement, icol_point, icol_elem)
     gvec =  view(y, 6*np + 6*ne + 10*ne +  1 : 6*np + 6*ne + 10*ne +  3)
     
     # linear/angular velocity
-    V =     view(y, 6*np + 6*ne + 10*ne +  4 : 6*np + 6*ne + 10*ne +  6)
+    v =     view(y, 6*np + 6*ne + 10*ne +  4 : 6*np + 6*ne + 10*ne +  6)
     omega = view(y, 6*np + 6*ne + 10*ne +  7 : 6*np + 6*ne + 10*ne +  9)
     
     # linear/angular acceleration
@@ -629,7 +631,7 @@ function gxbeam_sepinput(y, displacement, icol_point, icol_elem)
 
     return (u_p=u_p, theta_p=theta_p, F_p=F_p, M_p=M_p, 
         f_d=f_d, m_d=m_d, m_m=m_m, p_m=p_m, I_m=I_m, 
-        gvec=gvec, V=V, omega=omega, a=a, alpha=alpha)
+        gvec=gvec, v=v, omega=omega, a=a, alpha=alpha)
 end
 
 # convenience function for separating this model's parameter vector
@@ -640,3 +642,22 @@ function gxbeam_sepparam(p, start, stop, icol_point, icol_elem)
 end
 
 # --- Internal Methods for Couplings with this Model --- #
+
+# transformation from body to local frame
+gxbeam_body_to_element(elem, θ) = elem.Cab'*GXBeam.get_C(θ)
+
+# local element velocities (in local frame)
+function gxbeam_element_velocities(V, Ω)
+    vi = V
+    ωi = Ω
+    return vi, ωi
+end
+
+# local element accelerations (in local frame)
+function gxbeam_element_accelerations(elem, u, θ, Vdot, Ωdot, a0, α0)
+    x0 = @SVector zeros(3)
+    C = gxbeam_body_to_element(elem, θ)
+    ai = C*(a0 + cross(α0, elem.x - x0) + cross(α0, u)) + Vdot
+    αi = C*α0 + Ωdot
+    return ai, αi
+end

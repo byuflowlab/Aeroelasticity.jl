@@ -1,18 +1,18 @@
 
 """
-    PetersLiftingLine()
+    peters_liftingline_model(N)
 
 Construct a model by coupling an unsteady aerodynamic model based on Peters' finite state 
-theory (see [`Peters`](@ref)) and a lifting line section model (see 
-[`LiftingLineSection`](@ref)).
+theory (see [`peters_model`](@ref)) and a lifting line section model (see 
+[`liftingline_section_model`](@ref)).
 """
-function PetersLiftingLine(N)
+function peters_liftingline_model(N)
 
     # aerodynamic model
-    aero = Peters(N)
+    aero = peters_model(N)
 
     # structural model
-    stru = LiftingLineSection()
+    stru = liftingline_section_model()
 
     # submodels
     submodels = (aero, stru)
@@ -74,8 +74,8 @@ function peters_liftingline_inputs(dx, x, p, t; iλ, iq, bbar)
     # extract parameters
     a, b, a0, α0, cd0, cm0, ρ, c = p
     # freestream velocity components
-    u, v, ω = liftinglinesection_velocities(vx, vz, ωy)
-    udot, vdot, ωdot = liftinglinesection_accelerations(dvx, dvz, dωy)
+    u, v, ω = liftingline_section_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_section_accelerations(dvx, dvz, dωy)
     # calculate aerodynamic loads
     N, A, M = peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
     # forces and moments per unit span

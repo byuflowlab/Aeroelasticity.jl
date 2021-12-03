@@ -32,18 +32,18 @@ import Base.isempty
 import Base.iszero
 
 # Aerodynamic Models
-export Steady, QuasiSteady, Wagner, Peters, LiftingLine
+export steady_model, quasisteady_model, wagner_model, peters_model, liftingline_model
 
 # Structural Models
-export Section, LiftingLineSection, GEBT
+export typical_section_model, liftingline_section_model, gxbeam_model
 
 # Dynamics Models
-export RigidBody
+export rigidbody_model
 
 # Coupled Models
-export SteadySection, QuasiSteadySection, WagnerSection, PetersSection
-export SteadyLiftingLine, QuasiSteadyLiftingLine, WagnerLiftingLine, PetersLiftingLine
-export LiftingLineBeam, LiftingLineRigidBody, LiftingLineBeamRigidBody
+export steady_section_model, quasisteady_section_model, wagner_section_model, peters_section_model
+export steady_liftingline_model, quasisteady_liftingline_model, wagner_liftingline_model, peters_liftingline_model
+export liftingline_rigidbody_model, liftingline_gxbeam_model, liftingline_gxbeam_rigidbody_model
 
 # Helper Functions
 include("util.jl")
@@ -75,6 +75,7 @@ include(joinpath("models", "coupled", "two-dimensional", "steady-liftingline.jl"
 include(joinpath("models", "coupled", "two-dimensional", "quasisteady-liftingline.jl"))
 include(joinpath("models", "coupled", "two-dimensional", "wagner-liftingline.jl"))
 include(joinpath("models", "coupled", "two-dimensional", "peters-liftingline.jl"))
-# include(joinpath("models", "coupled", "liftingline-rigidbody.jl"))
+include(joinpath("models", "coupled", "three-dimensional", "liftingline-gxbeam.jl"))
+include(joinpath("models", "coupled", "three-dimensional", "liftingline-rigidbody.jl"))
 
 end

@@ -1,3 +1,5 @@
+const number_of_rates = number_of_states
+
 """
     number_of_states(model)
 
@@ -48,6 +50,7 @@ number_of_additional_parameters(coupling::Coupling) = val(coupling.npc)
 
 number_of_additional_parameters(model::CoupledModel) = number_of_additional_parameters(model.coupling)
 
+const rate_indices = state_indices
 
 """
     state_indices(model::CoupledModel)
@@ -103,6 +106,8 @@ function additional_parameter_indices(model::CoupledModel)
     return UnitRange(ip1, ip2)
 end
 
+const get_rates = get_states
+
 """
     get_states(model::Model; kwargs...)
 
@@ -150,6 +155,8 @@ Return the additional parameter vector for `model` using the values in `kwargs`.
 function get_additional_parameters(model::CoupledModel; kwargs...)
     return get_parameters(model.coupling; kwargs...)
 end
+
+const set_rates! = set_states!
 
 """
     set_states!(x, model::Model; kwargs...)
@@ -217,6 +224,8 @@ function set_additional_parameters!(p, model::CoupledModel; kwargs...)
 
     return set_parameters!(view(p, additional_parameter_indices(model)), model.coupling; kwargs...)
 end
+
+const separate_rates = separate_states
 
 """
     separate_states(model, x)

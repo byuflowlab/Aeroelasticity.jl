@@ -1,5 +1,5 @@
 """
-    LiftingLineRigidBody()
+    liftingline_rigidbody_model()
 
 Construct a model by coupling a lifting line aerodynamic model and a rigid body
 dynamics model.  This model introduces additional parameters corresponding to
@@ -12,7 +12,7 @@ additional forces/moments applied on the body ``F_x, F_y, F_z, M_x, M_y, M_z``.
 oriented with the x-axis in the chordwise direction, the y-axis in the spanwise
 direction (out the right wing), and the z-axis in the airfoil normal direction**
 """
-function LiftingLineRigidBody(section_models)
+function liftingline_rigidbody_model(section_models)
 
     # aerodynamic model
     aero = LiftingLine(section_models)

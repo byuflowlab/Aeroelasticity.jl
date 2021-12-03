@@ -1,10 +1,10 @@
 """
-    QuasiSteady()
+    quasisteady_model()
 
 Construct a 2D aerodynamic model based on quasi-steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
-function QuasiSteady()
+function quasisteady_model()
 
     # number of parameters (use Val(N) to use inferrable dimensions)
     np = Val(6)

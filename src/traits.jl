@@ -198,10 +198,10 @@ for iarg = (1, 2, 3, 4)
 
     @eval begin
         # by default, return original rate jacobian
-        $(fname)(jac, f, iip, nx, np) = jac
+        $(fname)(jac, f, iip, nx, ny, np) = jac
 
         # invariant jacobian
-        function $(fname)(::Invariant{Nothing}, f, iip, nx, np)
+        function $(fname)(::Invariant{Nothing}, f, iip, nx, ny, np)
                
             # set values arbitrarily
             dx = zeros(val(nx))
@@ -213,7 +213,7 @@ for iarg = (1, 2, 3, 4)
                 # initialize jacobian
                 J = zeros(nx, $ncol)
                 # get in-place function
-                fJ = $(adfunc)(f, val(nx), $iarg)
+                fJ = $(adfunc)(f, val(ny), $iarg)
                 # calculate in-place jacobian
                 fJ(J, dx, x, p, t)
             else # out-of-place
@@ -227,7 +227,7 @@ for iarg = (1, 2, 3, 4)
         end
 
         # constant jacobian
-        function $(fname)(::Constant{Nothing}, f, iip, nx, np)
+        function $(fname)(::Constant{Nothing}, f, iip, nx, ny, np)
     
             # set values arbitrarily
             dx = zeros(nx)
@@ -236,7 +236,7 @@ for iarg = (1, 2, 3, 4)
 
             if iip
                 # get in-place function
-                fJ = $(adfunc)(f, val(nx), $iarg)
+                fJ = $(adfunc)(f, val(ny), $iarg)
                 # get in-place jacobian function
                 fJ = (J, p) -> fJ(J, dx, x, p, t)
             else
@@ -251,9 +251,9 @@ for iarg = (1, 2, 3, 4)
         end
 
         # out-of-place or in-place linear rate jacobian
-        function $(fname)(::Linear{Nothing}, f, iip, nx, np)
+        function $(fname)(::Linear{Nothing}, f, iip, nx, ny, np)
             if iip
-                fJ = $(adfunc)(f, nx, $iarg)
+                fJ = $(adfunc)(f, val(ny), $iarg)
             else
                 fJ = $(adfunc)(f, $iarg)
             end
@@ -261,9 +261,9 @@ for iarg = (1, 2, 3, 4)
         end
 
         # out-of-place or in-place nonlinear rate jacobian
-        function $(fname)(::Nonlinear{Nothing}, f, iip, nx, np)
+        function $(fname)(::Nonlinear{Nothing}, f, iip, nx, ny, np)
             if iip
-                fJ = $(adfunc)(f, nx, $iarg)
+                fJ = $(adfunc)(f, val(ny), $iarg)
             else
                 fJ = $(adfunc)(f, $iarg)
             end

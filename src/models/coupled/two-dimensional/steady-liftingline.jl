@@ -1,16 +1,17 @@
 """
-    SteadyLiftingLine()
+    steady_liftingline_model()
 
 Construct a model by coupling a steady aerodynamic model based on thin airfoil theory (see 
-[`Steady`](@ref)) and a lifting line section model (see [`LiftingLineSection`](@ref)).  
+[`Steady`](@ref)) and a lifting line section model (see 
+[`liftingline_section_model`](@ref)).  
 """
-function SteadyLiftingLine()
+function steady_liftingline_model()
 
     # aerodynamic model
-    aero = Steady()
+    aero = steady_model()
 
     # structural model
-    stru = LiftingLineSection()
+    stru = liftingline_section_model()
 
     # submodels
     submodels = (aero, stru)
@@ -58,7 +59,7 @@ function steady_liftingline_inputs(dx, x, p, t)
     # extract parameters
     a, b, a0, α0, cd0, cm0, ρ, c = p
     # freestream velocity components
-    u, v, ω = liftinglinesection_velocities(vx, vz, ωy)
+    u, v, ω = liftingline_section_velocities(vx, vz, ωy)
     # calculate aerodynamic loads
     N, A, M = steady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v)
     # forces and moments per unit span

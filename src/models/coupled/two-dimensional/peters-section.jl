@@ -1,18 +1,18 @@
 """
-    PetersSection(N)
+    peters_section_model(N)
 
 Construct a model by coupling an unsteady aerodynamic model based on Peters' finite state 
 theory (see [`Peters`](@ref)) and a two-degree of freedom typical section model (see 
 [`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, 
 air density ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 """
-function PetersSection(N)
+function peters_section_model(N)
 
     # aerodynamic model
-    aero = Peters(N)
+    aero = peters_model(N)
 
     # structural model
-    stru = Section()
+    stru = typical_section_model()
 
     # submodels
     submodels = (aero, stru)

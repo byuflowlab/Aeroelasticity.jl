@@ -16,7 +16,7 @@ displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i},
 \\theta_{z,i}`` applied to each node, followed by the distributed loads
 ``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}`` applied to each beam
 element, followed by the properties of point masses attached to each beam element ``m, p, 
-I_{11}, I_{22}, I_{33}, I_{12}, I_{13}, I_{23}``, followed by the linear and angular 
+I_{11}, I_{22}, I_{33}, I_{12}, I_{13}, I_{23}``, followed by the gravity vector, followed by the linear and angular 
 velocity and accelearation of the system. Parameters correspond to the location ``p_{x}, 
 p_{y}, p_{z}`` of each node followed by each beam element's properties. Each beam element's 
 properties are defined by a triad which defines the orientation of the beam element 

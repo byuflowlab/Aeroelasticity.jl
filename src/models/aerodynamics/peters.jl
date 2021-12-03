@@ -1,11 +1,11 @@
 """
-    Peters(N)
+    peters_model(N)
 
 Construct an aerodynamic model based on Peters' finite state model with `N` state variables, 
 inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, \\alpha_0, 
 c_{d,0}, c_{m,0}``
 """
-function Peters(N)
+function peters_model(N)
 
     # model constants (which may be used when this model is coupled with other models)
     Abar, bbar, cbar = peters_constants(N)

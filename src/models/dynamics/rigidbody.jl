@@ -1,5 +1,5 @@
 """
-    RigidBody(state_indices=(), rate_indices=(), prescribed_values=())
+    rigidbody_model(state_indices=(), rate_indices=(), prescribed_values=())
 
 Construct a six-degree of freedom rigid-body model with state variables ``x, y, z, \\phi,
 \\theta, \\psi, u, v, w, p, q, r``, inputs ``m, I_{xx}, I_{yy}, I_{zz}, I_{xz},
@@ -8,7 +8,7 @@ variables corresponding to `state_indices` to set the state rates corresponding 
 `rate_indices` to the values specified in `prescribed_values`. Otherwise, allow the state 
 variables and their respective rates to be defined by their rate equations.
 """
-function RigidBody(state_indices=(), rate_indices=(), prescribed_values=())
+function rigidbody_model(state_indices=(), rate_indices=(), prescribed_values=())
     
     # residual function
     fresid = (dx, x, y, p, t) -> rigidbody_residual(dx, x, y, p, t; 

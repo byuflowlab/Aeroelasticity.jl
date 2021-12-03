@@ -1,18 +1,18 @@
 """
-    WagnerSection(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+    wagner_section_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
 
-Construct a model by coupling an unsteady aerodynamic model based on Wagner's function (see 
-[`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
+Construct a model by coupling an unsteady aerodynamic model based on wagner_model's function (see 
+[`wagner_model`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
 This coupling introduces the freestream velocity ``U_\\infty``, air density 
 ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 """
-function WagnerSection(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+function wagner_section_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
     
     # aerodynamic model
-    aero = Wagner(; C1, C2, eps1, eps2)
+    aero = wagner_model(; C1, C2, eps1, eps2)
 
     # structural model
-    stru = Section()
+    stru = typical_section_model()
 
     # submodels
     submodels = (aero, stru)

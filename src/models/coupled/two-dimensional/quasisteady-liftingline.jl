@@ -1,17 +1,17 @@
-
 """
-    QuasiSteadyLiftingLine()
+    quasisteady_liftingline_model()
 
 Construct a model by coupling a quasi-steady aerodynamic model based on thin airfoil theory 
-(see [`QuasiSteady`](@ref)) and a lifting line section model (see [`LiftingLineSection`](@ref)).  
+(see [`quasisteady_model`](@ref)) and a lifting line section model (see 
+[`liftingline_section_model`](@ref)).  
 """
-function QuasiSteadyLiftingLine()
+function quasisteady_liftingline_model()
 
     # aerodynamic model
-    aero = QuasiSteady()
+    aero = quasisteady_model()
 
     # structural model
-    stru = LiftingLineSection()
+    stru = liftingline_section_model()
 
     # submodels
     submodels = (aero, stru)
@@ -62,8 +62,8 @@ function quasisteady_liftingline_inputs(dx, x, p, t)
     # extract parameters
     a, b, a0, α0, cd0, cm0, ρ, c = p
     # freestream velocity components
-    u, v, ω = liftinglinesection_velocities(vx, vz, ωy)
-    udot, vdot, ωdot = liftinglinesection_accelerations(dvx, dvz, dωy)
+    u, v, ω = liftingline_section_velocities(vx, vz, ωy)
+    udot, vdot, ωdot = liftingline_section_accelerations(dvx, dvz, dωy)
     # calculate aerodynamic loads
     N, A, M = quasisteady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v, ω, vdot, ωdot)
     # forces and moments per unit span

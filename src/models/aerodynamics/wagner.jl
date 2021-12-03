@@ -1,11 +1,11 @@
 """
-    Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+    wagner_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
 
 Construct an aerodynamic model based on Wagner's function with state variables ``\\lambda_1,
 \\lambda_2``, inputs ``u, v, \\omega``, and parameters ``a, b, a_0, \\alpha_0, 
 c_{d0}, c_{m0}``
 """
-function Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+function wagner_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
 
     # model constants (which may be used when this model is coupled with other models)
     constants = (C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)

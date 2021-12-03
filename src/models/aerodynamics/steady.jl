@@ -1,10 +1,10 @@
 """
-    Steady()
+    steady_model()
 
 Construct a 2D aerodynamic model based on steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
-function Steady()
+function steady_model()
 
     # number of parameters (use Val(N) to use inferrable dimensions)
     np = Val(6)

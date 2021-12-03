@@ -1,18 +1,18 @@
 """
-    SteadySection()
+    steady_section_model()
 
 Construct a model by coupling a steady aerodynamic model based on thin airfoil theory (see 
 [`Steady`](@ref)) and a two-degree of freedom typical section model (see [`Section()`]).  
 This model introduces the freestream velocity ``U_\\infty``, air density ``\\rho_\\infty``, 
 and air speed of sound ``c`` as additional parameters.
 """
-function SteadySection()
+function steady_section_model()
 
     # aerodynamic model
-    aero = Steady()
+    aero = steady_model()
 
     # structural model
-    stru = Section()
+    stru = typical_section_model()
 
     # submodels
     submodels = (aero, stru)
