@@ -514,7 +514,7 @@ end
 
 # dispatch to an out-of-place function
 function _get_rate_jacobian!(J, ::OutOfPlace, model, args...; kwargs...)
-    return J .= get_rate_jacobian(model, args...; kwargs...)
+    return J .= get_rate_jacobian(model, args...)
 end
 
 # calculate rate jacobian for a standalone model
@@ -772,7 +772,7 @@ end
 
 # dispatch to an out-of-place function
 function _get_state_jacobian!(J, ::OutOfPlace, model, args...; kwargs...)
-    return J .= get_state_jacobian(model, args...; kwargs...)
+    return J .= get_state_jacobian(model, args...)
 end
 
 # calculate state jacobian for a standalone model
@@ -2080,7 +2080,6 @@ function correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, ato
     return perm, corruption
 end
 
-
 """
     get_ode(model)
     get_ode(model, p)
@@ -2090,7 +2089,8 @@ may be solved using DifferentialEquations.
 """
 function get_ode(model::CoupledModel, p=nothing)
 
-    iip = isinplace(model)
+    # always construct in-place models, always compile
+    iip = true
     compile = true
 
     # construct coupling function
@@ -2127,7 +2127,7 @@ function ode_coupling_function(model::CoupledModel)
         Np = number_of_parameters(model)
 
         # cached variables
-        ucache = fill(NaN, Nx)
+        xcache = fill(NaN, Nx)
         ycache = fill(NaN, Ny)
         pcache = fill(NaN, Np)
         tcache = fill(NaN)
@@ -2140,8 +2140,8 @@ function ode_coupling_function(model::CoupledModel)
             # check if we can use the cache variables (no custom types)
             if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
                 # update the cache variables (if necessary)
-                if (x != ucache) && (p != pcache) && (t != tcache[])
-                    ucache .= x
+                if (x != xcache) && (p != pcache) && (t != tcache[])
+                    xcache .= x
                     ycache .= get_coupling_inputs!(ycache, model, dx, x, p, t)
                     pcache .= p
                     tcache .= t
@@ -2166,20 +2166,9 @@ end
 
 function ode_rate_function(model::CoupledModel, fy)
 
-    if isinplace(model)
-        f = (dx, x, p, t) -> begin
-            dx = FillArrays.Zeros(x)
-            y = fy(x, p, t)
-            get_residual!(resid, model, dx, x, y, p, t)
-            return resid .*= -1
-        end
-    else
-        f = (x, p, t) -> begin
-            dx = FillArrays.Zeros(x)
-            y = fy(x, p, t)
-            resid = get_residual(model, dx, x, y, p, t)
-            return -resid
-        end
+    f = (dx, x, p, t) -> begin
+        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
+        return dx .*= -1
     end
 
     return f
@@ -2207,35 +2196,29 @@ function ode_mass_matrix(model::CoupledModel, fy, p=nothing)
         Nx = number_of_states(model)
         Ny = number_of_inputs(model)
 
+        # state rate vector
+        dx = FillArrays.Zeros(Nx)
+
         # initialize mass matrix
         M = zeros(Nx, Nx)
 
         # construct update function
-        if isinplace(model)
-            # model is inplace so use cached variables if possible
 
-            # cached variables
-            drdy_cache = fill(NaN, Nx, Ny),
-            dyddx_cache = fill(NaN, Ny, Nx)
+        # cached variables
+        drdy_cache = fill(NaN, Nx, Ny)
+        dyddx_cache = fill(NaN, Ny, Nx)
 
-            # state rate vector
-            dx = FillArrays.Zeros(x)
-
-            # update function
-            update_func = (M, x, p, t) -> begin
-                # check if we can use the cache variables (no custom types)
-                if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                    # use cache variables
-                    get_rate_jacobian!(M, model, dx, x, fy(x, p, t), p, t;
-                        drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-                else
-                    # don't use cache variables (to accomodate custom types)
-                    get_rate_jacobian!(M, model, dx, x, fy(x, p, t), p, t)
-                end
+        # update function
+        update_func = (M, x, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+                # use cache variables
+                get_rate_jacobian!(M, model, dx, x, fy(x, p, t), p, t;
+                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+            else
+                # don't use cache variables (to accomodate custom types)
+                get_rate_jacobian!(M, model, dx, x, fy(x, p, t), p, t)
             end
-        else
-            # model is out-of-place so don't use cache variables
-            update_func = (M, x, p, t) -> M .= get_rate_jacobian(model, dx, x, fy(x, p, t), p, t)
         end
 
         mass_matrix = DiffEqArrayOperator(M; update_func)
@@ -2251,60 +2234,41 @@ function ode_time_gradient(model::CoupledModel, fy, p=nothing)
 
     if all(iszero.(getproperty.(submodels, :tgrad))) && iszero(coupling.tgrad)
         # time gradient is a zero vector
-        if isinplace(model)
-            tgrad = (dT, x, p, t) -> dT .= 0
-        else
-            tgrad = (x, p, t) -> zero(x)
-        end
+        tgrad = (dT, x, p, t) -> dT .= 0
     elseif all(isinvariant.(getproperty.(submodels, :tgrad))) && isinvariant(coupling.tgrad)
         # time gradient is independent of all inputs
         dT0 = get_time_gradient(model)
-        if isinplace(model)
-            tgrad = (dT, x, p, t) -> dT .= dT0
-        else
-            tgrad = (x, p, t) -> dT0
-        end
+        tgrad = (dT, x, p, t) -> dT .= dT0
     elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :tgrad))) && 
         isconstant(coupling.tgrad)
         # time gradient only depends on the parameter vector
         dT0 = get_rate_jacobian(model, p)
-        if isinplace(model)
-            tgrad = (dT, x, p, t) -> dT .= dT0
-        else
-            tgrad = (x, p, t) -> dT0
-        end
+        tgrad = (dT, x, p, t) -> dT .= dT0
     else
         # time gradient defined as a function of state variables, parameters, and time 
 
-        if isinplace(model)
-            # model is inplace so use cached variables if possible
+        # problem dimensions
+        Nx = number_of_states(model)
+        Ny = number_of_inputs(model)
 
-            # problem dimensions
-            Nx = number_of_states(model)
-            Ny = number_of_inputs(model)
+        # cached variables
+        drdy_cache = fill(NaN, Nx, Ny),
+        dyddx_cache = fill(NaN, Ny, Nx)
 
-            # cached variables
-            drdy_cache = fill(NaN, Nx, Ny),
-            dyddx_cache = fill(NaN, Ny, Nx)
+        # state rate vector
+        dx = FillArrays.Zeros(x)
 
-            # state rate vector
-            dx = FillArrays.Zeros(x)
-
-            # update function
-            tgrad = (dT, x, p, t) -> begin
-                # check if we can use the cache variables (no custom types)
-                if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                    # use cache variables
-                    get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t;
-                        drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-                else
-                    # don't use cache variables (to accomodate custom types)
-                    get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t)
-                end
+        # update function
+        tgrad = (dT, x, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+                # use cache variables
+                get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t;
+                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+            else
+                # don't use cache variables (to accomodate custom types)
+                get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t)
             end
-        else
-            # model is out-of-place so don't use cache variables
-            tgrad = (x, p, t) -> get_time_gradient(model, dx, x, fy(x, p, t), p, t)
         end
     end
 
@@ -2318,61 +2282,43 @@ function ode_state_jacobian(model::CoupledModel, fy, p=nothing)
 
     if all(iszero.(getproperty.(submodels, :statejac))) && iszero(coupling.statejac)
         # state jacobian is a zero vector
-        if isinplace(model)
-            jac = (J, x, p, t) -> J .= 0
-        else
-            jac = (x, p, t) -> zero(x) .* zero(x)'
-        end
+        jac = (J, x, p, t) -> J .= 0
     elseif all(isinvariant.(getproperty.(submodels, :statejac))) && isinvariant(coupling.statejac)
         # state jacobian is independent of all inputs
         J0 = get_state_jacobian(model)
-        if isinplace(model)
-            jac = (J, x, p, t) -> J .= J0
-        else
-            jac = (x, p, t) -> J0
-        end
+        jac = (J, x, p, t) -> J .= J0
     elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :statejac))) && 
         isconstant(coupling.statejac)
         # state jacobian only depends on the parameter vector
         J0 = get_state_jacobian(model, p)
-        if isinplace(model)
-            jac = (J, x, p, t) -> J .= J0
-        else
-            jac = (x, p, t) -> J0
-        end
+        jac = (J, x, p, t) -> J .= J0
     else
         # state jacobian defined as a function of state variables, parameters, and time 
 
+        # problem dimensions
+        Nx = number_of_states(model)
+        Ny = number_of_inputs(model)
+
+        # state rate vector
+        dx = FillArrays.Zeros(Nx)
+
         # construct state jacobian function
-        if isinplace(model)
-            # model is inplace so use cached variables if possible
 
-            # problem dimensions
-            Nx = number_of_states(model)
-            Ny = number_of_inputs(model)
+        # cached variables
+        drdy_cache = fill(NaN, Nx, Ny)
+        dyddx_cache = fill(NaN, Ny, Nx)
 
-            # cached variables
-            drdy_cache = fill(NaN, Nx, Ny),
-            dyddx_cache = fill(NaN, Ny, Nx)
-
-            # state rate vector
-            dx = FillArrays.Zeros(x)
-
-            # update function
-            jac = (J, x, p, t) -> begin
-                # check if we can use the cache variables (no custom types)
-                if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                    # use cache variables
-                    get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t;
-                        drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-                else
-                    # don't use cache variables (to accomodate custom types)
-                    get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t)
-                end
+        # update function
+        jac = (J, x, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+                # use cache variables
+                get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t;
+                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+            else
+                # don't use cache variables (to accomodate custom types)
+                get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t)
             end
-        else
-            # model is out-of-place so don't use cache variables
-            jac = (x, p, t) -> get_state_jacobian(model, dx, x, fy(x, p, t), p, t)
         end
     end
 
@@ -2386,61 +2332,119 @@ function ode_parameter_jacobian(model::CoupledModel, fy, p=nothing)
 
     if all(iszero.(getproperty.(submodels, :paramjac))) && isidentity(coupling.paramjac)
         # parameter jacobian is a zero matrix
-        if isinplace(model)
-            jac = (pJ, x, p, t) -> pJ .= 0
-        else
-            jac = (x, p, t) -> zero(x) .* zero(p)'
-        end
+        jac = (pJ, x, p, t) -> pJ .= 0
     elseif all(isinvariant.(getproperty.(submodels, :paramjac))) && isinvariant(coupling.paramjac)
         # parameter jacobian is independent of all inputs
         pJ0 = get_parameter_jacobian(model)
-        if isinplace(model)
-            paramjac = (pJ, x, p, t) -> pJ .= pJ0
-        else
-            paramjac = (x, p, t) -> pJ0
-        end
+        paramjac = (pJ, x, p, t) -> pJ .= pJ0
     elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :paramjac))) && 
         isconstant(coupling.paramjac)
         # time gradient only depends on the parameter vector
         pJ0 = get_parameter_jacobian(model, p)
-        if isinplace(model)
-            paramjac = (pJ, x, p, t) -> pJ .= pJ0
-        else
-            paramjac = (x, p, t) -> pJ0
-        end
+        paramjac = (pJ, x, p, t) -> pJ .= pJ0
     else
         # construct time gradient function
-        if isinplace(model)
-            # model is inplace so use cached variables if possible
 
-            # problem dimensions
-            Nx = number_of_states(model)
-            Ny = number_of_inputs(model)
+        # problem dimensions
+        Nx = number_of_states(model)
+        Ny = number_of_inputs(model)
 
-            # cached variables
-            drdy_cache = fill(NaN, Nx, Ny),
-            dyddx_cache = fill(NaN, Ny, Nx)
+        # cached variables
+        drdy_cache = fill(NaN, Nx, Ny)
+        dyddx_cache = fill(NaN, Ny, Nx)
 
-            # state rate vector
-            dx = FillArrays.Zeros(x)
+        # state rate vector
+        dx = FillArrays.Zeros(Nx)
 
-            # update function
-            pjac = (dT, x, p, t) -> begin
-                # check if we can use the cache variables (no custom types)
-                if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                    # use cache variables
-                    get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t;
-                        drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-                else
-                    # don't use cache variables (to accomodate custom types)
-                    get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t)
-                end
+        # update function
+        pjac = (dT, x, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
+                # use cache variables
+                get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t;
+                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+            else
+                # don't use cache variables (to accomodate custom types)
+                get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t)
             end
-        else
-            # model is out-of-place so don't use cache variables
-            pjac = (x, p, t) -> get_parameter_jacobian(model, dx, x, fy(x, p, t), p, t)
         end
+
     end
 
     return pjac
+end
+
+"""
+    get_dae(model)
+
+Construct an DAEFunction corresponding to the specified model or models which
+may be solved using DifferentialEquations.
+"""
+function get_dae(model::CoupledModel)
+
+    # always construct in-place models, always compile
+    iip = true
+    compile = true
+
+    # construct coupling function
+    fy = dae_coupling_function(model)
+
+    # construct rate function
+    f = dae_residual_function(model, fy)
+
+    # return ODE function
+    return DAEFunction{iip, compile}(f)
+end
+
+function dae_coupling_function(model::CoupledModel)
+
+    # check whether cached variables should be used
+    if isinplace(model)
+        # model is inplace so use cached variables if possible
+
+        # problem dimensions
+        Nx = number_of_states(model)
+        Ny = number_of_inputs(model)
+        Np = number_of_parameters(model)
+
+        # cached variables
+        dxcache = fill(NaN, Nx)
+        xcache = fill(NaN, Nx)
+        ycache = fill(NaN, Ny)
+        pcache = fill(NaN, Np)
+        tcache = fill(NaN)
+
+        # coupling function
+        fy = (dx, x, p, t) -> begin
+            # check if we can use the cache variables (no custom types)
+            if promote_type(eltype(dx), eltype(x), eltype(p), typeof(t)) <: Float64
+                # update the cache variables (if necessary)
+                if (dx != dxcache) && (x != xcache) && (p != pcache) && (t != tcache[])
+                    dxcache .= dx
+                    xcache .= x
+                    ycache .= get_coupling_inputs!(ycache, model, dx, x, p, t)
+                    pcache .= p
+                    tcache .= t
+                end
+                # set inputs to the cached inputs
+                y = ycache
+            else
+                # calculate inputs (out-of-place to accomodate custom type)
+                y = get_coupling_inputs(model, dx, x, p, t)
+            end
+            # return cached or computed inputs
+            return y
+        end
+    else
+        # model is out of place so calculate coupling inputs directly
+        fy = (dx, x, p, t) -> get_coupling_inputs(model, dx, x, p, t)
+    end
+
+    # return coupling function
+    return fy
+end
+
+function dae_residual_function(model::CoupledModel, fy)
+
+    return (resid, dx, x, p, t) -> get_residual!(resid, model, dx, x, fy(dx, x, p, t), p, t)
 end

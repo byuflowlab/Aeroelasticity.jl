@@ -64,7 +64,7 @@ kh = m*ωh^2 # plunge spring constant
 kθ = Iθ*ωθ^2 # pitch spring constant
 
 # models
-models = (SteadySection(), QuasiSteadySection(), WagnerSection(), PetersSection(6))
+models = (steady_section_model(), quasisteady_section_model(), wagner_section_model(), peters_section_model(6))
 
 # eigenvalue/eigenvector storage
 λ = Vector{Matrix{ComplexF64}}(undef, length(models))
@@ -226,7 +226,7 @@ Time domain simulations may also be used in order to determine a system's stabil
 using DifferentialEquations
 
 # model
-model = PetersSection(6)
+model = peters_section_model(6)
 
 # reduced velocity
 V = 1.0 # = U/(b*ωθ)
@@ -245,11 +245,11 @@ u0_aero = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 u0_stru = [1.0, 0.0, 0.0, 0.0] # non-zero plunge degree of freedom
 x0 = vcat(u0_aero, u0_stru)
 
-# simulate from 0 to 10 seconds
+# simulate from 0 to 100 seconds
 tspan = (0.0, 100.0)
 
 # construct ODE function
-f = get_ode(coupled_model)
+f = get_ode(model)
 
 # construct ODE problem
 prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
