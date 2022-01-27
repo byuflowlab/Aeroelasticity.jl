@@ -1,9 +1,9 @@
 """
-    Model{iip, F, NS, NI, NP, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
+    Submodel{iip, F, NS, NI, NP, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
 
-Base type for standalone models in AerostructuralDynamics.
+Base type for submodels in AerostructuralDynamics.
 """
-struct Model{iip, F, NS, NI, NP, C, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
+struct Submodel{iip, F, NS, NI, NP, C, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
     # residual function
     f::F
     # dimensions
@@ -28,9 +28,9 @@ struct Model{iip, F, NS, NI, NP, C, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
 end
 
 """
-    Model{iip}(f, nx, ny, np; kwargs...)
+    Submodel{iip}(f, nx, ny, np; kwargs...)
 
-Define a custom model for use with AerostructuralDynamics.  Note that `iip` should be set to
+Define a custom submodel for use with AerostructuralDynamics.  Note that `iip` should be set to
 `true` if `f` is defined in-place and `false` otherwise. 
 
 # Arguments
@@ -55,7 +55,7 @@ Define a custom model for use with AerostructuralDynamics.  Note that `iip` shou
  - `sepinput = (y) -> (y = y,)`: Function for separating inputs into named variables.
  - `sepparam = (p) -> (p = p,)`: Function for separating parameters into named variables.
 """
-function Model{iip}(f, nx, ny, np;
+function Submodel{iip}(f, nx, ny, np;
     constants = (),
     ratejac = Nonlinear(),
     statejac = Nonlinear(),
@@ -76,7 +76,7 @@ function Model{iip}(f, nx, ny, np;
     paramjac = add_parameter_jacobian(paramjac, f, iip, nx, ny, np)
     tgrad = add_time_gradient(tgrad, f, iip, nx, ny, np)
 
-    return Model{iip,
+    return Submodel{iip,
         typeof(f), typeof(nx), typeof(ny), typeof(np), typeof(constants),
         typeof(ratejac), typeof(statejac), typeof(inputjac), typeof(paramjac), typeof(tgrad),
         typeof(setstate), typeof(setinput), typeof(setparam),
@@ -88,9 +88,9 @@ function Model{iip}(f, nx, ny, np;
 end
 
 """
-    NoStateModel(np; kwargs...)
+    Submodel(np; kwargs...)
 
-Define a standalone model with no state variables
+Define a submodel with no state variables (see [`Submodel`](@ref))
 
 # Arguments
  - `np`: Number of parameters.
@@ -101,12 +101,12 @@ Define a standalone model with no state variables
     set of keyword arguments.
  - `sepparam = (p) -> (p = p,)`: Function for separating parameters into named variables.
 """
-function NoStateModel(np; 
+function Submodel(np; 
     constants = (),
     setparam = (params; p) -> params .= p,
     sepparam = (p) -> (p = p,))
 
-    return Model{false}((dx, x, y, p, t) -> Float64[], Val(0), Val(0), np;
+    return Submodel{false}((dx, x, y, p, t) -> Float64[], Val(0), Val(0), np;
         constants = constants,
         ratejac = Empty(),
         statejac = Empty(),
@@ -124,7 +124,7 @@ end
 """
     Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT, IP, OP}
 
-Base type for model couplings in AerostructuralDynamics.
+Base type for coupling models in AerostructuralDynamics.
 """
 struct Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT, IP, OP}
     # coupling function
@@ -147,7 +147,7 @@ end
 """
     Coupling{iip}(g, nx, ny, np, npc; kwargs...)
 
-Define a custom coupling for use with AerostructuralDynamics.  Note that `iip` should 
+Define a custom coupling model for use with AerostructuralDynamics.  Note that `iip` should 
 be set to `true` if `g` is defined in-place and `false` otherwise. 
 
 # Arguments
@@ -196,14 +196,38 @@ end
 Base type for coupled models in AerostructuralDynamics.
 """
 struct CoupledModel{M,C}
-    models::M
+    submodels::M
     coupling::C
 end
 
 """
-    CoupledModel(models, coupling)
+    CoupledModel(submodels, coupling)
 
-Define a coupled model given a tuple of models (of type [`Model`](@ref)) and a coupling 
-function (of type [`Coupling`](@ref)).
+Define a coupled model given a tuple of submodels (of type [`Submodel`](@ref)) and a 
+coupling model (of type [`Coupling`](@ref)).
 """
-CoupledModel()
+CoupledModel(submodels, coupling)
+
+# --- Inplaceness Trait --- #
+
+abstract type InPlaceness end
+struct InPlace <: InPlaceness end
+struct OutOfPlace <: InPlaceness end
+
+inplaceness(::Submodel{true}) = InPlace()
+inplaceness(::Submodel{false}) = OutOfPlace()
+
+inplaceness(::Coupling{true}) = InPlace()
+inplaceness(::Coupling{false}) = OutOfPlace()
+
+function inplaceness(model::CoupledModel)
+    if any(isinplace.(model.submodels)) || isinplace(model.coupling)
+        return InPlace()
+    else
+        return OutOfPlace()
+    end
+end
+
+isinplace(x) = isinplace(inplaceness(x))
+isinplace(::InPlace) = true
+isinplace(::OutOfPlace) = false

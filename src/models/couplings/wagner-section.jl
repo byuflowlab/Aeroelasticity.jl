@@ -1,37 +1,18 @@
-"""
-    wagner_section_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+# --- Coupling Model Creation --- #
 
-Construct a model by coupling an unsteady aerodynamic model based on wagner_model's function (see 
-[`wagner_model`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
+"""
+    Coupling(aero::Wagner, stru::Section)
+
+Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see 
+[`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
 This coupling introduces the freestream velocity ``U_\\infty``, air density 
 ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 """
-function wagner_section_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
-    
-    # aerodynamic model
-    aero = wagner_model(; C1, C2, eps1, eps2)
-
-    # structural model
-    stru = typical_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = wagner_section_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function wagner_section_coupling(aero, stru)
+function Coupling(aero::Wagner, ::Section)
 
     # model constants
-    C1 = aero.constants.C1
-    C2 = aero.constants.C2
+    C1 = aero.C1
+    C2 = aero.C2
 
     # coupling function
     g = (dx, x, p, t) -> wagner_section_inputs(dx, x, p, t; C1, C2)
@@ -51,10 +32,10 @@ function wagner_section_coupling(aero, stru)
     tgrad = Zeros()
 
     # convenience function for setting coupling parameters
-    setparam = wagner_section_setparam
+    setparam = wagner_section_set_parameters!
 
     # convenience function for separating coupling parameters
-    sepparam = wagner_section_sepparam
+    sepparam = wagner_section_separate_parameters
 
     # return resulting coupling
     return Coupling{false}(g, nx, ny, np, npc;
@@ -65,6 +46,8 @@ function wagner_section_coupling(aero, stru)
         setparam = setparam,
         sepparam = sepparam)
 end
+
+# --- Internal Methods --- #
 
 # coupling function
 function wagner_section_inputs(dx, x, p, t; C1, C2)
@@ -86,7 +69,7 @@ function wagner_section_inputs(dx, x, p, t; C1, C2)
 end
 
 # convenience function for defining the coupling function parameters
-function wagner_section_setparam(p; U, rho, c)
+function wagner_section_set_parameters!(p; U, rho, c)
     p[1] = U
     p[2] = rho
     p[3] = c
@@ -94,4 +77,4 @@ function wagner_section_setparam(p; U, rho, c)
 end
 
 # convenience function for separating the coupling function parameters
-wagner_section_sepparam(p) = (U = p[1], rho = p[2], c = p[3])
+wagner_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])

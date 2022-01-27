@@ -1,33 +1,14 @@
+# --- Coupling Model Creation --- #
+
 """
-    quasisteady_section_model()
+    Coupling(::QuasiSteady, ::Section)
 
-Construct a model by coupling a steady aerodynamic model based on thin airfoil theory (see 
-[`Steady`](@ref)) and a two-degree of freedom typical section model (see [`Section()`]).  
-This model introduces the freestream velocity ``U``, air density ``\\rho``, and air speed 
-of sound ``c`` as additional parameters.
+Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory 
+(see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model 
+(see [`Section()`]).  This model introduces the freestream velocity ``U``, air density 
+``\\rho``, and air speed of sound ``c`` as additional parameters.
 """
-function quasisteady_section_model()
-
-    # aerodynamic model
-    aero = quasisteady_model()
-
-    # structural model
-    stru = typical_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = quasisteady_section_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function quasisteady_section_coupling(aero, stru)
+function Coupling(::QuasiSteady, ::Section)
 
     # coupling function
     g = quasisteady_section_inputs
@@ -47,10 +28,10 @@ function quasisteady_section_coupling(aero, stru)
     tgrad = Zeros()
 
     # convenience function for setting coupling parameters
-    setparam = quasisteady_section_setparam
+    setparam = quasisteady_section_set_parameters!
 
     # convenience function for separating coupling parameters
-    sepparam = quasisteady_section_sepparam
+    sepparam = quasisteady_section_separate_parameters
 
     # return resulting coupling
     return Coupling{false}(g, nx, ny, np, npc;
@@ -61,6 +42,8 @@ function quasisteady_section_coupling(aero, stru)
         setparam = setparam,
         sepparam = sepparam)
 end
+
+# --- Internal Methods --- #
 
 # coupling function
 function quasisteady_section_inputs(dx, x, p, t)
@@ -83,7 +66,7 @@ function quasisteady_section_inputs(dx, x, p, t)
 end
 
 # convenience function for defining the coupling function parameters
-function quasisteady_section_setparam(p; U, rho, c)
+function quasisteady_section_set_parameters!(p; U, rho, c)
     p[1] = U
     p[2] = rho
     p[3] = c
@@ -91,5 +74,5 @@ function quasisteady_section_setparam(p; U, rho, c)
 end
     
 # convenience function for separating the coupling function parameters
-quasisteady_section_sepparam(p) = (U = p[1], rho = p[2], c = p[3])
+quasisteady_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])
 

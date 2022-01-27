@@ -1,33 +1,14 @@
+# --- Coupling Model Creation --- #
+
 """
-    steady_section_model()
+    Coupling(::Steady, ::Section)
 
-Construct a model by coupling a steady aerodynamic model based on thin airfoil theory (see 
-[`Steady`](@ref)) and a two-degree of freedom typical section model (see [`Section()`]).  
-This model introduces the freestream velocity ``U_\\infty``, air density ``\\rho_\\infty``, 
-and air speed of sound ``c`` as additional parameters.
+Coupling model for coupling a steady aerodynamic model based on thin airfoil theory 
+(see [`Steady`](@ref)) and a two-degree of freedom typical section model 
+(see [`Section()`]).  This model introduces the freestream velocity ``U_\\infty``, air 
+density ``\\rho_\\infty``, and air speed of sound ``c`` as additional parameters.
 """
-function steady_section_model()
-
-    # aerodynamic model
-    aero = steady_model()
-
-    # structural model
-    stru = typical_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = steady_section_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function steady_section_coupling(aero, stru)
+function Coupling(::Steady, ::Section)
 
     # coupling function
     g = steady_section_inputs
@@ -47,10 +28,10 @@ function steady_section_coupling(aero, stru)
     tgrad = Zeros()
 
     # convenience function for setting coupling parameters
-    setparam = steady_section_setparam
+    setparam = steady_section_set_parameters!
 
     # convenience function for separating coupling parameters
-    sepparam = steady_section_sepparam
+    sepparam = steady_section_separate_parameters
 
     # return resulting coupling
     return Coupling{false}(g, nx, ny, np, npc;
@@ -61,6 +42,8 @@ function steady_section_coupling(aero, stru)
         setparam = setparam,
         sepparam = sepparam)
 end
+
+# --- Internal Methods --- #
 
 # coupling function
 function steady_section_inputs(dx, x, p, t)
@@ -79,7 +62,7 @@ function steady_section_inputs(dx, x, p, t)
 end
 
 # convenience function for defining the coupling function parameters
-function steady_section_setparam(p; U, rho, c)
+function steady_section_set_parameters!(p; U, rho, c)
     p[1] = U
     p[2] = rho
     p[3] = c
@@ -87,7 +70,7 @@ function steady_section_setparam(p; U, rho, c)
 end
 
 # convenience function for separating the coupling function parameters
-steady_section_sepparam(p) = (U = p[1], rho = p[2], c = p[3])
+steady_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])
 
 # local freestream velocities
 function section_steady_velocities(U, θ)

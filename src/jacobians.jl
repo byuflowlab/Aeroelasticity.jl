@@ -1,27 +1,3 @@
-# --- Inplaceness Trait --- #
-
-abstract type InPlaceness end
-struct InPlace <: InPlaceness end
-struct OutOfPlace <: InPlaceness end
-
-inplaceness(model::Model{true}) = InPlace()
-inplaceness(model::Model{false}) = OutOfPlace()
-
-inplaceness(coupling::Coupling{true}) = InPlace()
-inplaceness(coupling::Coupling{false}) = OutOfPlace()
-
-function inplaceness(model::CoupledModel)
-    if any(isinplace.(model.models)) || isinplace(model.coupling)
-        return InPlace()
-    else
-        return OutOfPlace()
-    end
-end
-
-isinplace(x) = isinplace(inplaceness(x))
-isinplace(::InPlace) = true
-isinplace(::OutOfPlace) = false
-
 # --- Jacobian Types --- #
 
 abstract type JacobianType end

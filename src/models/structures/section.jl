@@ -1,11 +1,15 @@
 """
-    typical_section_model()
+    Section()
 
-Construct a typical section structural model with state variables ``h, \\theta, \\dot{h},
+Typical section structural model with state variables ``h, \\theta, \\dot{h},
 \\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
 k_\\theta, m, S_\\theta, I_\\theta``
 """
-function typical_section_model()
+struct Section end
+
+# --- Submodel Creation --- #
+
+function Submodel(::Section)
 
     # residual function
     fresid = section_residual
@@ -23,17 +27,17 @@ function typical_section_model()
     tgrad = Zeros()
 
     # convenience functions for setting states, inputs, and parameters
-    setstate = section_setstate!
-    setinput = section_setinput!
-    setparam = section_setparam!
+    setstate = section_set_states!
+    setinput = section_set_inputs!
+    setparam = section_set_parameters!
 
     # convenience functions for separating states, inputs, and parameters
-    sepstate = section_sepstate
-    sepinput = section_sepinput
-    sepparam = section_sepparam
+    sepstate = section_separate_states
+    sepinput = section_separate_inputs
+    sepparam = section_separate_parameters
 
     # model definition
-    return Model{false}(fresid, nx, ny, np;
+    return Submodel{false}(fresid, nx, ny, np;
         ratejac = ratejac,
         statejac = statejac,
         inputjac = inputjac,
@@ -48,7 +52,35 @@ function typical_section_model()
     )
 end
 
-# --- Internal Methods for this Model --- #
+# --- Additional Functions --- #
+
+function section_coordinates(h, θ; 
+    a=0, 
+    b=0.5,
+    xcoord = [1.0, 0.993844, 0.975528, 0.945503, 0.904508, 0.853553, 0.793893, 0.726995, 
+        0.654508, 0.578217, 0.5, 0.421783, 0.345492, 0.273005, 0.206107, 0.146447, 
+        0.095492, 0.054497, 0.024472, 0.006156, 0.0, 0.006156, 0.024472, 0.054497, 
+        0.095492, 0.146447, 0.206107, 0.273005, 0.345492, 0.421783, 0.5, 0.578217, 
+        0.654508, 0.726995, 0.793893, 0.853553, 0.904508, 0.945503, 0.975528, 0.993844, 1.0],
+    ycoord = [0.00126, 0.00212, 0.004642, 0.008658, 0.013914, 0.020107, 0.026905, 0.033962, 
+        0.040917, 0.047383, 0.05294, 0.057148, 0.059575, 0.059848, 0.057714, 0.053083, 
+        0.046049, 0.036867, 0.025893, 0.013503, 0.0, -0.013503, -0.025893, -0.036867, 
+        -0.046049, -0.053083, -0.057714, -0.059848, -0.059575, -0.057148, -0.05294, 
+        -0.047383, -0.040917, -0.033962, -0.026905, -0.020107, -0.013914, -0.008658, 
+        -0.004642, -0.00212, -0.00126],
+    )
+
+    xplot = similar(xcoord)
+    yplot = similar(ycoord)
+    for i = 1:length(xcoord)
+        xplot[i] = (xcoord[i] - 0.5 - a)*2*b*cos(θ) - ycoord[i]*2*b*sin(θ)
+        yplot[i] = (xcoord[i] - 0.5 - a)*2*b*sin(θ) + ycoord[i]*2*b*cos(θ) + h
+    end
+
+    return xplot, yplot
+end
+
+# --- Internal Methods --- #
 
 # residual function
 function section_residual(dx, x, y, p, t)
@@ -89,7 +121,7 @@ function section_parameter_jacobian(dx, x, y, p, t)
 end
 
 # convenience function for defining this model's state vector
-function section_setstate!(x; h, theta, hdot, thetadot)
+function section_set_states!(x; h, theta, hdot, thetadot)
     x[1] = h
     x[2] = theta
     x[3] = hdot
@@ -98,14 +130,14 @@ function section_setstate!(x; h, theta, hdot, thetadot)
 end
 
 # convenience function for defining this model's input vector
-function section_setinput!(y; L, M)
+function section_set_inputs!(y; L, M)
     y[1] = L
     y[2] = M
     return y
 end
 
 # convenience function for defining this model's parameter vector
-function section_setparam!(p; kh, ktheta, m, Stheta, Itheta)
+function section_set_parameters!(p; kh, ktheta, m, Stheta, Itheta)
     p[1] = kh
     p[2] = ktheta
     p[3] = m
@@ -115,15 +147,13 @@ function section_setparam!(p; kh, ktheta, m, Stheta, Itheta)
 end
 
 # convenience function for separating this model's state vector
-section_sepstate(x) = (h = x[1], theta = x[2], hdot = x[3], thetadot = x[4])
+section_separate_states(x) = (h = x[1], theta = x[2], hdot = x[3], thetadot = x[4])
 
 # convenience function for separating this model's input vector
-section_sepinput(y) = (L = y[1], M = y[2])
+section_separate_inputs(y) = (L = y[1], M = y[2])
 
 # convenience function for separating this model's parameter vector
-section_sepparam(p) = (kh = p[1], ktheta = p[2], m = p[3], Stheta = p[4], Itheta = p[5])
-
-# --- Internal Methods for Couplings with this Model --- #
+section_separate_parameters(p) = (kh = p[1], ktheta = p[2], m = p[3], Stheta = p[4], Itheta = p[5])
 
 # airfoil local linear/angular velocities
 function section_velocities(U, θ, hdot, θdot)

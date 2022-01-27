@@ -1,11 +1,28 @@
 """
-    peters_model(N)
+    Peters{N,TF=Float64}()
 
-Construct an aerodynamic model based on Peters' finite state model with `N` state variables, 
-inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, \\alpha_0, 
-c_{d,0}, c_{m,0}``
+Two-dimensional aerodynamic model based on Peters' finite state model with `N` state 
+variables, inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, 
+\\alpha_0, c_{d,0}, c_{m,0}``
 """
-function peters_model(N)
+struct Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
+    A::TA
+    b::TV
+    c::TV
+end
+
+Peters{N}() where N = Peters{N,Float64}()
+
+function Peters{N,TF}() where {N,TF}
+
+    A, b, c = peters_constants(N)
+
+    return Peters(SMatrix{N,N,TF}(A), SVector{N,TF}(b), SVector{N,TF}(c))
+end
+
+# --- Submodel Creation --- #
+
+function Submodel(::Peters{N}) where N
 
     # model constants (which may be used when this model is coupled with other models)
     Abar, bbar, cbar = peters_constants(N)
@@ -26,17 +43,17 @@ function peters_model(N)
     tgrad = Zeros()
 
     # convenience functions for setting states, inputs, and parameters
-    setstate = peters_setstate!
-    setinput = peters_setinput!
-    setparam = peters_setparam!
+    setstate = peters_set_states!
+    setinput = peters_set_inputs!
+    setparam = peters_set_parameters!
 
     # convenience functions for separating states, inputs, and parameters
-    sepstate = peters_sepstate
-    sepinput = peters_sepinput
-    sepparam = peters_sepparam
+    sepstate = peters_separate_states
+    sepinput = peters_separate_inputs
+    sepparam = peters_separate_parameters
 
     # model definition
-    return Model{false}(fresid, nx, ny, np;
+    return Submodel{false}(fresid, nx, ny, np;
         constants = (Abar=Abar, bbar=bbar, cbar=cbar),
         ratejac = ratejac,
         statejac = statejac,
@@ -52,7 +69,7 @@ function peters_model(N)
     )
 end
 
-# --- Internal Methods for this Model --- #
+# --- Internal Methods --- #
 
 # function for defining model constants
 function peters_constants(N)
@@ -143,10 +160,10 @@ function peters_parameter_jacobian(dx, x, y, p, t; Abar, cbar)
 end
 
 # convenience function for defining this model's state vector
-peters_setstate!(x; lambda) = x .= lambda
+peters_set_states!(x; lambda) = x .= lambda
 
 # convenience function for defining this model's input vector
-function peters_setinput!(y; u, omega, vdot, omegadot)
+function peters_set_inputs!(y; u, omega, vdot, omegadot)
     y[1] = u
     y[2] = omega
     y[3] = vdot
@@ -155,7 +172,7 @@ function peters_setinput!(y; u, omega, vdot, omegadot)
 end
 
 # convenience function for defining this model's parameter vector
-function peters_setparam!(p; a, b, a0, alpha0, cd0, cm0)
+function peters_set_parameters!(p; a, b, a0, alpha0, cd0, cm0)
     p[1] = a
     p[2] = b
     p[3] = a0
@@ -166,15 +183,13 @@ function peters_setparam!(p; a, b, a0, alpha0, cd0, cm0)
 end
 
 # convenience function for separating this model's state vector
-peters_sepstate = (x) -> (lambda=x,)
+peters_separate_states = (x) -> (lambda=x,)
 
 # convenience function for separating this model's input vector
-peters_sepinput = (y) -> (u=y[1], omega=y[2], vdot=y[3], omegadot=y[4])
+peters_separate_inputs = (y) -> (u=y[1], omega=y[2], vdot=y[3], omegadot=y[4])
 
 # convenience function for separating this model's parameter vector
-peters_sepparam = (p) -> (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
-
-# --- Internal Methods for Couplings with this Model --- #
+peters_separate_parameters = (p) -> (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
 
 # aerodynamic loads per unit span
 function peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)

@@ -1,45 +1,21 @@
-"""
-    peters_section_model(N)
+# --- Coupling Model Creation --- #
 
-Construct a model by coupling an unsteady aerodynamic model based on Peters' finite state 
+"""
+    Coupling(::Peters, ::Section)
+
+Coupling model for coupling an unsteady aerodynamic model based on Peters' finite state 
 theory (see [`Peters`](@ref)) and a two-degree of freedom typical section model (see 
 [`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, 
 air density ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 """
-function peters_section_model(N)
-
-    # aerodynamic model
-    aero = peters_model(N)
-
-    # structural model
-    stru = typical_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = peters_section_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function peters_section_coupling(aero, stru)
+function Coupling(aero::Peters{N}, ::Section) where N
 
     # state variable indices
-    iλ, iq = state_indices((aero, stru))
-
-    # model constants
-    bbar = aero.constants.bbar
-
-    # number of aerodynamic state variables
-    N = length(bbar)
+    iλ = SVector{N}(1:N)
+    iq = SVector{4}(N+1:N+4)
 
     # coupling function
-    g = (dx, x, p, t) -> peters_section_inputs(dx, x, p, t; iλ, iq, bbar)
+    g = (dx, x, p, t) -> peters_section_inputs(dx, x, p, t; iλ, iq, bbar = aero.b)
 
     # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
     nx = Val(N+4)
@@ -56,10 +32,10 @@ function peters_section_coupling(aero, stru)
     tgrad = Zeros()
     
     # convenience function for setting coupling parameters
-    setparam = peters_section_setparam
+    setparam = peters_section_set_parameters!
 
     # convenience function for separating coupling parameters
-    sepparam = peters_section_sepparam
+    sepparam = peters_section_separate_parameters
     
     # return resulting coupling
     return Coupling{false}(g, nx, ny, np, npc;
@@ -93,7 +69,7 @@ function peters_section_inputs(dx, x, p, t; iλ, iq, bbar)
 end
 
 # convenience function for defining the coupling function parameters
-function peters_section_setparam(p; U, rho, c)
+function peters_section_set_parameters!(p; U, rho, c)
     p[1] = U
     p[2] = rho
     p[3] = c
@@ -101,4 +77,4 @@ function peters_section_setparam(p; U, rho, c)
 end
 
 # convenience function for separating the coupling function parameters
-peters_section_sepparam(p) = (U = p[1], rho = p[2], c = p[3])
+peters_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])

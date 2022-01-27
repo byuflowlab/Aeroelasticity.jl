@@ -1,5 +1,5 @@
 """
-    gxbeam_model(start, stop, displacement; kwargs...)
+    GXBeamAssembly(start, stop, displacement; kwargs...)
 
 Construct a geometrically exact beam theory structural model with beam elements
 which extend from the point indices in `start` to the point indices in
@@ -18,7 +18,7 @@ which extend from the point indices in `start` to the point indices in
 # Keyword Arguments
  - `force_scaling = 1.0`: Factor used to scale system forces/moments internally
 """
-function gxbeam_model(start, stop, displacement; force_scaling = 1.0)
+function GXBeamAssembly(start, stop, displacement; force_scaling = 1.0)
 
     # initialize system pointers
     N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
@@ -54,16 +54,16 @@ function gxbeam_model(start, stop, displacement; force_scaling = 1.0)
     tgrad = Zeros()
 
     # convenience functions for setting states, inputs, and parameters
-    setstate = (x; kwargs...) -> gxbeam_setstate!(x, displacement, icol_point, icol_elem, 
+    setstate = (x; kwargs...) -> gxbeam_set_states!(x, displacement, icol_point, icol_elem, 
         force_scaling; kwargs...)
-    setinput = (y; kwargs...) -> gxbeam_setinput!(y, displacement, icol_point, icol_elem; 
+    setinput = (y; kwargs...) -> gxbeam_set_inputs!(y, displacement, icol_point, icol_elem; 
         kwargs...) 
-    setparam = (p; kwargs...) -> gxbeam_setparam!(p, icol_point, icol_elem; kwargs...)
+    setparam = (p; kwargs...) -> gxbeam_set_parameters!(p, icol_point, icol_elem; kwargs...)
 
     # convenience functions for separating states, inputs, and parameters
-    sepstate = (x) -> gxbeam_sepstate(x, displacement, icol_point, icol_elem, force_scaling)
+    sepstate = (x) -> gxbeam_separate_states(x, displacement, icol_point, icol_elem, force_scaling)
     sepinput = (y) -> gxbeam_sepinput(y, displacement, icol_point, icol_elem)
-    sepparam = (p) -> gxbeam_sepparam(p, start, stop, icol_point, icol_elem)
+    sepparam = (p) -> gxbeam_separate_parameters(p, start, stop, icol_point, icol_elem)
 
     # model definition
     return Model{true}(fresid, nx, ny, np;
@@ -273,7 +273,7 @@ function gxbeam_point_mass(y)
 end
 
 # convenience function for defining this model's state vector
-function gxbeam_setstate!(x, displacement, icol_point, icol_elem, force_scaling;
+function gxbeam_set_states!(x, displacement, icol_point, icol_elem, force_scaling;
     u_e = nothing, theta_e = nothing, F_e = nothing, M_e = nothing,
     V_e = nothing, Omega_e = nothing, u_p = nothing, theta_p = nothing,
     F_p = nothing, M_p = nothing)
@@ -324,7 +324,7 @@ function gxbeam_setstate!(x, displacement, icol_point, icol_elem, force_scaling;
 end
 
 # convenience function for defining this model's input vector
-function gxbeam_setinput!(y, displacement, icol_point, icol_elem; 
+function gxbeam_set_inputs!(y, displacement, icol_point, icol_elem; 
     u_p = nothing, theta_p = nothing, F_p = nothing, M_p = nothing, 
     f_d = nothing, m_d = nothing, 
     m_m = nothing, p_m = nothing, I_m = nothing,
@@ -425,7 +425,7 @@ function gxbeam_setinput!(y, displacement, icol_point, icol_elem;
 end
 
 # convenience function for defining this model's parameter vector
-function gxbeam_setparam!(p, icol_point, icol_elem; assembly)
+function gxbeam_set_parameters!(p, icol_point, icol_elem; assembly)
 
     np = length(icol_point)
     ne = length(icol_elem)
@@ -480,7 +480,7 @@ function gxbeam_setparam!(p, icol_point, icol_elem; assembly)
 end
 
 # convenience function for separating this model's state vector
-function gxbeam_sepstate(x, displacement, icol_point, icol_elem, force_scaling)
+function gxbeam_separate_states(x, displacement, icol_point, icol_elem, force_scaling)
   
     # floating point type
     TF = eltype(x)
@@ -553,7 +553,7 @@ function gxbeam_sepstate(x, displacement, icol_point, icol_elem, force_scaling)
 end
 
 # convenience function for separating this model's input vector
-function gxbeam_sepinput(y, displacement, icol_point, icol_elem)
+function gxbeam_separate_inputs(y, displacement, icol_point, icol_elem)
 
     TF = eltype(y)
 
@@ -635,7 +635,7 @@ function gxbeam_sepinput(y, displacement, icol_point, icol_elem)
 end
 
 # convenience function for separating this model's parameter vector
-function gxbeam_sepparam(p, start, stop, icol_point, icol_elem)
+function gxbeam_separate_parameters(p, start, stop, icol_point, icol_elem)
     np = length(icol_point)
     ne = length(icol_elem)
     return (assembly = gxbeam_assembly(p, np, ne, start, stop),)

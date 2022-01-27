@@ -1,28 +1,32 @@
 """
-    quasisteady_model()
+    QuasiSteady()
 
-Construct a 2D aerodynamic model based on quasi-steady thin airfoil theory with parameters 
+Two-dimensional aerodynamic model based on quasi-steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
-function quasisteady_model()
+struct QuasiSteady end
+
+# --- Submodel Creation --- #
+
+function Submodel(::QuasiSteady)
 
     # number of parameters (use Val(N) to use inferrable dimensions)
     np = Val(6)
 
     # convenience function for setting parameters
-    setparam = quasisteady_setparam!
+    setparam = quasisteady_set_parameters!
 
     # convenience function for separating parameters
-    sepparam = quasisteady_sepparam
+    sepparam = quasisteady_separate_parameters
 
     # model definition
-    return NoStateModel(np; setparam, sepparam)
+    return Submodel(np; setparam, sepparam)
 end
 
-# --- Internal Methods for use by this Model --- #
+# --- Internal Methods --- #
 
 # convenience function for defining this model's parameter vector
-function quasisteady_setparam!(p; a, b, a0, alpha0, cd0, cm0)
+function quasisteady_set_parameters!(p; a, b, a0, alpha0, cd0, cm0)
     p[1] = a
     p[2] = b
     p[3] = a0
@@ -33,9 +37,7 @@ function quasisteady_setparam!(p; a, b, a0, alpha0, cd0, cm0)
 end
 
 # convenience function for separating this model's parameter vector
-quasisteady_sepparam(p) = (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
-
-# --- Internal Methods for Couplings with this Model --- #
+quasisteady_separate_parameters(p) = (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
 
 # aerodynamic loads per unit span
 function quasisteady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v, ω, vdot, ωdot)

@@ -1,28 +1,32 @@
 """
-    steady_model()
+    Steady()
 
-Construct a 2D aerodynamic model based on steady thin airfoil theory with parameters 
+Two-dimensional aerodynamic model based on steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
-function steady_model()
+struct Steady end
+
+# --- Submodel Creation --- #
+
+function Submodel(::Steady)
 
     # number of parameters (use Val(N) to use inferrable dimensions)
     np = Val(6)
 
     # convenience function for setting parameters
-    setparam = steady_setparam!
+    setparam = steady_set_parameters!
 
     # convenience function for separating parameters
-    sepparam = steady_sepparam
+    sepparam = steady_separate_parameters
 
     # model definition
-    return NoStateModel(np; setparam, sepparam)
+    return Submodel(np; setparam, sepparam)
 end
 
-# --- Internal Methods for this Model --- #
+# --- Internal Methods --- #
 
 # convenience function for defining this model's parameter vector
-function steady_setparam!(p; a, b, a0, alpha0, cd0, cm0)
+function steady_set_parameters!(p; a, b, a0, alpha0, cd0, cm0)
     p[1] = a
     p[2] = b
     p[3] = a0
@@ -33,9 +37,7 @@ function steady_setparam!(p; a, b, a0, alpha0, cd0, cm0)
 end
 
 # convenience function for separating this model's parameter vector
-steady_sepparam(p) = (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
-
-# --- Internal Methods for Couplings with this Model --- #
+steady_separate_parameters(p) = (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
 
 # aerodynamic loads per unit span
 function steady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v)
