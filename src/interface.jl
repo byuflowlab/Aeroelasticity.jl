@@ -86,7 +86,7 @@ function assemble_states!(x0, model::CoupledModel;
     end
 
     # populate state vector
-    for i = 1:length(states)
+    for i = 1:length(coupled_states)
         set_states!(x0, model, i; coupled_states[i]...)
     end
 
@@ -143,7 +143,7 @@ function assemble_parameters!(p, model::CoupledModel;
     end
 
     # populate parameter vector
-    for i = 1:length(parameters)
+    for i = 1:length(coupled_parameters)
         set_parameters!(p, model, i; coupled_parameters[i]...)
     end
     set_additional_parameters!(p, model; additional_parameters...)

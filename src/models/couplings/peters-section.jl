@@ -11,8 +11,8 @@ air density ``\\rho_\\infty`` and air speed of sound ``c`` as additional paramet
 function Coupling(aero::Peters{N}, ::Section) where N
 
     # state variable indices
-    iλ = SVector{N}(1:N)
-    iq = SVector{4}(N+1:N+4)
+    iλ = 1:N
+    iq = N+1:N+4
 
     # coupling function
     g = (dx, x, p, t) -> peters_section_inputs(dx, x, p, t; iλ, iq, bbar = aero.b)
