@@ -64,12 +64,12 @@ kh = m*ωh^2 # plunge spring constant
 kθ = Iθ*ωθ^2 # pitch spring constant
 
 # define aerodynamic models
-aerodynamic_models = (Steady(), QuasiSteady(), Wagner(), Peters())
+aerodynamic_models = (Steady(), QuasiSteady(), Wagner(), Peters{6}())
 
 # initialize eigenvalue/eigenvector storage
-λ = Vector{Matrix{ComplexF64}}(undef, length(models))
-Uλ = Vector{Array{ComplexF64,3}}(undef, length(models))
-Vλ = Vector{Array{ComplexF64,3}}(undef, length(models))
+λ = Vector{Matrix{ComplexF64}}(undef, length(aerodynamic_models))
+Uλ = Vector{Array{ComplexF64,3}}(undef, length(aerodynamic_models))
+Vλ = Vector{Array{ComplexF64,3}}(undef, length(aerodynamic_models))
 
 # perform an analysis for each aerodynamic model
 for imodel = 1:length(aerodynamic_models)
@@ -78,12 +78,12 @@ for imodel = 1:length(aerodynamic_models)
     model = assemble_model(;
         aerodynamic_model = aerodynamic_models[imodel],
         structural_model = Section())
-
-    # define initial guess for equilibrium states
-    x0 = assemble_states(model)
+ 
+    # define ODE function
+    f = ODEFunction(model)
 
     # eigenvalue/eigenvector storage
-    nλ = number_of_states(models[imodel])
+    nλ = number_of_states(model)
     λ[imodel] = zeros(ComplexF64, nλ, length(V))
     Uλ[imodel] = zeros(ComplexF64, nλ, nλ, length(V))
     Vλ[imodel] = zeros(ComplexF64, nλ, nλ, length(V))
@@ -105,6 +105,9 @@ for imodel = 1:length(aerodynamic_models)
             aerodynamic_parameters = aerodynamic_parameters,
             structural_parameters = structural_parameters,
             additional_parameters = additional_parameters)
+
+        # define initial guess for equilibrium states
+        x0 = assemble_states(model)
 
         # find equilibrium point
         x = solve(SteadyStateProblem(f, x0, p))
@@ -183,7 +186,7 @@ sp2 = plot(
 
 labels = ["Steady", "Quasi-Steady", "Wagner", "Peters (N=6)"]
 
-for ia = 1:length(models)
+for ia = 1:length(aerodynamic_models)
 
     plot!(sp1, V, imag.(λ[ia][1,:])/ωθ,
         label = labels[ia],
@@ -266,44 +269,46 @@ Iθ = r2*m*b^2 # inertia
 kh = m*ωh^2 # plunge spring constant
 kθ = Iθ*ωθ^2 # pitch spring constant
 
-# model
-model = PetersSection(6)
-
 # reduced velocity
 V = 1.0 # = U/(b*ωθ)
 
 # dimensionalized velocity
 U = V*b*ωθ
 
-# parameters
-p_aero = [a, b, a0, α0, cd0, cm0]
-p_stru = [kh, kθ, m, Sθ, Iθ]
-p_additional = [U, ρ, c]
-p = vcat(p_aero, p_stru, p_additional)
+# define coupled model
+model = assemble_model(;
+    aerodynamic_model = Peters{6}(),
+    structural_model = Section())
 
-# initial states
-u0_aero = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-u0_stru = [0.5, 0.0, 0.0, 0.0] # non-zero plunge degree of freedom
-x0 = vcat(u0_aero, u0_stru)
-
-# simulate from 0 to 100 seconds
-tspan = (0.0, 100.0)
+# define parameter vector
+p = assemble_parameters(model;
+    aerodynamic_parameters = (; a = a, b = b, a0 = a0, alpha0 = α0, cd0 = cd0, cm0 = cm0),
+    structural_parameters = (; kh = kh, ktheta = kθ, m = m, Stheta = Sθ, Itheta = Iθ),
+    additional_parameters = (; U = U, rho = ρ, c = c))
 
 # construct ODE function
-f = get_ode(model)
+f = ODEFunction(model)
+
+# initial states
+x0 = assemble_states(model;
+    aerodynamic_states = (;lambda=zeros(6)),
+    structural_states = (;h=0.5, theta=0, hdot=0, thetadot=0))
+
+# simulate for 100 seconds
+tspan = (0.0, 100.0)
 
 # construct ODE problem
-prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
+prob = ODEProblem(f, x0, tspan, p)
 
 # solve ODE
-sol = DifferentialEquations.solve(prob)
+sol = solve(prob)
 
 nothing #hide
 ```
 
 We can then plot the solution using DifferentialEquations' built-in interface with the [Plots](https://github.com/JuliaPlots/Plots.jl) package.
 
-```@example typical-section-stability
+```@example typical-section-simulation
 using Plots
 pyplot()
 
@@ -330,7 +335,7 @@ nothing #hide
 
 For aeroelastic models based on a typical section, we can also easily visualize the section's behavior.
 
-```@example typical-section-stability
+```@example typical-section-simulation
 
 # animation parameters
 a = -1/5
