@@ -293,7 +293,7 @@ separate_parameters(submodel::Submodel, p) = submodel.sepparam(p)
 
 separate_parameters(coupling::Coupling, p) = coupling.sepparam(p)
 
-function separate_parameters(model::CoupledModel, p) where N
+function separate_parameters(model::CoupledModel, p)
 
     pmodels = view.(Ref(p), parameter_indices(model))
     pmodels_sep = separate_parameters.(model.submodels, pmodels)
@@ -473,7 +473,7 @@ function get_rate_partial(model::CoupledModel)
     return block_diagonal(Jii)
 end
 
-function get_rate_partial(model::CoupledModel, p) where N
+function get_rate_partial(model::CoupledModel, p)
     
     # get parameters for each submodel
     ip = parameter_indices(model)
@@ -486,7 +486,7 @@ function get_rate_partial(model::CoupledModel, p) where N
     return block_diagonal(Jii)
 end
 
-function get_rate_partial(model::CoupledModel, dx, x, y, p, t) where N
+function get_rate_partial(model::CoupledModel, dx, x, y, p, t)
 
     # get variable indices
     ix = state_indices(model)
@@ -600,7 +600,7 @@ function _get_rate_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model::Cou
     dx, x, y, p, t;
     drdy_cache = similar(J, number_of_states(model), number_of_inputs(model)),
     dyddx_cache = similar(J, number_of_inputs(model), number_of_states(model))
-    ) where N
+    )
 
     # get state and parameter indices
     ix = state_indices(model)
@@ -675,7 +675,7 @@ function _get_state_jacobian(::OutOfPlace, submodel::Submodel, args...)
 end
 
 # calculate state jacobian for a coupled model
-function _get_state_jacobian(::OutOfPlace, model::CoupledModel) where N
+function _get_state_jacobian(::OutOfPlace, model::CoupledModel)
 
     # initialize mass matrix
     r_x = get_state_partial(model)
@@ -690,7 +690,7 @@ function _get_state_jacobian(::OutOfPlace, model::CoupledModel) where N
 end
 
 # calculate state jacobian for a coupled model
-function _get_state_jacobian(::OutOfPlace, model::CoupledModel, p) where N
+function _get_state_jacobian(::OutOfPlace, model::CoupledModel, p)
 
     # initialize mass matrix
     r_x = get_state_partial(model, p)
@@ -705,7 +705,7 @@ function _get_state_jacobian(::OutOfPlace, model::CoupledModel, p) where N
 end
 
 # calculate state jacobian for a coupled model
-function _get_state_jacobian(::OutOfPlace, model::CoupledModel, dx, x, y, p, t) where N
+function _get_state_jacobian(::OutOfPlace, model::CoupledModel, dx, x, y, p, t)
 
     # initialize mass matrix
     r_x = get_state_partial(model, dx, x, y, p, t)
@@ -719,7 +719,7 @@ function _get_state_jacobian(::OutOfPlace, model::CoupledModel, dx, x, y, p, t) 
     return r_x + r_y*y_x
 end
 
-function get_state_partial(model::CoupledModel) where N
+function get_state_partial(model::CoupledModel)
 
     submodels = model.submodels
 
@@ -730,7 +730,7 @@ function get_state_partial(model::CoupledModel) where N
     return block_diagonal(Jii)
 end
 
-function get_state_partial(model::CoupledModel, p) where N
+function get_state_partial(model::CoupledModel, p)
     
     submodels = model.submodels
 
@@ -744,7 +744,7 @@ function get_state_partial(model::CoupledModel, p) where N
     return block_diagonal(Jii)
 end
 
-function get_state_partial(model::CoupledModel, dx, x, y, p, t) where N
+function get_state_partial(model::CoupledModel, dx, x, y, p, t)
     
     submodels = model.submodels
 
@@ -789,7 +789,7 @@ end
 function _get_state_jacobian!(J, ::InPlace, model::CoupledModel;
     drdy_cache = similar(J, number_of_states(model), number_of_inputs(model)),
     dydx_cache = similar(J, number_of_inputs(model), number_of_states(model))
-    ) where N
+    )
 
     # get state and input indices
     ix = state_indices(model)
@@ -821,7 +821,7 @@ end
 function _get_state_jacobian!(J, ::InPlace, model::CoupledModel, p;
     drdy_cache = similar(J, number_of_states(model), number_of_inputs(model)),
     dydx_cache = similar(J, number_of_inputs(model), number_of_states(model))
-    ) where N
+    )
 
     # get state and parameter indices
     ix = state_indices(model)
@@ -855,7 +855,7 @@ end
 function _get_state_jacobian!(J, ::InPlace, model::CoupledModel, dx, x, y, p, t;
     drdy_cache = similar(J, number_of_states(model), number_of_inputs(model)),
     dydx_cache = similar(J, number_of_inputs(model), number_of_states(model))
-    ) where N
+    )
 
     # get state, input, and parameter indices
     ix = state_indices(model)
@@ -932,7 +932,7 @@ function _get_input_jacobian(::OutOfPlace, submodel::Submodel, args...)
 end
 
 # calculate input jacobian for a coupled model
-function _get_input_jacobian(::OutOfPlace, model::CoupledModel) where N
+function _get_input_jacobian(::OutOfPlace, model::CoupledModel)
 
     submodels = model.submodels
 
@@ -944,7 +944,7 @@ function _get_input_jacobian(::OutOfPlace, model::CoupledModel) where N
 end
 
 # calculate input jacobian for a coupled model
-function _get_input_jacobian(::OutOfPlace, model::CoupledModel, p) where N
+function _get_input_jacobian(::OutOfPlace, model::CoupledModel, p)
 
     submodels = model.submodels
 
@@ -959,7 +959,7 @@ function _get_input_jacobian(::OutOfPlace, model::CoupledModel, p) where N
 end
 
 # calculate input jacobian for a coupled model
-function _get_input_jacobian(::OutOfPlace, model::CoupledModel, dx, x, y, p, t) where N
+function _get_input_jacobian(::OutOfPlace, model::CoupledModel, dx, x, y, p, t)
 
     submodels = model.submodels
 
@@ -1410,11 +1410,11 @@ function _get_time_gradient(::OutOfPlace, model::CoupledModel, dx, x, y, p, t)
     return r_t + r_y*y_t
 end
 
-function get_time_partial(model::CoupledModel) where N
+function get_time_partial(model::CoupledModel)
     return vcat(get_time_gradient.(model.submodels)...)
 end
 
-function get_time_partial(model::CoupledModel, p) where N
+function get_time_partial(model::CoupledModel, p)
 
     ip = parameter_indices(model)
 
@@ -1423,7 +1423,7 @@ function get_time_partial(model::CoupledModel, p) where N
     return vcat(get_time_gradient.(model.submodels, ps)...)
 end
 
-function get_time_partial(model::CoupledModel, dx, x, y, p, t) where N
+function get_time_partial(model::CoupledModel, dx, x, y, p, t)
 
     ix = state_indices(model)
     iy = input_indices(model)
@@ -1592,7 +1592,7 @@ function _get_coupling_inputs(::OutOfPlace, coupling, dx, x, p, t)
 end
 
 """
-    get_coupling_inputs!(y, models::CoupledModel, dx, x, p, t) where N
+    get_coupling_inputs!(y, models::CoupledModel, dx, x, p, t)
 
 In-place version of [`get_coupling_inputs`](@ref)
 """
@@ -1610,7 +1610,7 @@ function _get_coupling_inputs!(y, ::OutOfPlace, coupling, dx, x, p, t)
 end
 
 # calculate in-place coupling inputs
-function _get_coupling_inputs!(y, ::InPlace, coupling, dx, x, p, t) where N
+function _get_coupling_inputs!(y, ::InPlace, coupling, dx, x, p, t)
     return coupling.g(y, dx, x, p, t)
 end
 
