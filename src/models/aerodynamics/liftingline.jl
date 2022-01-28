@@ -1,24 +1,37 @@
 """
-    liftingline_model(section_models)
+    LiftingLine
 
-Construct a lifting line model using the aerodynamic models in `models`. State variables, 
-inputs, and parameters correspond to the state variables, inputs, and parameters of each of 
-the cross sections concatenated
+Lifting line model constructed by concatenating the governing equations, state variables,
+inputs, and parameters of multiple two-dimensional aerodynamic models.
 """
-function liftingline_model(section_models)
+struct LiftingLine{T}
+    section_models::T
+end
 
-    # model constants (which may be used when this model is coupled with other models)
-    constants = (section_models = section_models,)
+"""
+    LiftingLine(section_models)
+
+Construct a lifting line aerodynamic model from a collection of two-dimensional aerodynamic 
+models.
+"""
+LiftingLine(section_models)
+
+# --- Submodel Creation --- #
+
+function Submodel(model::LiftingLine)
+
+    section_models = model.section_models
 
     # residual function
-    fresid = (resid, dx, x, y, p, t) -> liftingline_residual!(resid, dx, x, y, p, t; section_models = section_models)
+    fresid = (resid, dx, x, y, p, t) -> liftingline_residual!(resid, dx, x, y, p, t; 
+        section_models = section_models)
 
-    # number of state, input, and parameters (use Val(N) to use inferrable dimensions)
+    # number of states, inputs, and parameters
     nx = sum(number_of_states.(section_models))
     ny = sum(number_of_inputs.(section_models))
     np = sum(number_of_parameters.(section_models))
 
-    # rate jacobian definition (which depends on submodel rate jacobian definitions)
+    # rate jacobian definition (depends on submodel rate jacobian definitions)
     rate_jacobians = getproperty.(section_models, :ratejac)
     if all(isempty.(rate_jacobians))
         ratejac = Empty()
@@ -40,7 +53,7 @@ function liftingline_model(section_models)
         )
     end
 
-    # state jacobian definition (which depends on submodel state jacobian definitions)
+    # state jacobian definition (depends on submodel state jacobian definitions)
     state_jacobians = getproperty.(section_models, :statejac)
     if all(isempty.(state_jacobians))
         statejac = Empty()
@@ -62,7 +75,7 @@ function liftingline_model(section_models)
         )
     end
 
-    # input jacobian definition (which depends on submodel input jacobian definitions)
+    # input jacobian definition (depends on submodel input jacobian definitions)
     input_jacobians = getproperty.(section_models, :inputjac)
     if all(isempty.(input_jacobians))
         inputjac = Empty()
@@ -84,7 +97,7 @@ function liftingline_model(section_models)
         )
     end
 
-    # parameter jacobian definition (which depends on submodel parameter jacobian definitions)
+    # parameter jacobian definition (depends on submodel parameter jacobian definitions)
     parameter_jacobians = getproperty.(section_models, :paramjac)
     if all(isempty.(parameter_jacobians))
         paramjac = Empty()
@@ -106,7 +119,7 @@ function liftingline_model(section_models)
         )
     end
 
-    # time gradient definition (which depends on submodel time gradient definitions)
+    # time gradient definition (depends on submodel time gradient definitions)
     time_gradients = getproperty.(section_models, :tgrad)
     if all(isempty.(time_gradients))
         tgrad = Empty()
@@ -137,8 +150,7 @@ function liftingline_model(section_models)
     sepparam = (p) -> liftingline_sepparam(p; section_models)
 
     # model definition
-    return Model{true}(fresid, nx, ny, np;
-        constants = constants,
+    return Submodel{true}(fresid, nx, ny, np;
         ratejac = ratejac,
         statejac = statejac,
         inputjac = inputjac,

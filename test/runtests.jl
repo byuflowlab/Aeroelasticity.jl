@@ -10,6 +10,7 @@ include(joinpath("models", "aerodynamics", "steady.jl"))
 include(joinpath("models", "aerodynamics", "quasisteady.jl"))
 include(joinpath("models", "aerodynamics", "wagner.jl"))
 include(joinpath("models", "aerodynamics", "peters.jl"))
+include(joinpath("models", "aerodynamics", "liftingline.jl"))
 
 include(joinpath("models", "structures", "section.jl"))
 
