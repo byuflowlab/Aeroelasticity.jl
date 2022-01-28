@@ -37,7 +37,9 @@ For the purposes of this guide, we will be working with a two-degree-of-freedom 
 Our goal is to create an 2D aeroelastic model which we can use to simulate the behavior of this system.  For the aerodynamic model, we will be using Peters' finite state model (see [`Peters`](@ref)).  For the structural model, we will be using a two degree of freedom typical section model (see [`Section`](@ref)).  To assemble an aeroelastic model using these two models we use the [`assemble_model`](@ref) function.
 
 ```@example guide
-model = assemble_model(aerodynamic_model = Peters{4}(), structural_model = Section())
+model = assemble_model(
+    aerodynamic_model = Peters{4}(), 
+    structural_model = Section())
 
 nothing #hide
 ```
