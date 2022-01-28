@@ -47,12 +47,25 @@ Using a small angle approximation allows us to assume ``\alpha \approx sin(\alph
 \mathcal{N} = a_0 \rho_\infty b u (v - U_\infty \alpha_0) \\
 \mathcal{A} = -a_0 \rho_\infty b v (v - U_\infty \alpha_0)
 ```
+If we further assume that ``u >> v`` (which is reasonable considering our small angle assumption) then
+```math
+U_\infty = \sqrt{u^2 + v^2} \approx = u
+```
+and the expressions for the normal and axial force further reduce to
+```math
+\mathcal{N} = a_0 \rho_\infty b u^2 \alpha_\text{eff} \\
+\mathcal{A} = -a_0 \rho_\infty b u*v \alpha_\text{eff}
+```
+where ``\alpha_\text{eff}`` is the effective angle of attack, defined for this model as
+```math
+\alpha_\text{eff} = \frac{v}{u} - \alpha_0
+```
 
 ### Pitching Moment
 
-Thin airfoil theory may be used to show that the airfoil quarter chord is the theoretical location of the aerodynamic center.  It may also be used to derive pitching moment coefficients for various airfoil shapes.  To accomodate multiple airfoil shapes, we introduce the quarter-chord moment coefficient ``c_{m_0}`` as an additional parameter.  Using this coefficient, the pitching moment at a location ``a b`` aft of the airfoil mid-chord is defined as
+Thin airfoil theory may be used to show that the airfoil quarter chord is the theoretical location of the aerodynamic center.  It may also be used to derive pitching moment coefficients for various airfoil shapes.  To accomodate multiple airfoil shapes, we introduce the quarter-chord moment coefficient ``c_{m_0}`` as an additional parameter.  Using this coefficient, the pitching moment at a location ``a b`` aft of the airfoil mid-chord may be defined as
 ```math
-\mathcal{M} = 2 \rho b^2 U_\infty^2 c_{m_0} + b \left(\frac{1}{2} + a \right) \mathcal{N}
+\mathcal{M} = 2 \rho b^2 u^2 c_{m_0} + b \left(\frac{1}{2} + a \right) \mathcal{N}
 ```
 
 ### Compressibility Correction
@@ -63,15 +76,14 @@ At this point, a compressibility correction may be applied to the results of thi
 \mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\sqrt{1 - M^2}} \\
 \mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\sqrt{1 - M^2}}
 ```
-where ``M`` is the Mach number, defined as ``\frac{V_\infty}{c}`` where ``c`` is the air speed of sound. 
+where ``M`` is the Mach number, defined as ``\frac{u}{c}`` where ``c`` is the air speed of sound. 
 
-### Skin Friction Correction
+### Viscous Forces
 
-
-After the Prandtl-Glauert compressibility correction has been applied, an extra force in the axial direction ``\mathcal{F}_f`` may be added to account for skin friction.  The magnitude of this force is scaled using the ``c_{d_0}`` coefficient.
+After the Prandtl-Glauert compressibility correction has been applied, an extra force in the axial direction ``\mathcal{F}_v`` may be added to account for viscous forces.  The magnitude of this force is scaled using the ``c_{d_0}`` coefficient.
 
 ```math
-\mathcal{F}_f = ρ b U_\infty^2 c_{d_0}
+\mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
 ## Examples
