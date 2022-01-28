@@ -20,7 +20,7 @@ LiftingLine(section_models)
 
 function Submodel(model::LiftingLine)
 
-    section_models = model.section_models
+    section_models = Submodel.(model.section_models)
 
     # residual function
     fresid = (resid, dx, x, y, p, t) -> liftingline_residual!(resid, dx, x, y, p, t; 

@@ -356,7 +356,7 @@ end
 
 # calculate residual for a submodel
 function _get_residual!(resid, ::InPlace, submodel::Submodel, dx, x, y, p, t)
-   return model.f(resid, dx, x, y, p, t)
+   return submodel.f(resid, dx, x, y, p, t)
 end
 
 # calculate residual for a coupled model

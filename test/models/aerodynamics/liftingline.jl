@@ -1,23 +1,23 @@
 @testset "Lifting Line" begin
 
-    section_models = ntuple(Steady(), 2)
+    section_models = fill(Steady(), 2)
     submodel = Submodel(LiftingLine(section_models))
-    model_jacobian_tests(submodel)
-    model_io_tests(submodel)
+    submodel_jacobian_tests(submodel)
+    submodel_io_tests(submodel)
 
-    section_models = ntuple(QuasiSteady(), 2)
+    section_models = fill(QuasiSteady(), 2)
     submodel = Submodel(LiftingLine(section_models))
-    model_jacobian_tests(submodel)
-    model_io_tests(submodel)
+    submodel_jacobian_tests(submodel)
+    submodel_io_tests(submodel)
 
-    section_models = ntuple(Wagner(), 2)
+    section_models = fill(Wagner(), 2)
     submodel = Submodel(LiftingLine(section_models))
-    model_jacobian_tests(submodel)
-    model_io_tests(submodel)
+    submodel_jacobian_tests(submodel)
+    submodel_io_tests(submodel)
 
-    section_models = ntuple(Peters(), 2)
+    section_models = fill(Peters{4}(), 2)
     submodel = Submodel(LiftingLine(section_models))
-    model_jacobian_tests(submodel)
-    model_io_tests(submodel)
+    submodel_jacobian_tests(submodel)
+    submodel_io_tests(submodel)
 
 end

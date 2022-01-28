@@ -19,6 +19,7 @@ Author: Taylor McDonnell
      - Quasi-Steady Thin Airfoil Theory (2D)
      - Wagner's Function (2D)
      - Peters' Finite State (2D)
+     - Lifting Line (3D)
    - Structural Models
      - Two Degree of Freedom Typical Section Model (2D)
  - Supports multiple analysis types including:
