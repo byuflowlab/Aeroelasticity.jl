@@ -34,7 +34,7 @@ Author: Taylor McDonnell
 Enter the package manager by typing `]` and then run the following:
 
 ```julia
-pkg> add https://flow.byu.edu/AerostructuralDynamics.jl
+pkg> add https://flow.byu.edu/Aeroelasticity.jl
 ```
 
 ## Usage

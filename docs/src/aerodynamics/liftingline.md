@@ -23,7 +23,7 @@ LiftingLine(models)
 ## Example Initialization
 
 ```@example wagner
-using AerostructuralDynamics #hide
+using Aeroelasticity #hide
 model = LiftingLine{4}(Wagner())
 nothing #hide
 ```

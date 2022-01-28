@@ -1,5 +1,5 @@
 ```@autodocs
-Modules = [AerostructuralDynamics]
+Modules = [Aeroelasticity]
 Public = false
 Private = true
 ```

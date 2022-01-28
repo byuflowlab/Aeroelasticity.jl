@@ -1,7 +1,7 @@
 """
     Submodel{iip, F, NS, NI, NP, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
 
-Base type for submodels in AerostructuralDynamics.
+Base type for submodels in `Aeroelasticity.jl`.
 """
 struct Submodel{iip, F, NS, NI, NP, C, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
     # residual function
@@ -30,7 +30,7 @@ end
 """
     Submodel{iip}(f, nx, ny, np; kwargs...)
 
-Define a custom submodel for use with AerostructuralDynamics.  Note that `iip` should be set to
+Define a custom submodel for use with `Aeroelasticity.jl`.  Note that `iip` should be set to
 `true` if `f` is defined in-place and `false` otherwise. 
 
 # Arguments
@@ -124,7 +124,7 @@ end
 """
     Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT, IP, OP}
 
-Base type for coupling models in AerostructuralDynamics.
+Base type for coupling models in Aeroelasticity.jl.
 """
 struct Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT, IP, OP}
     # coupling function
@@ -147,7 +147,7 @@ end
 """
     Coupling{iip}(g, nx, ny, np, npc; kwargs...)
 
-Define a custom coupling model for use with AerostructuralDynamics.  Note that `iip` should 
+Define a custom coupling model for use with Aeroelasticity.jl.  Note that `iip` should 
 be set to `true` if `g` is defined in-place and `false` otherwise. 
 
 # Arguments
@@ -193,7 +193,7 @@ end
 """
     CoupledModel{M,C}
 
-Base type for coupled models in AerostructuralDynamics.
+Base type for coupled models in Aeroelasticity.jl.
 """
 struct CoupledModel{M,C}
     submodels::M

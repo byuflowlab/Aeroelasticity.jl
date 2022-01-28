@@ -1,4 +1,4 @@
-using AerostructuralDynamics
+using Aeroelasticity
 using LinearAlgebra
 using GXBeam
 using ForwardDiff

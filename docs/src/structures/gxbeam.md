@@ -41,7 +41,7 @@ GEBT(assembly, prescribed)
 ## Example Initialization
 
 ```@example gxbeam
-using AerostructuralDynamics, GXBeam, LinearAlgebra
+using Aeroelasticity, GXBeam, LinearAlgebra
 
 # discretization
 N = 8 # number of elements

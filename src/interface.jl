@@ -231,7 +231,7 @@ function _get_eigen(::InPlace, K, M; nev=min(20, number_of_states(model)))
 end
 
 """
-    ODEFunction(model::AerostructuralDynamics.CoupledModel, p=nothing)
+    ODEFunction(model::Aeroelasticity.CoupledModel, p=nothing)
 
 Construct an `ODEFunction` for a coupled model which may be used with 
 `DifferentialEquations`.     
@@ -524,7 +524,7 @@ function ode_parameter_jacobian(model::CoupledModel, fy, p=nothing)
 end
 
 """
-    DAEFunction(model::AerostructuralDynamics.CoupledModel, p=nothing)
+    DAEFunction(model::Aeroelasticity.CoupledModel, p=nothing)
 
 Construct an `DAEFunction` for a coupled model which may be used with 
 `DifferentialEquations`.     

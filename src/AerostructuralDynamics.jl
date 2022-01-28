@@ -1,4 +1,4 @@
-module AerostructuralDynamics
+module Aeroelasticity
 
 using ArnoldiMethod
 using ForwardDiff

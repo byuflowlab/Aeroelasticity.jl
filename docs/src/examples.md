@@ -17,9 +17,9 @@ The equations of motion for this model are
 m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
 I_\theta \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M
 ```
-where ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_θ`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.  To learn more about how this model is implemented in `AerostructuralDynamics`, see [`TypicalSection`](@ref).
+where ``b`` is the semichord length, ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``x_\theta`` is the distance to the center of mass from the reference point, ``I_θ`` is the moment of inertia about the reference point, ``L`` is the lift per unit span, and ``M`` is the moment per unit span about the reference point.  To learn more about how this model is implemented in `Aeroelasticity.jl`, see [`Section`](@ref).
 
-AerostructuralDynamics has a number of pre-implemented aerodynamic models which may be used to model the aerodynamics of the typical section model.  These models include a steady-state thin airfoil theory model (see [`Steady`](@ref)), a quasi-steady thin airfoil theory model (see [`QuasiSteady`](@ref)), an unsteady aerodynamic model based on Wagner's function (see [`Wagner`](@ref)), and Peters' finite state aerodynamic model (see [`Peters`](@ref)).  We will perform aeroelastic analyses using each of these models and compare the results.
+`Aeroelasticity.jl` has a number of pre-implemented aerodynamic models which may be used to model the aerodynamics of the typical section model.  These models include a steady-state thin airfoil theory model (see [`Steady`](@ref)), a quasi-steady thin airfoil theory model (see [`QuasiSteady`](@ref)), an unsteady aerodynamic model based on Wagner's function (see [`Wagner`](@ref)), and Peters' finite state aerodynamic model (see [`Peters`](@ref)).  We will perform aeroelastic analyses using each of these models and compare the results.
 
 The non-dimensional parameters we will use are
 ```math
@@ -33,7 +33,7 @@ where ``a`` is the normalized distance from the semichord to the reference point
 ```
 
 ```@example typical-section-stability
-using AerostructuralDynamics, DifferentialEquations, LinearAlgebra
+using Aeroelasticity, DifferentialEquations, LinearAlgebra
 
 # define non-dimensional parameters
 V = range(1e-6, 3.1, length=1000) # = U/(b*ωθ) (reduced velocity)
@@ -239,7 +239,7 @@ The non-dimensional parameters we use for this example match those used by Hodge
 Time domain simulations may also be used in order to determine a system's stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the [`get_ode`](@ref) function and then solved using the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package.  For this example we use the same parameters as in the previous example.
 
 ```@example typical-section-simulation
-using AerostructuralDynamics, DifferentialEquations, LinearAlgebra
+using Aeroelasticity, DifferentialEquations, LinearAlgebra
 
 # define non-dimensional parameters
 V = range(1e-6, 3.1, length=1000) # = U/(b*ωθ) (reduced velocity)
