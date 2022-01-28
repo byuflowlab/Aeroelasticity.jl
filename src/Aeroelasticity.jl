@@ -16,7 +16,8 @@ import Base.iszero
 export assemble_model
 export assemble_states, assemble_states!
 export assemble_parameters, assemble_parameters!
-export number_of_states, number_of_parameters
+export number_of_states, number_of_inputs, number_of_parameters
+export state_indices, input_indices, parameter_indices
 export separate_states, separate_parameters
 export linearize, get_eigen, correlate_eigenmodes
 
