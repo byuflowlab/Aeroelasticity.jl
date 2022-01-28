@@ -2,7 +2,7 @@
 
 ## Aeroelastic Analysis of a Typical Section
 
-```@setup typical-section
+```@setup typical-section-stability
 using Plots
 pyplot()
 nothing #hide
@@ -144,7 +144,7 @@ nothing #hide
 
 We now plot the results for each aerodynamic model.
 
-```@example typical-section
+```@example typical-section-stability
 using Plots
 pyplot()
 
@@ -235,6 +235,12 @@ Using the `Wagner` or `Peters` aerodynamic models yields a flutter reduced veloc
 The non-dimensional parameters we use for this example match those used by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity".  Hodges and Pierce performed the analysis using a steady-state model and Peter's finite state model with six state variables.   The results presented here for the steady-state and Peters' finite state models match the results presented by Hodges and Pierce in "Introduction to Structural Dynamics and Aeroelasticity", which validates our implementation of these models.  Additionally, since the flutter speed predicted by the `Wagner` and `Peters` models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.
 
 ## Time Domain Simulation of a Typical Section
+
+```@setup typical-section-simulation
+using Plots
+pyplot()
+nothing #hide
+```
 
 Time domain simulations may also be used in order to determine a system's stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the [`get_ode`](@ref) function and then solved using the [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl) package.  For this example we use the same parameters as in the previous example.
 
