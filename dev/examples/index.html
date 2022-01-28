@@ -1,103 +1,99 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · AerostructuralDynamics.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">AerostructuralDynamics.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../guide/">Getting Started</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Aeroelastic-Analysis-of-a-Typical-Section"><span>Aeroelastic Analysis of a Typical Section</span></a></li><li><a class="tocitem" href="#Aeroelastic-Analysis-of-the-Goland-Wing"><span>Aeroelastic Analysis of the Goland Wing</span></a></li><li><a class="tocitem" href="#Aeroelastic-Analysis-of-a-Highly-Flexible-Cantilever-Wing"><span>Aeroelastic Analysis of a Highly Flexible Cantilever Wing</span></a></li><li><a class="tocitem" href="#Aeroelastic-Analysis-of-a-Blended-Wing-Body-Aircraft"><span>Aeroelastic Analysis of a Blended-Wing-Body Aircraft</span></a></li></ul></li><li><span class="tocitem">Model Documentation</span><ul><li><input class="collapse-toggle" id="menuitem-4-1" type="checkbox"/><label class="tocitem" for="menuitem-4-1"><span class="docs-label">Aerodynamic Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../aerodynamics/steady/">Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../aerodynamics/quasisteady/">Quasi-Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../aerodynamics/wagner/">Wagner&#39;s Function</a></li><li><a class="tocitem" href="../aerodynamics/peters/">Peters&#39; Finite State</a></li><li><a class="tocitem" href="../aerodynamics/liftingline/">Lifting Line</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-2" type="checkbox"/><label class="tocitem" for="menuitem-4-2"><span class="docs-label">Structural Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../structures/section/">Typical Section</a></li><li><a class="tocitem" href="../structures/rigidbody/">Rigid Body</a></li><li><a class="tocitem" href="../structures/gxbeam/">Geometrically Exact Beam Theory</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-3" type="checkbox"/><label class="tocitem" for="menuitem-4-3"><span class="docs-label">Coupled Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../couplings/steady-section/">Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../couplings/quasisteady-section/">Quasi-Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../couplings/wagner-section/">Wagner&#39;s Function + Typical Section</a></li><li><a class="tocitem" href="../couplings/peters-section/">Peters&#39; Finite State + Typical Section</a></li><li><a class="tocitem" href="../couplings/liftingline-rigidbody/">Lifting Line + Rigid Body</a></li><li><a class="tocitem" href="../couplings/liftingline-gxbeam/">Lifting Line + Geometrically Exact Beam Theory</a></li><li><a class="tocitem" href="../couplings/liftingline-gxbeam-rigidbody/">Lifting Line + Geometrically Exact Beam Theory + Rigid Body</a></li></ul></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../library/public/">Public</a></li><li><a class="tocitem" href="../library/internals/">Internals</a></li></ul></li><li><a class="tocitem" href="../developer/">Developer Guide</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/byuflowlab/AerostructuralDynamics.jl/blob/master/docs/src/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Aeroelastic-Analysis-of-a-Typical-Section"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-a-Typical-Section">Aeroelastic Analysis of a Typical Section</a><a id="Aeroelastic-Analysis-of-a-Typical-Section-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-a-Typical-Section" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a two-dimensional aeroelastic analysis using a typical section model with two degrees of freedom.</p><p><img src="../typical-section.svg" alt/></p><p>The equations of motion for this model are</p><p class="math-container">\[m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
-I_P \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M\]</p><p>where <span>$b$</span> is the semichord length, <span>$k_h$</span> is the linear spring constant, <span>$k_\theta$</span> is the torsional spring constant, <span>$m$</span> is the mass per unit span, <span>$x_\theta$</span> is the distance to the center of mass from the reference point, <span>$I_θ$</span> is the moment of inertia about the reference point, <span>$L$</span> is the lift per unit span, and <span>$M$</span> is the moment per unit span about the reference point.</p><p>This package has a number of different two-dimensional aerodynamic models which we may use to model the aerodynamics of the typical section model.  These models include a steady-state model, a quasi-steady model, an unsteady aerodynamic model based on Wagner&#39;s function, and Peters&#39; finite state aerodynamic model.  We will perform an aeroelastic analysis using each of these models and compare the results.</p><p>The non-dimensional parameters we will use are</p><p class="math-container">\[a = -1/5 \quad e = -1/10  \\
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · Aeroelasticity.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><script src="../../copy.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">Aeroelasticity.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../guide/">Getting Started</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Aeroelastic-Analysis-of-a-Typical-Section"><span>Aeroelastic Analysis of a Typical Section</span></a></li><li><a class="tocitem" href="#Time-Domain-Simulation-of-a-Typical-Section"><span>Time Domain Simulation of a Typical Section</span></a></li></ul></li><li><span class="tocitem">Model Documentation</span><ul><li><input class="collapse-toggle" id="menuitem-4-1" type="checkbox"/><label class="tocitem" for="menuitem-4-1"><span class="docs-label">Aerodynamic Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../aerodynamics/steady/">Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../aerodynamics/quasisteady/">Quasi-Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../aerodynamics/wagner/">Wagner&#39;s Function</a></li><li><a class="tocitem" href="../aerodynamics/peters/">Peters&#39; Finite State</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-2" type="checkbox"/><label class="tocitem" for="menuitem-4-2"><span class="docs-label">Structural Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../structures/section/">Typical Section</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-3" type="checkbox"/><label class="tocitem" for="menuitem-4-3"><span class="docs-label">Coupled Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../couplings/steady-section/">Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../couplings/quasisteady-section/">Quasi-Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../couplings/wagner-section/">Wagner&#39;s Function + Typical Section</a></li><li><a class="tocitem" href="../couplings/peters-section/">Peters&#39; Finite State + Typical Section</a></li></ul></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../library/public/">Public</a></li><li><a class="tocitem" href="../library/internals/">Internals</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/byuflowlab/Aeroelasticity.jl/blob/master/docs/src/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Aeroelastic-Analysis-of-a-Typical-Section"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-a-Typical-Section">Aeroelastic Analysis of a Typical Section</a><a id="Aeroelastic-Analysis-of-a-Typical-Section-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-a-Typical-Section" title="Permalink"></a></h2><p>In this example, we perform a two-dimensional aeroelastic analysis for a two degree of freedom typical section model.</p><p><img src="../typical-section.svg" alt/></p><p>The equations of motion for this model are</p><p class="math-container">\[m \left(\ddot{h}+b x_\theta \ddot{\theta} \right) + k_h h = -L \\
+I_\theta \ddot{\theta} + m b x_\theta \ddot{h} + k_\theta = M\]</p><p>where <span>$b$</span> is the semichord length, <span>$k_h$</span> is the linear spring constant, <span>$k_\theta$</span> is the torsional spring constant, <span>$m$</span> is the mass per unit span, <span>$x_\theta$</span> is the distance to the center of mass from the reference point, <span>$I_θ$</span> is the moment of inertia about the reference point, <span>$L$</span> is the lift per unit span, and <span>$M$</span> is the moment per unit span about the reference point.  To learn more about how this model is implemented in <code>Aeroelasticity.jl</code>, see <a href="@ref"><code>Section</code></a>.</p><p><code>Aeroelasticity.jl</code> has a number of pre-implemented aerodynamic models which may be used to model the aerodynamics of the typical section model.  These models include a steady-state thin airfoil theory model (see <a href="../aerodynamics/steady/#Aeroelasticity.Steady"><code>Steady</code></a>), a quasi-steady thin airfoil theory model (see <a href="../aerodynamics/quasisteady/#Aeroelasticity.QuasiSteady"><code>QuasiSteady</code></a>), an unsteady aerodynamic model based on Wagner&#39;s function (see <a href="../aerodynamics/wagner/#Aeroelasticity.Wagner"><code>Wagner</code></a>), and Peters&#39; finite state aerodynamic model (see <a href="../aerodynamics/peters/#Aeroelasticity.Peters"><code>Peters</code></a>).  We will perform aeroelastic analyses using each of these models and compare the results.</p><p>The non-dimensional parameters we will use are</p><p class="math-container">\[a = -1/5 \quad e = -1/10  \\
 r^2 = \frac{I_P}{m b^2} \quad \sigma = \frac{\omega_h}{\omega_\theta} \\
-\mu = \frac{m}{\rho_\infty \pi b^2} \quad V = \frac{U}{b \omega_\theta}\]</p><p>where <span>$a$</span> is the normalized distance from the semichord to the reference point, <span>$e$</span> is the normalized distance from the semichord to the center of mass, and <span>$\omega_h$</span> and <span>$\omega_\theta$</span> are the uncoupled natural frequencies, defined as follows.</p><p class="math-container">\[\omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}\]</p><pre><code class="language- hljs">using AerostructuralDynamics, DifferentialEquations, LinearAlgebra
+\mu = \frac{m}{\rho_\infty \pi b^2} \quad V = \frac{U}{b \omega_\theta}\]</p><p>where <span>$a$</span> is the normalized distance from the semichord to the reference point, <span>$e$</span> is the normalized distance from the semichord to the center of mass, and <span>$\omega_h$</span> and <span>$\omega_\theta$</span> are the uncoupled natural frequencies, defined as</p><p class="math-container">\[\omega_h = \sqrt{\frac{k_h}{m}} \quad \omega_\theta = \sqrt{\frac{k_\theta}{I_P}}\]</p><pre><code class="language-julia hljs">using Aeroelasticity, DifferentialEquations, LinearAlgebra
 
-# reduced velocity range
-V = range(1e-6, 3.1, length=5000) # = U/(b*ωθ) (reduced velocity)
-
-# non-dimensional parameters
+# define non-dimensional parameters
+V = range(1e-6, 3.1, length=1000) # = U/(b*ωθ) (reduced velocity)
 a = -1/5 # reference point normalized location
 e = -1/10 # center of mass normalized location
 μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
 r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 σ = 2/5 # = ωh/ωθ (natural frequency ratio)
-xθ = e - a
+xθ = e - a # distance from center of mass to reference point
 a0 = 2*pi # lift curve slope
 α0 = 0 # zero lift angle
-cd0 = 0
-cm0 = 0
+cd0 = 0 # drag coefficient
+cm0 = 0 # moment coefficient
 
-# chosen dimensional parameters
-b = 1
-ρ = 1
-ωθ = 1
+# choose dimensional parameters
+b = 1 # semichord
+ρ = 1 # air density
+ωθ = 1 # pitch natural frequency
+c = 343 # air speed of sound
 
-# derived dimensional parameters
-m = μ*ρ*pi*b^2
-Sθ = m*xθ*b
-Iθ = r2*m*b^2
-ωh = σ*ωθ
-kh = m*ωh^2
-kθ = Iθ*ωθ^2
+# calculate dimensionalized parameters
+U = V*b*ωθ # freestrean velocity
+m = μ*ρ*pi*b^2 # mass
+Sθ = m*xθ*b # mass imbalance
+Iθ = r2*m*b^2 # inertia
+ωh = σ*ωθ # plunge natural frequency
+kh = m*ωh^2 # plunge spring constant
+kθ = Iθ*ωθ^2 # pitch spring constant
 
-# dimensionalized velocity
-U = V*b*ωθ
-
-# aerodynamic models
+# define aerodynamic models
 aerodynamic_models = (Steady(), QuasiSteady(), Wagner(), Peters{6}())
 
-# structural model
-structural_model = TypicalSection()
-
-# eigenvalue/eigenvector storage
+# initialize eigenvalue/eigenvector storage
 λ = Vector{Matrix{ComplexF64}}(undef, length(aerodynamic_models))
 Uλ = Vector{Array{ComplexF64,3}}(undef, length(aerodynamic_models))
 Vλ = Vector{Array{ComplexF64,3}}(undef, length(aerodynamic_models))
 
-# loop through each aerodynamic model
-for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
+# perform an analysis for each aerodynamic model
+for imodel = 1:length(aerodynamic_models)
 
-    # coupled model
-    model = couple_models(aerodynamic_model, structural_model)
+    # define coupled model
+    model = assemble_model(;
+        aerodynamic_model = aerodynamic_models[imodel],
+        structural_model = Section())
 
-    # ode representation of the coupled model
-    f = get_ode(model)
-
-    # equilibrium rates are zero
-    dx = zeros(number_of_states(model))
-
-    # initial guess for equilibrium states
-    x0 = zeros(number_of_states(model))
-
-    # current time
-    t = 0.0
+    # define ODE function
+    f = ODEFunction(model)
 
     # eigenvalue/eigenvector storage
     nλ = number_of_states(model)
-    λ[ia] = zeros(ComplexF64, nλ, length(V))
-    Uλ[ia] = zeros(ComplexF64, nλ, nλ, length(V))
-    Vλ[ia] = zeros(ComplexF64, nλ, nλ, length(V))
+    λ[imodel] = zeros(ComplexF64, nλ, length(V))
+    Uλ[imodel] = zeros(ComplexF64, nλ, nλ, length(V))
+    Vλ[imodel] = zeros(ComplexF64, nλ, nλ, length(V))
 
     # loop through each reduced frequency
     for i = 1:length(V)
 
-        # set parameters
-        p_aero = [a, b, a0, α0, cd0, cm0]
-        p_stru = [kh, kθ, m, Sθ, Iθ]
-        p_input = [U[i], ρ]
-        p = vcat(p_aero, p_stru, p_input)
+        # define aerodynamic parameters
+        aerodynamic_parameters = (; a = a, b = b, a0 = a0, alpha0 = α0, cd0 = cd0, cm0 = cm0)
+
+        # define structural parameters
+        structural_parameters = (; kh = kh, ktheta = kθ, m = m, Stheta = Sθ, Itheta = Iθ)
+
+        # define additional parameters
+        additional_parameters = (; U = U[i], rho = ρ, c = c)
+
+        # define parameter vector
+        p = assemble_parameters(model;
+            aerodynamic_parameters = aerodynamic_parameters,
+            structural_parameters = structural_parameters,
+            additional_parameters = additional_parameters)
+
+        # define initial guess for equilibrium states
+        x0 = assemble_states(model)
 
         # find equilibrium point
         x = solve(SteadyStateProblem(f, x0, p))
 
-        # find corresponding inputs
-        y = get_coupling_inputs(model, dx, x, p, t)
+        # linearize about equilibrium point
+        K, M = linearize(model, x, p)
 
         # perform linear stability analysis
-        λi, Uλi, Vλi = get_eigen(model, dx, x, y, p, t)
+        λi, Uλi, Vλi = get_eigen(model, K, M)
 
         # correlate eigenvalues
         if i &gt; 1
             # previous left eigenvector matrix
-            Uλpi = Uλ[ia][:,:,i-1]
-
-            # current mass matrix
-            Mi = get_rate_jacobian(model, dx, x, y, p, t)
+            Uλpi = Uλ[imodel][:,:,i-1]
 
             # use correlation matrix to correlate eigenmodes
-            perm, corruption = correlate_eigenmodes(Uλpi, Mi, Vλi)
+            perm, corruption = correlate_eigenmodes(Uλpi, M, Vλi)
 
             # re-arrange eigenmodes
             λi = λi[perm]
@@ -106,13 +102,11 @@ for (ia, aerodynamic_model) in enumerate(aerodynamic_models)
         end
 
         # save eigenvalues/eigenvectors
-        λ[ia][:,i] = λi
-        Uλ[ia][:,:,i] = Uλi
-        Vλ[ia][:,:,i] = Vλi
+        λ[imodel][:,i] = λi
+        Uλ[imodel][:,:,i] = Uλi
+        Vλ[imodel][:,:,i] = Vλi
     end
-end
-
-nothing #hide</code></pre><p>We now plot the results for each aerodynamic model.</p><pre><code class="language- hljs">using Plots
+end</code></pre><p>We now plot the results for each aerodynamic model.</p><pre><code class="language- hljs">using Plots
 pyplot()
 
 sp1 = plot(
@@ -123,15 +117,13 @@ sp1 = plot(
     ylim = (0, 1.05),
     ytick = 0.0:0.2:1.0,
     ylabel = &quot;\$ \\frac{\\Omega}{\\omega_\\theta} \$&quot;,
-    framestyle = :zerolines,
-    titlefontsize = 14,
-    guidefontsize = 14,
-    legendfontsize = 11,
-    tickfontsize = 11,
-    legend = :topright,
+    titlefontsize = 10,
+    guidefontsize = 10,
+    legendfontsize = 8,
+    tickfontsize = 9,
     foreground_color_legend = nothing,
     background_color_legend = nothing,
-    minorgrid=true
+    minorgrid=false
     )
 
 sp2 = plot(
@@ -143,14 +135,14 @@ sp2 = plot(
     ytick = -0.6:0.2:0.6,
     ylabel = &quot;\$ \\frac{Γ}{\\omega_\\theta} \$&quot;,
     framestyle = :zerolines,
-    titlefontsize = 14,
-    guidefontsize = 14,
-    legendfontsize = 11,
-    tickfontsize = 11,
+    titlefontsize = 10,
+    guidefontsize = 10,
+    legendfontsize = 8,
+    tickfontsize = 9,
     legend = :topleft,
     foreground_color_legend = nothing,
     background_color_legend = nothing,
-    minorgrid = true
+    minorgrid = false
     )
 
 labels = [&quot;Steady&quot;, &quot;Quasi-Steady&quot;, &quot;Wagner&quot;, &quot;Peters (N=6)&quot;]
@@ -190,115 +182,73 @@ for ia = 1:length(aerodynamic_models)
     end
 end
 
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
+p1 = plot(sp1, sp2, layout = (1, 2), size = (800, 300))
 
 savefig(p1, &quot;typical-section-stability.svg&quot;) #hide
 
-nothing #hide</code></pre><p><img src="typical-section-stability.svg" alt/></p><p>Using the Wagner and/or Peters aerodynamic models yields a flutter reduced velocity around 2.2, while the steady and/or quasi-steady aerodynamic models predict significantly lower flutter velocities.  The aerodynamic state variables of the Wagner and Peters models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the steady-state and quasi-steady models.</p><p>We can visualize and/or create animations of the flutter mode with the help of custom plot recipes.</p><pre><code class="language- hljs">
-# flutter reduced velocity
-Vf = 2.2
+nothing #hide</code></pre><p><img src="typical-section-stability.svg" alt/></p><p>Using the <code>Wagner</code> or <code>Peters</code> aerodynamic models yields a flutter reduced velocity around 2.2, while the <code>Steady</code> and <code>QuasiSteady</code> aerodynamic models predict significantly lower flutter velocities.  The aerodynamic state variables of the <code>Wagner</code> and <code>Peters</code> models allows these models to capture the impact of vortex shedding on the lift and drag of the profile, therefore we can expect these models to yield more accurate results than the <code>Steady</code> and <code>QuasiSteady</code> models.</p><p>The non-dimensional parameters we use for this example match those used by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;.  Hodges and Pierce performed the analysis using a steady-state model and Peter&#39;s finite state model with six state variables.   The results presented here for the steady-state and Peters&#39; finite state models match the results presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;, which validates our implementation of these models.  Additionally, since the flutter speed predicted by the <code>Wagner</code> and <code>Peters</code> models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.</p><h2 id="Time-Domain-Simulation-of-a-Typical-Section"><a class="docs-heading-anchor" href="#Time-Domain-Simulation-of-a-Typical-Section">Time Domain Simulation of a Typical Section</a><a id="Time-Domain-Simulation-of-a-Typical-Section-1"></a><a class="docs-heading-anchor-permalink" href="#Time-Domain-Simulation-of-a-Typical-Section" title="Permalink"></a></h2><p>Time domain simulations may also be used in order to determine a system&#39;s stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the <a href="@ref"><code>get_ode</code></a> function and then solved using the <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations</a> package.  For this example we use the same parameters as in the previous example.</p><pre><code class="language-julia hljs">using Aeroelasticity, DifferentialEquations, LinearAlgebra
 
-# aerodynamic model
-ia = 4 # Peter&#39;s finite state model
-
-# coupled model
-model = couple_models(aerodynamic_models[ia], structural_model)
-
-# flutter mode identity
-it = argmin(abs.(V .- Vf))
-iλ = argmin(abs.(real.(λ[ia][:,it])))
-
-# flutter mode eigenvalue and eigenvector
-λf = λ[ia][iλ,it]
-vf = Vλ[ia][:,iλ,it]
-
-# flutter mode state rates
-dxf = zeros(number_of_states(model))
-
-# flutter mode state variables
-xf = zeros(number_of_states(model))
-
-# flutter mode parameters
-p_aero = [a, b, a0, α0, cd0, cm0]
-p_stru = [kh, kθ, m, Sθ, Iθ]
-p_input = [Vf*b*ωθ, ρ]
-pf = vcat(p_aero, p_stru, p_input)
-
-# animation time
-t1 = -pi/abs(imag(λf))
-t2 = pi/abs(imag(λf))
-
-# eigenvector scaling
-scaling = 0.5
-
-# create animation
-anim = @animate for t in range(t1, t2, length=50)
-
-    xi = xf + scaling*real.(vf*exp(λf*t))
-
-    plot(model, dxf, xi, pf, t)
-
-end
-
-# save animation
-gif(anim, &quot;typical-section-flutter-mode.gif&quot;)
-
-nothing #hide</code></pre><p>The non-dimensional parameters we use for this example match those used by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;.  Hodges and Pierce performed the analysis using a steady state model and Peter&#39;s finite state model with six state variables.   The results presented here for the steady-state and Peters&#39; finite state models match the results presented by Hodges and Pierce in &quot;Introduction to Structural Dynamics and Aeroelasticity&quot;, which validates our implementation of these models.  Additionally, since the flutter speed predicted by the Wagner and Peters&#39; models match, we can be reasonably confident that the Wagner unsteady aerodynamic model is also implemented correctly.</p><p>Time domain simulations may also be used in order to determine a system&#39;s stability.  To perform time domain simulations, an object representing the ordinary differential equations corresponding to the model may be generated using the <a href="../library/public/#AerostructuralDynamics.get_ode"><code>get_ode</code></a> function and then solved using the <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations</a> package.</p><pre><code class="language-julia hljs">using DifferentialEquations
-
-# models
-aerodynamic_model = Peters{6}()
-structural_model = TypicalSection()
-coupled_model = couple_models(aerodynamic_model, structural_model)
-
-# non-dimensional parameters
+# define non-dimensional parameters
+V = range(1e-6, 3.1, length=1000) # = U/(b*ωθ) (reduced velocity)
 a = -1/5 # reference point normalized location
 e = -1/10 # center of mass normalized location
 μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
 r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
 σ = 2/5 # = ωh/ωθ (natural frequency ratio)
-xθ = e - a
+xθ = e - a # distance from center of mass to reference point
 a0 = 2*pi # lift curve slope
 α0 = 0 # zero lift angle
-cd0 = 0
-cm0 = 0
-V = 1.0 # = U/(b*ωθ) (reduced velocity)
+cd0 = 0 # drag coefficient
+cm0 = 0 # moment coefficient
 
-# chosen dimensional parameters
-b = 1
-ρ = 1
-ωθ = 1
+# choose dimensional parameters
+b = 1 # semichord
+ρ = 1 # air density
+ωθ = 1 # pitch natural frequency
+c = 343 # air speed of sound
 
-# derived dimensional parameters
-m = μ*ρ*pi*b^2
-Sθ = m*xθ*b
-Iθ = r2*m*b^2
-ωh = σ*ωθ
-kh = m*ωh^2
-kθ = Iθ*ωθ^2
+# calculate dimensionalized parameters
+U = V*b*ωθ # freestrean velocity
+m = μ*ρ*pi*b^2 # mass
+Sθ = m*xθ*b # mass imbalance
+Iθ = r2*m*b^2 # inertia
+ωh = σ*ωθ # plunge natural frequency
+kh = m*ωh^2 # plunge spring constant
+kθ = Iθ*ωθ^2 # pitch spring constant
+
+# reduced velocity
+V = 1.0 # = U/(b*ωθ)
+
+# dimensionalized velocity
 U = V*b*ωθ
 
-# parameters
-p_aero = [a, b, a0, α0, cd0, cm0]
-p_stru = [kh, kθ, m, Sθ, Iθ]
-p_additional = [U, ρ]
-p = vcat(p_aero, p_stru, p_additional)
+# define coupled model
+model = assemble_model(;
+    aerodynamic_model = Peters{6}(),
+    structural_model = Section())
 
-# initial states
-u0_aero = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-u0_stru = [1.0, 0.0, 0.0, 0.0] # non-zero plunge degree of freedom
-x0 = vcat(u0_aero, u0_stru)
-
-# simulate from 0 to 10 seconds
-tspan = (0.0, 100.0)
+# define parameter vector
+p = assemble_parameters(model;
+    aerodynamic_parameters = (; a = a, b = b, a0 = a0, alpha0 = α0, cd0 = cd0, cm0 = cm0),
+    structural_parameters = (; kh = kh, ktheta = kθ, m = m, Stheta = Sθ, Itheta = Iθ),
+    additional_parameters = (; U = U, rho = ρ, c = c))
 
 # construct ODE function
-f = get_ode(coupled_model)
+f = ODEFunction(model)
+
+# initial states
+x0 = assemble_states(model;
+    aerodynamic_states = (;lambda=zeros(6)),
+    structural_states = (;h=0.5, theta=0, hdot=0, thetadot=0))
+
+# simulate for 100 seconds
+tspan = (0.0, 100.0)
 
 # construct ODE problem
-prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
+prob = ODEProblem(f, x0, tspan, p)
 
 # solve ODE
-sol = DifferentialEquations.solve(prob)</code></pre><p>We can then plot the solution using DifferentialEquations&#39; built-in interface with the <a href="https://github.com/JuliaPlots/Plots.jl">Plots</a> package.</p><pre><code class="language-julia hljs">using Plots
+sol = solve(prob)</code></pre><p>We can then plot the solution using DifferentialEquations&#39; built-in interface with the <a href="https://github.com/JuliaPlots/Plots.jl">Plots</a> package.</p><pre><code class="language-julia hljs">using Plots
 pyplot()
 
 plot(sol,
@@ -313,674 +263,22 @@ plot(sol,
     label = &quot;&quot;,
     layout = (4, 1),
     size = (600,1200)
-    )</code></pre><p><img src="../typical-section-solution.svg" alt/></p><p>We can also visualize and/or create animations of the solution geometry with the help of custom plot recipes.</p><pre><code class="language-julia hljs"># Plot Recipes:
-# - plot(model, dx, x, p, t)
-# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
-# - plot(model, sol, t) # plots the solution geometry at time `t`
+    )</code></pre><p><img src="../typical-section-solution.svg" alt/></p><p>For aeroelastic models based on a typical section, we can also easily visualize the section&#39;s behavior.</p><pre><code class="language-julia hljs"># animation parameters
+a = -1/5
+b = 0.5
 
 # create animation
 anim = @animate for t in range(tspan[1], tspan[2], length=200)
-    plot(coupled_model, sol, t)
+    h, θ = sol(t, idxs=7:8)
+    xplot, yplot = section_coordinates(h, θ; a, b)
+    plot(xplot, yplot;
+        framestyle = :origin,
+        grid = :false,
+        xlims = (-1.0, 1.0),
+        ylims = (-0.75, 0.75),
+        aspect_ratio = 1.0,
+        label = &quot;t = $(round(t, digits=1))&quot;)
 end
 
-# save animation
 gif(anim, &quot;typical-section-simulation.gif&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Saved animation to
-└   fn = &quot;/home/runner/work/AerostructuralDynamics.jl/AerostructuralDynamics.jl/docs/build/typical-section-simulation.gif&quot;</code></pre><p><img src="../typical-section-simulation.gif" alt/></p><p>Visualizing the solution geometry is especially helpful for identifying mode shapes.  For example, we can visualize the mode shape of the flutter mode for this system.</p><pre><code class="language-julia hljs"># Plot Recipes:
-# - plot(model, dx, x, p, t)
-# - plot(model, sol) # plots the solution geometry at index `sol.tslocation`
-# - plot(model, sol, t) # plots the solution geometry at time `t`
-
-# create animation
-anim = @animate for t in range(tspan[1], tspan[2], length=200)
-    plot(coupled_model, sol, t)
-end
-
-# save animation
-gif(anim, &quot;typical-section-flutter-mode.gif&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Saved animation to
-└   fn = &quot;/home/runner/work/AerostructuralDynamics.jl/AerostructuralDynamics.jl/docs/build/typical-section-flutter-mode.gif&quot;</code></pre><p><img src="../typical-section-flutter-mode.gif" alt/></p><h2 id="Aeroelastic-Analysis-of-the-Goland-Wing"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-the-Goland-Wing">Aeroelastic Analysis of the Goland Wing</a><a id="Aeroelastic-Analysis-of-the-Goland-Wing-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-the-Goland-Wing" title="Permalink"></a></h2><p><img src="goland-wing.png" alt/></p><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been extensively used for validation.</p><p>The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its airfoil consists of a 4% thick parabolic arc.  There are two configurations for this wing, one with a tip store and one without.  The configuration we consider in this example is the configuration without a tip store.</p><p>The deflections of Goland wing are relatively small, so linear structural models are sufficient for modeling the wing&#39;s structure.  However, to demonstrate the capabilities of this package, we will use a nonlinear geometrically exact beam theory model.  </p><p>For the aerodynamics, we use a lifting line model which is capable of using a variety of 2D models to model section lift and moment coefficients.  While this type of aerodynamic model is inappropriate for this wing due to the wing&#39;s low aspect ratio, we use it so that we can obtain a better comparison between our results and the results of other aeroelastic analyses of the Goland wing performed with lifting line aerodynamics.</p><pre><code class="language- hljs">using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
-
-# discretization
-N = 8 # number of elements
-
-# geometric properties
-span = 6.096 # m (20 ft span)
-chord = 1.8288 # m (6 ft chord)
-
-# structural section properties
-xea = 0.33*chord # m (elastic axis, from leading edge)
-EIcc = 9.77e6 # N*m^2 (flat bending rigidity)
-GJ = 0.99e6 # N*m^2 (torsional rigidity)
-μ = 35.71 # kg/m (mass per unit length)
-xcm = 0.43*chord # m (center of mass, from leading edge)
-i11 = 8.64 # kg*m (moment of inertia about elastic axis)
-i22 = 0.1*i11 # moment of inertia about beam y-axis
-i33 = 0.9*i11 # moment of inertia about beam z-axis
-
-# freestream properties
-Vinf = vcat(1, 5:5:200) # m/s (velocity)
-α = 0 # angle of attack
-
-# aerodynamic section properties
-xref = xea/chord # normalized reference location (relative to leading edge)
-a = xref - 0.5 # normalized reference location (relative to semi-chord)
-b = chord / 2 # m (semi-chord)
-ρ = 1.02 # kg/m^3 (air density)
-a0 = 0.85*(2*pi) # lift slope (for each section)
-α0 = 0 # zero lift angle of attack (for each section)
-
-# define geometry
-xpt = range(0, 0, length=N+1) # point x-coordinates (in body frame)
-ypt = range(0, span, length=N+1) # point y-coordinates (in body frame)
-zpt = range(0, 0, length=N+1) # point z-coordinates (in body frame)
-points = [[xpt[i],ypt[i],zpt[i]] for i = 1:N+1]
-start = 1:N # starting point of each beam element
-stop = 2:N+1 # ending point of each beam element
-frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
-compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 0]), N) # compliance matrix
-xm2 = xea - xcm
-mass = fill([
-    μ 0 0 0 0 -μ*xm2;
-    0 μ 0 0 0 0;
-    0 0 μ μ*xm2 0 0;
-    0 0 μ*xm2 i11 0 0;
-    0 0 0 0 i22 0;
-    -μ*xm2 0 0 0 0 i33], N) # mass matrix
-assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
-
-prescribed = Dict(
-    # fixed left edge
-    1 =&gt; GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
-        theta_z=0),
-)
-
-# prescribed point conditions
-point_conditions = zeros(6, length(assembly.points))
-
-# additional distributed loads
-element_loads = zeros(6, length(assembly.elements))
-
-# construct aerodynamic model
-aerodynamic_model = LiftingLine{N}(Peters{6}())
-
-# construct structural model
-structural_model = GEBT(assembly, prescribed)
-
-# define coupled model
-model = couple_models(aerodynamic_model, structural_model)
-
-# construct ODE function
-f = get_ode(model)
-
-# current time
-t = 0.0
-
-# eigenvalue/eigenvector storage
-nev = 12*N
-λ = zeros(ComplexF64, nev, length(Vinf))
-Uλ = zeros(ComplexF64, nev, number_of_states(model), length(Vinf))
-Vλ = zeros(ComplexF64, number_of_states(model), nev, length(Vinf))
-
-# initial guess for state variables
-x0 = zeros(number_of_states(model))
-
-# loop through each velocity
-for i = 1:length(Vinf)
-
-    println(Vinf[i])
-
-    # set parameters
-    p_aero = get_parameters(aerodynamic_model; section_parameters =
-        fill((a = a, b = b, a0 = a0, alpha0 = α0), N))
-
-    p_stru = get_parameters(structural_model; assembly = assembly)
-
-    p_additional = get_additional_parameters(model;
-        rho = ρ,
-        point_conditions = point_conditions,
-        element_loads = element_loads,
-        x = Vinf[i],
-        v = 0,
-        w = 0,
-        p = 0,
-        q = 0,
-        r = 0,
-        )
-
-    p = vcat(p_aero, p_stru, p_additional)
-
-    # find state variables corresponding to steady state operating conditions
-    sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
-
-    # use state variables from steady state operating conditions
-    x = sol.x
-
-    # calculate inputs corresponding to steady state operating conditions
-    y = get_coupling_inputs(model, x, p, t)
-
-    # perform linear stability analysis
-    λi, Uλi, Vλi = get_eigen(model, x, y, p, t; nev)
-
-    # correlate eigenvalues
-    if i &gt; 1
-        # previous left eigenvector matrix
-        Uλpi = Uλ[:,:,i-1]
-
-        # current mass matrix
-        Mi = get_mass_matrix(model, x, y, p, t)
-
-        # use correlation matrix to correlate eigenmodes
-        perm, corruption = AerostructuralDynamics.correlate_eigenmodes(Uλpi, Mi, Vλi)
-
-        # re-arrange eigenmodes
-        λi = λi[perm]
-        Uλi = Uλi[perm,:]
-        Vλi = Vλi[:,perm]
-    end
-
-    # save eigenvalues/eigenvectors
-    λ[:,i] = λi
-    Uλ[:,:,i] = Uλi
-    Vλ[:,:,i] = Vλi
-
-    # update initial guess for the state variables
-    x0 .= x
-end</code></pre><p>To identify the flutter speed and frequency, we can plot the results.</p><pre><code class="language- hljs">using Plots
-pyplot()
-
-sp1 = plot(
-    xlim = (0, 200),
-    xtick = 0:40:200,
-    xlabel = &quot;Velocity (m/s)&quot;,
-    ylim = (0, 800),
-    ytick = 0:100:800,
-    ylabel = &quot;Frequency (rad/s)&quot;,
-    framestyle = :zerolines,
-    titlefontsize = 14,
-    guidefontsize = 14,
-    legendfontsize = 11,
-    tickfontsize = 11,
-    legend = :topright,
-    foreground_color_legend = nothing,
-    background_color_legend = nothing,
-    minorgrid=true)
-
-sp2 = plot(
-    xlim = (0, 200),
-    xtick = 0:40:200,
-    xlabel = &quot;Velocity (m/s)&quot;,
-    ylim = (-80, 20),
-    ytick = -80:20:20,
-    ylabel = &quot;Damping (1/s)&quot;,
-    framestyle = :zerolines,
-    titlefontsize = 14,
-    guidefontsize = 14,
-    legendfontsize = 11,
-    tickfontsize = 11,
-    legend = :topright,
-    foreground_color_legend = nothing,
-    background_color_legend = nothing,
-    minorgrid=true)
-
-for i = 1:size(λ, 1)
-
-    Vi = Vinf[:]
-    λi = λ[i,:]
-
-    if any(-80 .&lt;= real.(λi) .&lt;= 20)
-        plot!(sp1, Vi, imag.(λi),
-            label = &quot;&quot;,
-            color = i,
-            markersize = 3,
-            markerstrokewidth = 0,
-            )
-    end
-
-end
-
-for i = 1:size(λ, 1)
-
-    Vi = Vinf[:]
-    λi = λ[i,:]
-
-    if any(-80 .&lt;= real.(λi) .&lt;= 20)
-        plot!(sp2, Vi,
-            real.(λi),
-            label = &quot;&quot;,
-            color = i,
-            markersize = 3,
-            markerstrokewidth = 0,
-            )
-    end
-end
-
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)</code></pre><p>As predicted by this analysis, the flutter speed is 140 m/s and the flutter frequency is 69.7 rad/s.  These results are nearly identical to results by Palacios and Epureanu in &quot;An Intrinsic Description of the Nonlinear Aeroelasticity of Very Flexible Wings&quot; for a similar aeroelastic model.  We can therefore be reasonably confident that the models used for this example are implemented correctly.</p><pre><code class="language- hljs">using DifferentialEquations
-
-Vinf = 100.0
-
-x0 = zeros(number_of_states(model))
-
-# set parameters
-p_aero = get_parameters(aerodynamic_model; section_parameters =
-    fill((a = a, b = b, a0 = a0, alpha0 = α0), N))
-
-p_stru = get_parameters(structural_model; assembly = assembly)
-
-p_additional = get_additional_parameters(model;
-    rho = ρ,
-    point_conditions = point_conditions,
-    element_loads = element_loads,
-    x = 100.0,
-    v = 0,
-    w = 0,
-    p = 0,
-    q = 0,
-    r = 0,
-    )
-
-p = vcat(p_aero, p_stru, p_additional)
-
-# update initial state variables with steady state solution
-x0 .= solve(SteadyStateProblem(f, x0, p), SSRootfind())
-
-# simulate from 0 to 10 seconds
-tspan = (0.0, 10.0)
-
-# construct ODE function
-f = get_ode(model)
-
-# construct ODE problem
-prob = DifferentialEquations.ODEProblem(f, x0, tspan, p)
-
-# solve ODE
-sol = DifferentialEquations.solve(prob)
-
-nothing #hide</code></pre><h2 id="Aeroelastic-Analysis-of-a-Highly-Flexible-Cantilever-Wing"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-a-Highly-Flexible-Cantilever-Wing">Aeroelastic Analysis of a Highly Flexible Cantilever Wing</a><a id="Aeroelastic-Analysis-of-a-Highly-Flexible-Cantilever-Wing-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-a-Highly-Flexible-Cantilever-Wing" title="Permalink"></a></h2><p><img src="cantilever-wing.png" alt/></p><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using a highly flexible cantilever wing.  </p><p>The wing we are considering in this example was created by modifying Daedalus aircraft data and is therefore representative of a high-altitude long-endurance wing.  It has a 16 meter span (from root to tip) and a 1 meter chord.  To model the wing&#39;s aerodynamics, we will use a lifting line model.  To model the wing&#39;s structure, we will use a geometrically exact beam theory model.</p><pre><code class="language- hljs">using AerostructuralDynamics, GXBeam, DifferentialEquations, LinearAlgebra
-
-# discretization
-N = 1 # number of elements
-
-# geometric properties
-span = 16 # m
-chord = 1 # m
-
-# structural section properties
-GJ = 1e4 # N*m^2 (torsional rigidity)
-EIcc = 2e4 # N*m^2 (flat bending rigidity)
-EInn = 4e6 # N*m^2 (chord bending rigidity)
-μ = 0.75 # kg/m (mass per unit length)
-i11 = 0.1 # kg*m (moment of inertia about elastic axis)
-i22 = 0.1*i11 # moment of inertia about beam y-axis
-i33 = 0.9*i11 # moment of inertia about beam z-axis
-
-# freestream properties
-Vinf = vcat(0.1, 1:35) # m/s (velocity)
-α = 2*pi/180 # angle of attack
-
-# aerodynamic section properties
-a = 0.0 # normalized reference location (relative to semi-chord)
-b = chord / 2 # m (semi-chord)
-ρ = 0.088 # kg/m^3 (air density)
-a0 = 2*pi # lift slope (for each section)
-α0 = 0 # zero lift angle of attack (for each section)
-
-# define geometry
-xpt = range(0, 0, length=N+1) # point x-coordinates (in body frame)
-ypt = range(0, span, length=N+1) # point y-coordinates (in body frame)
-zpt = range(0, 0, length=N+1) # point z-coordinates (in body frame)
-points = [[xpt[i],ypt[i],zpt[i]] for i = 1:N+1]
-start = 1:N # starting point of each beam element
-stop = 2:N+1 # ending point of each beam element
-frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
-compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 1/EInn]), N) # compliance matrix
-mass = fill(Diagonal([μ, μ, μ, i11, i22, i33]), N)
-assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
-
-prescribed = Dict(
-    # fixed left edge
-    1 =&gt; GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
-        theta_z=0),
-)
-
-# prescribed point conditions
-point_conditions = zeros(6, length(assembly.points))
-
-# additional distributed loads
-element_loads = zeros(6, length(assembly.elements))
-
-# construct aerodynamic model
-aerodynamic_model = LiftingLine{N}(Peters{6}())
-
-# construct structural model
-structural_model = GEBT(assembly, prescribed)
-
-# define coupled model
-model = couple_models(aerodynamic_model, structural_model)
-
-# construct ODE function
-f = get_ode(model)
-
-# current time
-t = 0.0
-
-# eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
-
-# initial guess for state variables
-x0 = zeros(number_of_states(model))
-
-# loop through each velocity
-for i = 1:length(Vinf)
-
-    # previous left eigenvector matrix
-    global Uλpi
-
-    # set parameters
-    p_aero = get_parameters(aerodynamic_model; section_parameters =
-        fill((a = a, b = b, a0 = a0, alpha0 = α0), N))
-
-    p_stru = get_parameters(structural_model; assembly = assembly)
-
-    p_additional = get_additional_parameters(model;
-        rho = ρ,
-        point_conditions = point_conditions,
-        element_loads = element_loads,
-        x = Vinf[i]*cos(α),
-        v = 0,
-        w = -Vinf[i]*sin(α),
-        p = 0,
-        q = 0,
-        r = 0,
-        )
-
-    p = vcat(p_aero, p_stru, p_additional)
-
-    # find state variables corresponding to steady state operating conditions
-    sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
-
-    # use state variables from steady state operating conditions
-    x = sol.x
-
-    # calculate inputs corresponding to steady state operating conditions
-    y = get_coupling_inputs(model, x, p, t)
-
-    # perform linear stability analysis
-    λi, Uλi, Vλi = get_eigen(model, x, y, p, t; nev = number_of_states(model))
-
-    # correlate eigenvalues
-    if i &gt; 1
-        # calculate mass matrix
-        Mi = get_mass_matrix(model, x, y, p, t)
-
-        # use correlation matrix to correlate eigenmodes
-        perm, corruption = AerostructuralDynamics.correlate_eigenmodes(Uλpi, Mi, Vλi)
-
-        # re-arrange eigenmodes
-        λi = λi[perm]
-        Uλi = Uλi[perm,:]
-        Vλi = Vλi[:,perm]
-    end
-
-    # save eigenvalues
-    λ[:,i] = λi
-
-    # save previous left eigenvector matrix
-    Uλpi = Uλi
-
-    # update initial guess for the state variables
-    x0 .= x
-end
-
-nothing #hide</code></pre><p>We now plot the results predicted using each aerodynamic model.</p><pre><code class="language- hljs">using Plots
-pyplot()
-
-default(
-    titlefontsize = 14,
-    legendfontsize = 11,
-    guidefontsize = 14,
-    tickfontsize = 11,
-    foreground_color_legend = nothing,
-    background_color_legend = nothing,
-    minorgrid=true,
-    framestyle = :zerolines)
-
-sp1 = plot(
-    xlim = (0, 35),
-    xtick = 0:5:35,
-    xlabel = &quot;Velocity (m/s)&quot;,
-    ylim = (0, 350),
-    ytick = 0:50:350,
-    ylabel = &quot;Frequency (rad/s)&quot;,
-    legend = :topright
-    )
-
-sp2 = plot(
-    xlim = (0, 35),
-    xtick = 0:5:35,
-    xlabel = &quot;Velocity (m/s)&quot;,
-    ylim = (-12, 8),
-    ytick = -12:4:8,
-    ylabel = &quot;Damping (1/s)&quot;,
-    legend = :topleft
-    )
-
-for i = 1:size(λ, 1)
-
-    Vi = Vinf[:]
-    λi = λ[i,:]
-
-    if any(abs.(λi) .&lt; 1e4)
-        plot!(sp1, Vi, imag.(λi),
-            label = &quot;&quot;,
-            color = i,
-            markersize = 3,
-            markerstrokewidth = 0,
-            )
-    end
-
-end
-
-for i = 1:size(λ, 1)
-
-    Vi = Vinf[:]
-    λi = λ[i,:]
-
-    if any(abs.(λi) .&lt; 1e4)
-        plot!(sp2, Vi,
-            real.(λi)./abs.(λi)*100,
-            label = &quot;&quot;,
-            color = i,
-            markersize = 3,
-            markerstrokewidth = 0,
-            )
-    end
-end
-
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)
-
-nothing #hide</code></pre><p>As predicted by this analysis, the flutter speed is 140 m/s and the flutter frequency is 69.7 rad/s.  These results are nearly identical to results by Palacios and Epureanu in &quot;An Intrinsic Description of the Nonlinear Aeroelasticity of Very Flexible Wings&quot; for a similar aeroelastic model.  We can therefore be reasonably confident that the models used for this example are implemented correctly.</p><h2 id="Aeroelastic-Analysis-of-a-Blended-Wing-Body-Aircraft"><a class="docs-heading-anchor" href="#Aeroelastic-Analysis-of-a-Blended-Wing-Body-Aircraft">Aeroelastic Analysis of a Blended-Wing-Body Aircraft</a><a id="Aeroelastic-Analysis-of-a-Blended-Wing-Body-Aircraft-1"></a><a class="docs-heading-anchor-permalink" href="#Aeroelastic-Analysis-of-a-Blended-Wing-Body-Aircraft" title="Permalink"></a></h2><p>In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis using geometrically exact beam theory in combination with a rigid body dynamics model and various aerodynamic models.  </p><pre><code class="language-julia hljs">using AerostructuralDynamics, GXBeam, NLsolve, LinearAlgebra
-
-# discretization
-NB = 6 # number of elements on body
-NW = 12 # number of elements on wing
-N = NB + NW # number of elements on blended wing body aircraft
-
-# wing geometry
-chord = [1.39, 0.55, 0.55] # m (chord lengths in -x-direction)
-ybreak = [0.0, 0.89, 3.25] # m (span break locations in y-direction)
-sweep = 30 * pi/180 # leading edge sweep
-
-# stiffness properties
-EA = [1.69e8, 1.55e8] # N (extension stiffness)
-GJ = [2.25e6, 1.10e4] # N*m^2 (torsion stiffness)
-EIcc = [7.5e5, 1.14e4] # N*m^2 (out-of-plane bending stiffness)
-EInn = [3.5e7, 1.3e5] # N*m^2 (in-plane bending stiffness)
-
-# inertial properties
-μ = [50.0, 6.2] # kg/m (mass per unit length)
-i11 = [4.5, 5.08e-3] # kg*m (rotational inertia per unit length)
-i22 = [0.7, 5.0e-4] # kg*m (flat bending inertia per unit length)
-i33 = [22, 4.63e-3] # kg*m (edge bending inertia per unit length)
-
-# axis locations
-xref = [0.6438, 0.4560, 0.4560] .* chord # reference axis location (from leading edge)
-xcm = [0.6438, 0.4560, 0.4560] .* chord # center of gravity (from leading edge)
-
-# body definition
-xpt1 = range(0 + xref[1], ybreak[1]*tan(sweep) + xref[2]; length=NB+1)
-ypt1 = range(0, ybreak[1]; length=NB+1)
-zpt1 = range(0, 0; length=NB+1)
-points1 = [[xpt1[i],ypt1[i],zpt1[i]] for i = 1:NB+1]
-frames1 = fill( , NB)
-compliance1 = fill(Diagonal([1/EA, 0, 0, 1/GJ, 1/EIcc, 1/EInn]), NB)
-mass1 = fill(Diagonal([μ[1], μ[1], μ[1], i11[1], i22[1], i33[1]]), NB)
-a1 = linterp(xref[1]/chord[1] - 0.5, xref[2]/chord[2] - 0.5, length=NB)
-b1 = linterp(chord[1]/2, chord[2]/2, length=NB) # m (semi-chord)
-a01 = fill(2*pi, NB) # lift slope (for each section)
-α01 = fill(0.0, NB) # zero lift angle of attack (for each section)
-
-# wing definition
-xpt2 = range(ybreak[1]*tan(sweep) + xref[2], ybreak[2]*tan(sweep) + xref[3];
-    length=NW+1)
-ypt2 = range(ybreak[1], ybreak[2]; length=NW+1)
-zpt2 = range(0, 0; length=NW+1)
-points2 = [[xpt2[i],ypt2[i],zpt2[i]] for i = 1:NW+1]
-frames2 = fill( , NW)
-compliance2 = fill(Diagonal([1/EA[2], 0, 0, 1/GJ[2], 1/EIcc[2], 1/EInn[2]]), NW)
-mass2 = fill(Diagonal([μ[2], μ[2], μ[2], i11[2], i22[2], i33[2]]), NW)
-a2 = linterp(xref[2]/chord[2] - 0.5, xref[3]/chord[3] - 0.5; length = NW)
-b2 = linterp(chord[2]/2, chord[3]/2; length = NW) # m (semi-chord)
-a02 = fill(2*pi, NW) # lift slope (for each section)
-α02 = fill(0.0, NW) # zero lift angle of attack (for each section)
-
-# define beam assembly
-points = vcat(points1, points2[2:end])
-frames = vcat(frames1, frames2)
-start = 1:N # starting point of each beam element
-stop = 2:N+1 # ending point of each beam element
-assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
-
-# define aerodynamic section properties
-a = vcat(a1, a2)
-b = vcat(b1, b2)
-a0 = vcat(a01, a02)
-α0 = vcat(α01, α02)
-ρ = 1.02 # kg/m^3 (air density)
-
-# boundary condition initialization
-prescribed = Dict(
-    # fixed left edge
-    1 =&gt; GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
-        theta_z=0),
-)
-
-# construct aerodynamic model
-aerodynamic_model = LiftingLine{N}(Peters{6}())
-
-# construct structural model
-structural_model = GEBT(assembly, prescribed)
-
-# rigid body dynamics model
-dynamics_model = RigidBody()
-
-# define simulation models
-model = couple_models(aerodynamic_model, structural_model, dynamics_model)
-
-# eigenvalue storage
-λ = zeros(ComplexF64, number_of_states(model), length(Vinf))
-
-x0 = zeros(number_of_states(model))
-
-# loop through each velocity
-for i = 1:length(Vinf)
-
-    println(&quot;Vinf: &quot;, Vinf[i])
-
-    # set state variables, parameters, and current time
-    p_aero = vcat([(a[i], b[i], a0[i], α0[i]) for i = 1:N]...)
-    p_stru = set_parameters(structural_model, assembly)
-    p_additional = vcat(-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α), ρ,
-        set_inputs(structural_model, assembly; prescribed=prescribed))
-    p = vcat(p_aero, p_stru, p_additional)
-    t = 0
-
-    # find state variables corresponding to steady state operating conditions
-    fresid = x -&gt; get_rates(model, x, get_coupling_inputs(model, x, p, t), p, t)
-    sol = nlsolve(fresid, x0)
-    x = sol.zero
-
-    # calculate the inputs corresponding to steady state operating conditions
-    y = get_coupling_inputs(model, x, p, t)
-
-    # calculate the mass matrix corresponding to steady state operating conditions
-    M = get_mass_matrix(model, x, y, p, t)
-
-    # calculate the jacobian corresponding to steady state operating conditions
-    J = get_state_jacobian(model, x, y, p, t)
-
-    # solve the generalized eigenvalue problem
-    λ[:,i] = sort(eigvals(J, M), by=LinearAlgebra.eigsortby)
-
-    # update initial guess for the state variables
-    x0 .= x
-end</code></pre><p>We now plot the results predicted using each aerodynamic model.</p><pre><code class="language-julia hljs">using Plots
-pyplot()
-
-default(
-    titlefontsize = 14,
-    legendfontsize = 11,
-    guidefontsize = 14,
-    tickfontsize = 11,
-    foreground_color_legend = nothing,
-    background_color_legend = nothing,
-    minorgrid=true,
-    framestyle = :zerolines)
-
-sp1 = plot(
-    xlim = (0, 200),
-    xtick = 0:40:200,
-    xlabel = &quot;Velocity (m/s)&quot;,
-    ylim = (0, 1000),
-    ytick = 0:100:1000,
-    ylabel = &quot;Frequency (rad/s)&quot;,
-    legend = :topright
-    )
-
-sp2 = plot(
-    xlim = (0, 200),
-    xtick = 0:40:200,
-    xlabel = &quot;Velocity (m/s)&quot;,
-    ylim = (-80, 20),
-    ytick = -80:20:20,
-    ylabel = &quot;Damping (1/s)&quot;,
-    legend = :topleft
-    )
-
-for i = 1:size(λ, 1)
-
-    Vi = Vinf[:]
-    λi = λ[i,:]
-
-    scatter!(sp1, Vi, imag.(λi),
-        label = &quot;&quot;,
-        color = 1,
-        markersize = 3,
-        markerstrokewidth = 0,
-        )
-end
-
-for i = 1:size(λ, 1)
-
-    Vi = Vinf[:]
-    λi = λ[i,:]
-
-    scatter!(sp2, Vi,
-        real.(λi),
-        label = &quot;&quot;,
-        color = 1,
-        markersize = 3,
-        markerstrokewidth = 0,
-        )
-end
-
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800), show=true)
-</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../guide/">« Getting Started</a><a class="docs-footer-nextpage" href="../aerodynamics/steady/">Steady Thin Airfoil Theory »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.7 on <span class="colophon-date" title="Tuesday 28 September 2021 21:21">Tuesday 28 September 2021</span>. Using Julia version 1.6.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+└   fn = &quot;/home/runner/work/Aeroelasticity.jl/Aeroelasticity.jl/docs/build/typical-section-simulation.gif&quot;</code></pre><p><img src="../typical-section-simulation.gif" alt/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../guide/">« Getting Started</a><a class="docs-footer-nextpage" href="../aerodynamics/steady/">Steady Thin Airfoil Theory »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.12 on <span class="colophon-date" title="Friday 28 January 2022 17:07">Friday 28 January 2022</span>. Using Julia version 1.6.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
