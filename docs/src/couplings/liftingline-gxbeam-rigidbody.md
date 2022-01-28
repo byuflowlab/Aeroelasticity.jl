@@ -13,7 +13,7 @@ couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody)
 ## Example Initialization
 
 ```@example liftingline-gxbeam-rigidbody
-using AerostructuralDynamics, GXBeam, LinearAlgebra
+using Aeroelasticity, GXBeam, LinearAlgebra
 
 # discretization
 N = 8 # number of elements

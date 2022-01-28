@@ -1,7 +1,7 @@
-using Documenter, AerostructuralDynamics
+using Documenter, Aeroelasticity
 
 makedocs(;
-    modules = [AerostructuralDynamics],
+    modules = [Aeroelasticity],
     pages = [
         "Home" => "index.md",
         "Getting Started" => "guide.md",
@@ -35,12 +35,12 @@ makedocs(;
         ],
         "Developer Guide" => "developer.md",
     ],
-    sitename = "AerostructuralDynamics.jl",
+    sitename = "Aeroelasticity.jl",
     authors = "Taylor McDonnell <taylormcd@byu.edu>",
     # format = LaTeX(), # uncomment for PDF output
 )
 
 deploydocs(
-    repo = "github.com/byuflowlab/AerostructuralDynamics.jl.git",
+    repo = "github.com/byuflowlab/Aeroelasticity.jl.git",
     devbranch = "main",
 )
