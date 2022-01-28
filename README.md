@@ -26,7 +26,7 @@ Author: Taylor McDonnell
    - Eigenvalue Analyses
    - Time-Marching Analyses
  - Directly interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
- - Verified/Validated against theoretical, computational, and experimental results (see the [examples](@ref Examples))
+ - Verified/Validated against theoretical, computational, and experimental results (see the [examples](https://flow.byu.edu/Aeroelasticity.jl/dev/examples/))
  - May be easily extended to include additional models or model couplings.
 
 ## Installation
@@ -39,4 +39,4 @@ pkg> add https://flow.byu.edu/Aeroelasticity.jl
 
 ## Usage
 
-See the [Getting Started]() section of the documentation.
+See the [Getting Started](https://flow.byu.edu/Aeroelasticity.jl/dev/guide/) section of the documentation.
