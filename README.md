@@ -26,8 +26,8 @@ Author: Taylor McDonnell
    - Eigenvalue Analyses
    - Time-Marching Analyses
  - Directly interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
- - Verified/Validated against theoretical, computational, and/or experimental results (see the [examples](@ref Examples))
- - May be easily extended to include additional models and/or model couplings.
+ - Verified/Validated against theoretical, computational, and experimental results (see the [examples](@ref Examples))
+ - May be easily extended to include additional models or model couplings.
 
 ## Installation
 
