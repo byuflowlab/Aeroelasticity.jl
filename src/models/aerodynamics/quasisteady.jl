@@ -1,10 +1,17 @@
 """
-    QuasiSteady()
+    QuasiSteady
 
 Two-dimensional aerodynamic model based on quasi-steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
 struct QuasiSteady end
+
+"""
+    QuasiSteady()
+
+Initialize a model of type [`QuasiSteady`](@ref)
+"""
+QuasiSteady()
 
 # --- Submodel Creation --- #
 

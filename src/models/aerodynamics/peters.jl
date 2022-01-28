@@ -1,5 +1,5 @@
 """
-    Peters{N,TF=Float64}()
+    Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
 
 Two-dimensional aerodynamic model based on Peters' finite state model with `N` state 
 variables, inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, 
@@ -10,6 +10,13 @@ struct Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
     b::TV
     c::TV
 end
+
+"""
+    Peters{N, TF=Float64}()
+
+Initialize a model with type [`Peters`](@ref) with `N` state variables
+"""
+Peters()
 
 Peters{N}() where N = Peters{N,Float64}()
 

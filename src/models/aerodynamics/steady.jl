@@ -1,10 +1,17 @@
 """
-    Steady()
+    Steady
 
 Two-dimensional aerodynamic model based on steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
 struct Steady end
+
+"""
+    Steady()
+
+Initialize a model of type [`Steady`](@ref)
+"""
+Steady()
 
 # --- Submodel Creation --- #
 

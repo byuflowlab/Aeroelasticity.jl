@@ -12,6 +12,12 @@ struct Wagner{TF}
     eps2::TF
 end
 
+
+"""
+    Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+
+Initialize a model of type [`Wagner`](@ref)
+"""
 Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3) = Wagner(promote(C1, C2, eps1, eps2)...)
 
 # --- Submodel Creation --- #
