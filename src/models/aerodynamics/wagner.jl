@@ -12,7 +12,6 @@ struct Wagner{TF}
     eps2::TF
 end
 
-
 """
     Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
 
