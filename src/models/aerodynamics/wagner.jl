@@ -18,17 +18,18 @@ Wagner(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3) = Wagner(promote(C1, C2,
 
 function Submodel(model::Wagner)
 
+    C1 = model.C1
+    C2 = model.C2
+    eps1 = model.eps1
+    eps2 = model.eps2
+
     # residual function
-    fresid = (dx, x, y, p, t) -> wagner_residual(dx, x, y, p, t; C1 = model.C1, 
-        C2 = model.C2, eps1 = model.eps1, eps2 = model.eps2)
+    fresid = (dx, x, y, p, t) -> wagner_residual(dx, x, y, p, t; C1, C2, eps1, eps2)
 
     # number of state, input, and parameters (use Val(N) to use inferrable dimensions)
     nx = Val(2)
     ny = Val(3)
     np = Val(6)
-
-    # model constants
-    constants = (C1=model.C1, C2=model.C2, eps1 = model.eps1, eps2 = model.eps2)
 
     # jacobian definitions
     ratejac = Identity()
@@ -49,7 +50,6 @@ function Submodel(model::Wagner)
 
     # model definition
     return Submodel{false}(fresid, nx, ny, np;
-        constants = constants,
         ratejac = ratejac,
         statejac = statejac,
         inputjac = inputjac,
