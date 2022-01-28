@@ -1,11 +1,18 @@
 """
-    Section()
+    Section
 
 Typical section structural model with state variables ``h, \\theta, \\dot{h},
 \\dot{\\theta}``, inputs ``\\mathcal{L}, \\mathcal{M}``, and parameters ``k_h,
 k_\\theta, m, S_\\theta, I_\\theta``
 """
 struct Section end
+
+"""
+    Section()
+
+Initialize a model of type [`Section`](@ref)
+"""
+Section()
 
 # --- Submodel Creation --- #
 

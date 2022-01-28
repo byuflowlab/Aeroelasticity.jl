@@ -89,5 +89,5 @@ After the Prandtl-Glauert compressibility correction has been applied, an extra 
 \mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
-## Example Usage
+## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)
