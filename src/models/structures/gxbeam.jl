@@ -1,10 +1,49 @@
 """
+    GXBeamAssembly
+
+Model which describes the behavior of an assembly of beam elements, as modeled by the 
+`GXBeam` package.  State variables are as defined by GXBeam.  Inputs correspond to the 
+external forces ``F_{x,i}, F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or
+displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i},
+\\theta_{z,i}`` applied to each node, followed by the distributed loads
+``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}`` applied to each beam
+element, followed by the point mass properties ``m, p, I11, I22, I33, I12, I13, I23`` 
+corresponding to each beam element, followed by the gravity vector, linear velocity, 
+angular velocity, linear acceleration, and angular acceleration of the system. Parameters 
+correspond to the location ``p_{x}, p_{y}, p_{z}`` of each node followed by each beam 
+element's properties. Each beam element's properties are defined by a triad which defines 
+the orientation of the beam element ``e_{1,x}, e_{1,y}, e_{1,z}, e_{2,x}, e_{2,y}, e_{2,z}, 
+e_{3,x}, e_{3,y}, e_{3,z}``, followed by the 21 independent entries of the compliance matrix 
+``C_{11}, C_{12}, C_{13}, C_{14}, C_{15}, C_{16}, C_{22}, C_{23}, C_{24}, C_{25}, C_{26}, 
+C_{33}, C_{34}, C_{35}, C_{36}, C_{44}, C_{45}, C_{46}, C_{55}, C_{56}, C_{66}``, followed 
+by the beam element's inertial properties ``\\mu, x_{m,2}, x_{m,3}, i_{22}, i_{33}, i_{23}``
+"""
+struct GXBeamAssembly{TF,TI,TC,TB}
+    # beam element connectivity
+    start::TC
+    stop::TC
+    # location and degree of freedom of displacement constraints
+    displacement::TB
+    # scaling parameters for the system
+    force_scaling::TF
+    # indices for accessing governing equations for each point and beam element
+    irow_point::TI
+    irow_elem::TI
+    irow_elem1::TI
+    irow_elem2::TI
+    # indices for accessing state variables for each point and beam element
+    icol_point::TI
+    icol_elem::TI
+end
+
+# --- Constructors --- #
+
+"""
     GXBeamAssembly(start, stop, displacement; kwargs...)
 
 Construct a geometrically exact beam theory structural model with beam elements
-which extend from the point indices in `start` to the point indices in
-`stop` and points with prescribed displacements as specified in
-`displacement`.
+which extend from the point indices in `start` to the point indices in `stop` and 
+points with prescribed displacements as specified in `displacement`.
 
 # Arguments
  - `start`: Vector containing point index where each beam element starts
@@ -16,39 +55,95 @@ which extend from the point indices in `start` to the point indices in
     is the total number of points.
 
 # Keyword Arguments
- - `force_scaling = 1.0`: Factor used to scale system forces/moments internally
+ - `force_scaling = 1.0`: Factor used to scale forces and moments internally
 """
-function GXBeamAssembly(start, stop, displacement; force_scaling = 1.0)
+function GXBeamAssembly(start, stop, displacement; force_scaling=1.0)
 
     # initialize system pointers
     N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
         GXBeam.system_indices(start, stop, false)
 
+    return GXBeamAssembly(start, stop, displacement, force_scaling,
+        irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
+end
+
+"""
+    GXBeamAssembly(assembly, prescribed_conditions; kwargs...)
+
+Construct a geometrically exact beam theory structural model with connectivity
+as specified in `assembly` and displacement constraints as specified in 
+`prescribed_conditions`.
+
+# Keyword Arguments
+ - `force_scaling = 1.0`: Factor used to scale forces and moments internally.  If
+    not specified, a suitable default will be chosen based on the entries of the
+    compliance matrix.
+"""
+function GXBeamAssembly(assembly, prescribed_conditions;
+    force_scaling = GXBeam.default_force_scaling(assembly))
+
+    # system dimensions
+    npoint = length(assembly.points)
+    nelem = length(assembly.elements)
+
+    # connectivity
+    start = assembly.start
+    stop = assembly.stop
+
+    # dynamic simulation
+    static = false
+
+    # initialize system pointers
+    N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
+        GXBeam.system_indices(start, stop, static)
+
+    # set displacement constraint indices and degree of freedom
+    displacement = zeros(Bool, 6, npoint)
+    for key in keys(prescribed_conditions)
+        displacement[:,key] .= prescribed_conditions[key].isforce .== false
+    end
+
+    return GXBeamAssembly(start, stop, displacement, force_scaling,
+        irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
+end
+
+# --- Submodel Creation --- #
+
+function Submodel(model::GXBeamAssembly)
+    
+    # unpack constants
+    start = model.start
+    stop = model.stop
+    displacement = model.displacement
+    force_scaling = model.force_scaling
+    irow_point = model.irow_point
+    irow_elem = model.irow_elem
+    irow_elem1 = model.irow_elem1
+    irow_elem2 = model.irow_elem2
+    icol_point = model.icol_point
+    icol_elem = model.icol_elem
+
     # number of points and elements
     npoint = length(icol_point)
     nelem = length(icol_elem)
-
-    # define constants
-    constants = (start=start, stop=stop, displacement=displacement, 
-        force_scaling=force_scaling, irow_point=irow_point, irow_elem=irow_elem, 
-        irow_elem1=irow_elem1, irow_elem2=irow_elem2, icol_point=icol_point, 
-        icol_elem=icol_elem)
 
     # residual function
     fresid = (resid, dx, x, y, p, t) -> gxbeam_residual!(resid, dx, x, y, p, t; 
         start, stop, displacement, force_scaling, irow_point, irow_elem, 
         irow_elem1, irow_elem2, icol_point, icol_elem)
 
-    # number of states, inputs, and parameters (use Val(N) for inferrable dimensions)
+    # number of states, inputs, and parameters
     nx = 6*npoint + 18*nelem
     ny = 6*npoint + 6*nelem + 10*nelem + 15
     np = 3*npoint + 36*nelem
 
     # jacobian definitions
-    ratejac = Linear((J, dx, x, y, p, t) -> gxbeam_rate_jacobian!(J, dx, x, y, p, t; start, stop, displacement, force_scaling, 
-        irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem))
-    statejac = Nonlinear((J, dx, x, y, p, t) -> gxbeam_state_jacobian!(J, dx, x, y, p, t; start, stop, displacement, force_scaling, 
-        irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem))
+    ratejac = Linear((J, dx, x, y, p, t) -> gxbeam_rate_jacobian!(J, dx, x, y, p, t; 
+        start, stop, displacement, force_scaling, irow_point, irow_elem, irow_elem1, 
+        irow_elem2, icol_point, icol_elem))
+    statejac = Nonlinear((J, dx, x, y, p, t) -> gxbeam_state_jacobian!(J, dx, x, y, p, t; 
+        start, stop, displacement, force_scaling, irow_point, irow_elem, irow_elem1, 
+        irow_elem2, icol_point, icol_elem))
     inputjac = Nonlinear() # TODO: define inputjac function
     paramjac = Nonlinear() # TODO: define paramjac function
     tgrad = Zeros()
@@ -56,18 +151,19 @@ function GXBeamAssembly(start, stop, displacement; force_scaling = 1.0)
     # convenience functions for setting states, inputs, and parameters
     setstate = (x; kwargs...) -> gxbeam_set_states!(x, displacement, icol_point, icol_elem, 
         force_scaling; kwargs...)
+
     setinput = (y; kwargs...) -> gxbeam_set_inputs!(y, displacement, icol_point, icol_elem; 
         kwargs...) 
+
     setparam = (p; kwargs...) -> gxbeam_set_parameters!(p, icol_point, icol_elem; kwargs...)
 
     # convenience functions for separating states, inputs, and parameters
     sepstate = (x) -> gxbeam_separate_states(x, displacement, icol_point, icol_elem, force_scaling)
-    sepinput = (y) -> gxbeam_sepinput(y, displacement, icol_point, icol_elem)
+    sepinput = (y) -> gxbeam_separate_inputs(y, displacement, icol_point, icol_elem)
     sepparam = (p) -> gxbeam_separate_parameters(p, start, stop, icol_point, icol_elem)
 
     # model definition
-    return Model{true}(fresid, nx, ny, np;
-        constants = constants,
+    return Submodel{true}(fresid, nx, ny, np;
         ratejac = ratejac,
         statejac = statejac,
         inputjac = inputjac,

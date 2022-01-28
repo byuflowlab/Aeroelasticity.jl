@@ -22,7 +22,7 @@ export separate_states, separate_parameters
 export linearize, get_eigen, correlate_eigenmodes
 
 export Steady, QuasiSteady, Wagner, Peters, LiftingLine
-export Section
+export Section, GXBeamAssembly
 
 export Submodel, Coupling
 
@@ -39,7 +39,10 @@ include(joinpath("models", "aerodynamics", "quasisteady.jl"))
 include(joinpath("models", "aerodynamics", "wagner.jl"))
 include(joinpath("models", "aerodynamics", "peters.jl"))
 include(joinpath("models", "aerodynamics", "liftingline.jl"))
+
 include(joinpath("models", "structures", "section.jl"))
+include(joinpath("models", "structures", "gxbeam.jl"))
+
 include(joinpath("models", "couplings", "steady-section.jl"))
 include(joinpath("models", "couplings", "quasisteady-section.jl"))
 include(joinpath("models", "couplings", "wagner-section.jl"))

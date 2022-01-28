@@ -13,6 +13,7 @@ include(joinpath("models", "aerodynamics", "peters.jl"))
 include(joinpath("models", "aerodynamics", "liftingline.jl"))
 
 include(joinpath("models", "structures", "section.jl"))
+include(joinpath("models", "structures", "gxbeam.jl"))
 
 include(joinpath("models", "couplings", "steady-section.jl"))
 include(joinpath("models", "couplings", "quasisteady-section.jl"))
