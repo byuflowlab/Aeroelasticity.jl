@@ -15,17 +15,18 @@ Peters{N}() where N = Peters{N,Float64}()
 
 function Peters{N,TF}() where {N,TF}
 
-    A, b, c = peters_constants(N)
+    A, b, c = peters_constants(N, TF)
 
-    return Peters(SMatrix{N,N,TF}(A), SVector{N,TF}(b), SVector{N,TF}(c))
+    return Peters(A, b, c)
 end
 
 # --- Submodel Creation --- #
 
-function Submodel(::Peters{N}) where N
+function Submodel(model::Peters{N}) where N
 
-    # model constants (which may be used when this model is coupled with other models)
-    Abar, bbar, cbar = peters_constants(N)
+    Abar = model.A
+    bbar = model.b
+    cbar = model.c
 
     # residual function
     fresid = (dx, x, y, p, t) -> peters_residual(dx, x, y, p, t; Abar, cbar)
@@ -54,7 +55,6 @@ function Submodel(::Peters{N}) where N
 
     # model definition
     return Submodel{false}(fresid, nx, ny, np;
-        constants = (Abar=Abar, bbar=bbar, cbar=cbar),
         ratejac = ratejac,
         statejac = statejac,
         inputjac = inputjac,
@@ -72,24 +72,24 @@ end
 # --- Internal Methods --- #
 
 # function for defining model constants
-function peters_constants(N)
+function peters_constants(N, TF)
 
-    b = zeros(N)
+    b = zeros(TF, N)
     for n = 1:N-1
         b[n] = (-1)^(n-1)*factorial(big(N + n - 1))/factorial(big(N - n - 1))*
             1/factorial(big(n))^2
     end
     b[N] = (-1)^(N-1)
 
-    c = zeros(N)
+    c = zeros(TF, N)
     for n = 1:N
         c[n] = 2/n
     end
 
-    d = zeros(N)
+    d = zeros(TF, N)
     d[1] = 1/2
 
-    D = zeros(N, N)
+    D = zeros(TF, N, N)
     for m in 1:N-1
         n = m + 1
         D[n, m] = 1/(2*n)
