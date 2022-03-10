@@ -1,5 +1,10 @@
 # --- Jacobian Types --- #
 
+"""
+    AbstractJacobian
+
+Supertype for gradient/jacobian wrappers.
+"""
 abstract type AbstractJacobian end
 
 """
