@@ -1,56 +1,31 @@
-"""
-    liftingline_gxbeam_model(start, stop, displacement, lifting_elements, section_models, 
-        section_coupling)
+# --- Coupling Model Creation --- #
 
-Construct a model by coupling a lifting line aerodynamic model and a geometrically exact 
-beam theory model.  This model introduces additional parameters corresponding to
+"""
+    Coupling(::LiftingLine, ::GXBeamAssembly; kwargs...)
+
+Coupling model for coupling a lifting line aerodynamic model and a geometrically exact beam 
+element assembly model.  This model introduces additional parameters corresponding to
 the external point loads ``F_{x,i}, F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or 
 displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i}, \\theta_{z,i}`` 
 applied to each node, followed by the distributed loads ``f_{x,i}, f_{y,i}, f_{z,i}, 
 m_{x,i}, m_{y,i}, m_{z,i}`` applied to each beam element (excluding aerodynamic loads), 
 followed by the properties of point masses attached to each beam element ``m, p, I_{11}, 
-I_{22}, I_{33}, I_{12}, I_{13}, I_{23}``, followed by the gravity vector, followed by the 
-linear/angular velocities and accelearations of the system, followed by the freestream air 
-density ``\\rho_\\infty`` and air speed of sound ``c``.
+I_{22}, I_{33}, I_{12}, I_{13}, I_{23}``, followed by the gravity vector, linear velocity, 
+angular velocity, linear acceleration, and angular acceleration of the system, followed by 
+the freestream air density ``\\rho_\\infty`` and air speed of sound ``c``.
 
-# Arguments
-- `start`: Vector containing point index where each beam element starts
-- `stop`: Vector containing point index where each beam element stops
-- `displacement`: Boolean matrix indicating the point index and degree of
-   freedom of the system's displacement constraints.  Rows correspond to the
-   degrees of freedom ``x, y, z, \\theta_x, \\theta_y, \\theta_z`` and
-   columns correspond to the point indices ``1, 2, \\dots, N_p`` where ``N_p``
-   is the total number of points.
- - `lifting_elements`: Vector containing the element index for each aerodynamic section.
- - `section_models`: Two-dimensional coupled model used for each section.
+# Keyword Arguments
+ - `lifting_elements`: Beam element index corresponding to each aerodynamic section.
+    By default, aerodynamic models are assigned to beam elements in order
 
-**NOTE: When using this model, the local frame for each beam element should be
-oriented with the x-axis along the beam's axis, the y-axis forward, and the
-z-axis normal to the surface**
+**NOTE: This model assumes that each beam element is oriented with the x-axis along the 
+beam's axis, the y-axis forward (into the freestream), and the z-axis normal**
 """
-function liftingline_gxbeam_model(start, stop, displacement, lifting_elements, 
-    section_models)
+function Coupling(aero::LiftingLine, stru::GXBeamAssembly; 
+    lifting_elements = 1:length(aero.submodels))
 
-    # aerodynamic model
-    section_aerodynamic_models = getindex.(getproperty.(section_models, :models), 1)
-    liftingline = liftingline_model(section_aerodynamic_models)
-
-    # structural model
-    gxbeam = gxbeam_model(start, stop, displacement)
-
-    # submodels
-    submodels = (liftingline, gxbeam)
-
-    # construct coupling
-    coupling = liftingline_gxbeam_coupling(liftingline, gxbeam; lifting_elements, 
-        section_models)
-
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods --- #
-
-function liftingline_gxbeam_coupling(liftingline, gxbeam; lifting_elements, section_models)
+    # section models
+    section_models = aero.section_models
 
     # number of points and elements
     npoint = length(gxbeam.constants.icol_point)
@@ -68,8 +43,8 @@ function liftingline_gxbeam_coupling(liftingline, gxbeam; lifting_elements, sect
     np = number_of_parameters(liftingline) + number_of_parameters(gxbeam) + npc
 
     # coupling function
-    g = (y, dx, x, p, t) -> liftingline_gxbeam_inputs!(y, dx, x, p, t; liftingline, gxbeam, 
-        lifting_elements, section_models)
+    g = (y, dx, x, p, t) -> liftingline_gxbeam_inputs!(y, dx, x, p, t; 
+        aero, stru, lifting_elements, section_models)
 
     # jacobians
     ratejac = Nonlinear() # TODO: define rate jacobian
@@ -78,8 +53,8 @@ function liftingline_gxbeam_coupling(liftingline, gxbeam; lifting_elements, sect
     tgrad = Nonlinear() # TODO: define time gradient
     
     # input/output functions
-    setparam = (p; kwargs...) -> liftingline_gxbeam_setparam!(p, displacement, npoint, nelem; 
-        kwargs...)
+    setparam = (p; kwargs...) -> liftingline_gxbeam_setparam!(p, displacement, 
+        npoint, nelem; kwargs...)
     sepparam = (p) -> liftingline_gxbeam_sepparam(p, displacement, npoint, nelem)
 
     return Coupling{true}(g, nx, ny, np, npc;
@@ -92,7 +67,7 @@ function liftingline_gxbeam_coupling(liftingline, gxbeam; lifting_elements, sect
 end
 
 function liftingline_gxbeam_inputs!(y, dx, x, p, t; 
-    liftingline, gxbeam, lifting_elements, section_models)
+    liftingline_submodel, gxbeam_submodel, lifting_elements, section_models)
 
     # get indices of states, inputs, and parameters for each submodel
     submodels = (liftingline, gxbeam)
@@ -107,10 +82,9 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t;
     pa, ps = view(p, ipa), view(p, ips) 
 
     # get indices of states, inputs, and parameters for each lifting line section model
-    liftingline_section_models = liftingline.constants.section_models
-    ixas = state_indices(liftingline_section_models)
-    iyas = input_indices(liftingline_section_models)
-    ipas = parameter_indices(liftingline_section_models)
+    ixas = state_indices(section_models)
+    iyas = input_indices(section_models)
+    ipas = parameter_indices(section_models)
 
     # get views of states, inputs, and parameters for each lifting line section model
     dxas = view.(Ref(dxa), ixas)
