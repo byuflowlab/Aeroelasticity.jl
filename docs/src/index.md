@@ -1,45 +1,41 @@
-# AerostructuralDynamics
+# Aeroelasticity.jl
 
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://flow.byu.edu/AerostructuralDynamics.jl/stable)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://flow.byu.edu/AerostructuralDynamics.jl/dev)
-![](https://github.com/byuflowlab/AerostructuralDynamics.jl/workflows/Run%20tests/badge.svg)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://flow.byu.edu/Aeroelasticity.jl/dev)
+![](https://github.com/byuflowlab/Aeroelasticity.jl/workflows/Run%20tests/badge.svg)
 
-*Aerostructural Dynamics Analysis and Simulation Framework*
+*A Modular Multi-Fidelity Aeroelastic Analysis and Simulation Framework*
 
 Author: Taylor McDonnell
 
-**AerostructuralDynamics** is an extensible multi-fidelity modeling and analysis framework which is designed to simulate the behavior of coupled and/or decoupled aerodynamic, structural, and/or rigid-body dynamics models.  
+**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems.  Currently, this package only models the aeroelasticity of a two-degree of freedom typical section model, but additional models will be added soon.
 
-![](typical-section-flutter-mode.gif)
+![](typical-section-simulation.gif)
 
 ## Package Features
- - Provides a framework for coupling multiple models together for analysis and/or simulation.
- - Defines a variety of aerodynamic, structural, dynamics, control surface, and control system models
-   - Aerodynamics Models:
-     - Steady and/or Quasi-Steady Thin Airfoil Theory (2D)
+ - Facilitates defining and simulating the behavior of both 2D and 3D aeroelastic systems
+ - Contains a number of predefined aerodynamic, structural, and aeroelastic models including:
+   - Aerodynamic Models 
+     - Steady Thin Airfoil Theory (2D)
+     - Quasi-Steady Thin Airfoil Theory (2D)
      - Wagner's Function (2D)
      - Peters' Finite State (2D)
      - Lifting Line (3D)
-   - Structural Dynamics Models:
-     - Two Degree of Freedom Typical Section (2D)
-     - Geometrically Exact Beam Theory (As implemented by [GXBeam](https://github.com/byuflowlab/GXBeam.jl)) (3D)
-   - Dynamics Models:
-     - Rigid Body (3D)
-   - Control Surface Models:
-     - Steady State Linear Flap (2D)
-     - Lifting Line Flaps (3D)
-   - Control System Models:
-     - Trim (3D)
- - Interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
- - Verified and/or validated against theoretical, computational, and/or experimental results (see the [examples](@ref Examples))
- - May be easily extended to include additional models and/or model couplings.  (See the [developer guide](@ref Developer's Guide), pull requests are welcome)
+   - Structural Models
+     - Two Degree of Freedom Typical Section Model (2D)
+ - Supports multiple analysis types including:
+   - Steady State Analyses
+   - Eigenvalue Analyses
+   - Time-Marching Analyses
+ - Directly interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
+ - Verified/Validated against theoretical, computational, and experimental results (see the [examples](@ref Examples))
+ - May be easily extended to include additional models or model couplings.
 
 ## Installation
 
 Enter the package manager by typing `]` and then run the following:
 
 ```julia
-pkg> add https://flow.byu.edu/AerostructuralDynamics.jl
+pkg> add https://github.com/byuflowlab/Aeroelasticity.jl
 ```
 
 ## Usage

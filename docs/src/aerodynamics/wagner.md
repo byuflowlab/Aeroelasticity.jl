@@ -2,7 +2,21 @@
 
 ![](../airfoil.svg)
 
+## Type Definition
+
+```@docs
+Wagner
+```
+
+## Constructors
+
+```@docs
+Wagner()
+```
+
 ## Theory
+
+This model is a two-dimensional aerodynamic model with unsteady aerodynamics which are derived from Wagner's function.
 
 Wagner's function models the indicial response of aerodynamic loads under a sudden change in downwash ``w`` at the three-quarter's chord. The exact expression for Wagner's function is
 ```math
@@ -13,6 +27,8 @@ where ``u`` is the freestream velocity in the chordwise direction, ``\omega`` is
 \phi(t) = 1 - C_1 e^{-\varepsilon_1 (u/b) t} - C_2 e^{-\varepsilon_2 (u/b) t}
 ```
 where ``C_1 = 0.165``, ``C_2 = 0.335``, ``\varepsilon_1 = 0.455``, and ``\varepsilon_2 = 0.3``.
+
+### Normal Force, Axial Force, and Pitching Moment
 
 Wagner's function may be used to model arbitrary airfoil motion using Duhamel's integral.  We start by modeling the increment in the circulatory normal force ``d \mathcal{N}_c(t)`` at time ``t`` due to an increment in downwash ``d w(t)`` at earlier time ``\tau`` as
 ```math
@@ -50,22 +66,28 @@ and the aerodynamic states variables ``\lambda_1`` and ``\lambda_2`` are describ
 \dot{\lambda_2} = -\varepsilon_2 \frac{u}{b} \lambda_2 + C_2 \varepsilon_2 \frac{u}{b} w(t)
 ```
 
-The same lift and moment expressions are used as in the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory), but with the following effective angle of attack
+The same normal force, axial force, and pitching moment are used as in the quasisteady model, but with the following effective angle of attack
 ```math
 \alpha_\text{eff} = \left(\frac{v}{u} + \frac{b}{u} \left( \frac{1}{2} - a \right) \omega - \alpha_0 \right) \phi(0) + \frac{\lambda_1}{u} + \frac{\lambda_2}{u}
 ```
 
-## Type Definition
+### Compressibility Correction
 
-```@docs
-Wagner
+A compressibility correction may be applied to the results of this model in order to extend their applicability.  Applying a Prandtl-Glauert compressibility correction, the normal force, axial force, and pitching moment become
+```math
+\mathcal{N}_\text{compressible} = \frac{\mathcal{N}}{\sqrt{1 - M^2}} \\
+\mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\sqrt{1 - M^2}} \\
+\mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\sqrt{1 - M^2}}
+```
+where ``M`` is the Mach number, defined as ``\frac{u}{c}`` where ``c`` is the air speed of sound. 
+
+### Viscous Forces
+
+After the Prandtl-Glauert compressibility correction has been applied, an extra force in the axial direction ``\mathcal{F}_v`` may be added to account for viscous forces.  The magnitude of this force is scaled using the ``c_{d_0}`` coefficient.
+
+```math
+\mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
-## Constructors
-
-```@docs
-Wagner()
-```
-
-## Example Usage
+## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)

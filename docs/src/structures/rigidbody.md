@@ -19,7 +19,7 @@ RigidBody()
 ## Example Initialization
 
 ```@example rigid-body
-using AerostructuralDynamics #hide
+using Aeroelasticity #hide
 model = RigidBody()
 nothing #hide
 ```

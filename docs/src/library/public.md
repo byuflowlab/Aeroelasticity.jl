@@ -1,6 +1,6 @@
 # Public Documentation
 
-Documentation for `AerostructuralDynamics.jl`'s public interface.
+Documentation for `Aeroelasticity.jl`'s public interface.
 
 See the Models section of the manual for documentation covering the individual models.
 
