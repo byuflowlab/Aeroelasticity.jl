@@ -11,10 +11,10 @@ makedocs(;
     modules = [Aeroelasticity],
     pages = [
         "Home" => "index.md",
-        "Getting Started" => "guide.md",
+        "Getting Started" => joinpath("examples", "guide.md"),
         "Examples" => [
-            joinpath("examples", "cantilever.md"),
-            joinpath("examples", "overdetermined.md"),
+            joinpath("examples", "section-stability.md"),
+            joinpath("examples", "section-stability.md"),
         ],
         "Model Documentation" => [
             "Aerodynamic Models" => [
@@ -36,8 +36,8 @@ makedocs(;
         ],
         "Developer Guide" => "developer.md",
         "API Reference" => [
-            "Public" => joinpath("library", "public.md"),
-            "Internals" => joinpath("library", "internals.md"),
+            "Public" => joinpath("reference", "public.md"),
+            "Internals" => joinpath("reference", "internals.md"),
         ],
     ],
     sitename = "Aeroelasticity.jl",
