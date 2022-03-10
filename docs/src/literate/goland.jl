@@ -82,7 +82,7 @@ mass = fill([
 assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
 
 prescribed = Dict(
-    # fixed left edge
+    ## fixed left edge
     1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
         theta_z=0),
 )
