@@ -83,22 +83,17 @@ as specified in `assembly` and displacement constraints as specified in
 function GXBeamAssembly(assembly, prescribed_conditions;
     force_scaling = GXBeam.default_force_scaling(assembly))
 
-    # system dimensions
     npoint = length(assembly.points)
     nelem = length(assembly.elements)
 
-    # connectivity
     start = assembly.start
     stop = assembly.stop
 
-    # dynamic simulation
     static = false
 
-    # initialize system pointers
     N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
         GXBeam.system_indices(start, stop, static)
 
-    # set displacement constraint indices and degree of freedom
     displacement = zeros(Bool, 6, npoint)
     for key in keys(prescribed_conditions)
         displacement[:,key] .= prescribed_conditions[key].isforce .== false

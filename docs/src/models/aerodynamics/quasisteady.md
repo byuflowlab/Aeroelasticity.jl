@@ -1,6 +1,6 @@
 # [Quasi-Steady Thin Airfoil Theory Model](@id quasi-steady-thin-airfoil-theory)
 
-![](../airfoil.svg)
+![](../../assets/airfoil-drawing.svg)
 
 ## Type Definition
 
@@ -52,3 +52,4 @@ After the Prandtl-Glauert compressibility correction has been applied, an extra 
 
 ## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)
+ - [Time Domain Simulation of a Typical Section](@ref)
