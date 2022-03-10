@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>LiftingLine + GEBT + RigidBody · Aeroelasticity.jl</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">Aeroelasticity.jl</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Home</a></li><li><a class="tocitem" href="../../../examples/guide/">Getting Started</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../../examples/section-stability/">-</a></li><li><a class="tocitem" href="../../../examples/section-stability/">-</a></li></ul></li><li><span class="tocitem">Model Documentation</span><ul><li><input class="collapse-toggle" id="menuitem-4-1" type="checkbox"/><label class="tocitem" for="menuitem-4-1"><span class="docs-label">Aerodynamic Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../aerodynamics/steady/">Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../../aerodynamics/quasisteady/">Quasi-Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../../aerodynamics/wagner/">Wagner&#39;s Function</a></li><li><a class="tocitem" href="../../aerodynamics/peters/">Peters&#39; Finite State</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-2" type="checkbox"/><label class="tocitem" for="menuitem-4-2"><span class="docs-label">Structural Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../structures/section/">Typical Section</a></li><li><a class="tocitem" href="../../structures/gxbeam/">Geometrically Exact Beam Theory</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-3" type="checkbox"/><label class="tocitem" for="menuitem-4-3"><span class="docs-label">Coupled Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../steady-section/">Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../quasisteady-section/">Quasi-Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../wagner-section/">Wagner&#39;s Function + Typical Section</a></li><li><a class="tocitem" href="../peters-section/">Peters&#39; Finite State + Typical Section</a></li></ul></li></ul></li><li><a class="tocitem" href="../../../developer/">Developer Guide</a></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../../reference/public/">Public</a></li><li><a class="tocitem" href="../../../reference/internals/">Internals</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href><code>LiftingLine</code> + <code>GEBT</code> + <code>RigidBody</code></a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href><code>LiftingLine</code> + <code>GEBT</code> + <code>RigidBody</code></a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/byuflowlab/Aeroelasticity.jl/blob/master/docs/src/models/couplings/liftingline-gxbeam-rigidbody.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="[LiftingLine](@ref)-[GEBT](@ref)-[RigidBody](@ref)"><a class="docs-heading-anchor" href="#[LiftingLine](@ref)-[GEBT](@ref)-[RigidBody](@ref)"><a href="../../aerodynamics/liftingline/#Aeroelasticity.LiftingLine"><code>LiftingLine</code></a> + <a href="models/couplings/@ref"><code>GEBT</code></a> + <a href="models/couplings/@ref"><code>RigidBody</code></a></a><a id="[LiftingLine](@ref)-[GEBT](@ref)-[RigidBody](@ref)-1"></a><a class="docs-heading-anchor-permalink" href="#[LiftingLine](@ref)-[GEBT](@ref)-[RigidBody](@ref)" title="Permalink"></a></h1><h2 id="Theory"><a class="docs-heading-anchor" href="#Theory">Theory</a><a id="Theory-1"></a><a class="docs-heading-anchor-permalink" href="#Theory" title="Permalink"></a></h2><p>This model is defined by coupling the lifting line aerodynamics model with the geometrically exact beam theory model and the rigid body dynamics model.</p><h2 id="Constructors"><a class="docs-heading-anchor" href="#Constructors">Constructors</a><a id="Constructors-1"></a><a class="docs-heading-anchor-permalink" href="#Constructors" title="Permalink"></a></h2><div class="admonition is-warning"><header class="admonition-header">Missing docstring.</header><div class="admonition-body"><p>Missing docstring for <code>couple_models(aero::LiftingLine, stru::GEBT, dyn::RigidBody)</code>. Check Documenter&#39;s build log for details.</p></div></div><h2 id="Example-Initialization"><a class="docs-heading-anchor" href="#Example-Initialization">Example Initialization</a><a id="Example-Initialization-1"></a><a class="docs-heading-anchor-permalink" href="#Example-Initialization" title="Permalink"></a></h2><pre><code class="language- hljs">using Aeroelasticity, GXBeam, LinearAlgebra
+
+# discretization
+N = 8 # number of elements
+
+# geometric properties
+span = 6.096 # m (wing half span)
+chord = 1.8288 # m (chord)
+
+# structural section properties
+xea = 0.33*chord # m (elastic axis, from leading edge)
+EIcc = 9.77e6 # N*m^2 (flat bending rigidity)
+GJ = 0.99e6 # N*m^2 (torsional rigidity)
+μ = 35.71 # kg/m (mass per unit length)
+xcm = 0.43*chord # m (center of mass, from leading edge)
+i11 = 8.64 # kg*m (moment of inertia about elastic axis)
+i22 = 0.1*i11 # moment of inertia about beam y-axis
+i33 = 0.9*i11 # moment of inertia about beam z-axis
+
+# define geometry
+xpt = range(0, 0, length=N+1) # point x-coordinates (in body frame)
+ypt = range(0, span, length=N+1) # point y-coordinates (in body frame)
+zpt = range(0, 0, length=N+1) # point z-coordinates (in body frame)
+points = [[xpt[i],ypt[i],zpt[i]] for i = 1:N+1]
+start = 1:N # starting point of each beam element
+stop = 2:N+1 # ending point of each beam element
+frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 0]), N) # compliance matrix
+xm2 = xea - xcm
+mass = fill([
+    μ 0 0 0 0 -μ*xm2;
+    0 μ 0 0 0 0;
+    0 0 μ μ*xm2 0 0;
+    0 0 μ*xm2 i11 0 0;
+    0 0 0 0 i22 0;
+    -μ*xm2 0 0 0 0 i33], N) # mass matrix
+assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
+
+# boundary condition initialization
+prescribed = Dict(
+    # fixed left edge
+    1 =&gt; GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
+        theta_z=0),
+)
+
+aero = LiftingLine{N}(Wagner())
+
+stru = GEBT(assembly, prescribed)
+
+dyn = RigidBody()
+
+model = couple_models(aero, stru, dyn)
+
+nothing #hide</code></pre></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.14 on <span class="colophon-date" title="Thursday 10 March 2022 22:28">Thursday 10 March 2022</span>. Using Julia version 1.6.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

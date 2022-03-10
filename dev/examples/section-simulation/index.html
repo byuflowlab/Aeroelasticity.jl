@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>- · Aeroelasticity.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Aeroelasticity.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../guide/">Getting Started</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../section-stability/">-</a></li><li><a class="tocitem" href="../section-stability/">-</a></li></ul></li><li><span class="tocitem">Model Documentation</span><ul><li><input class="collapse-toggle" id="menuitem-4-1" type="checkbox"/><label class="tocitem" for="menuitem-4-1"><span class="docs-label">Aerodynamic Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../models/aerodynamics/steady/">Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../../models/aerodynamics/quasisteady/">Quasi-Steady Thin Airfoil Theory</a></li><li><a class="tocitem" href="../../models/aerodynamics/wagner/">Wagner&#39;s Function</a></li><li><a class="tocitem" href="../../models/aerodynamics/peters/">Peters&#39; Finite State</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-2" type="checkbox"/><label class="tocitem" for="menuitem-4-2"><span class="docs-label">Structural Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../models/structures/section/">Typical Section</a></li><li><a class="tocitem" href="../../models/structures/gxbeam/">Geometrically Exact Beam Theory</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-3" type="checkbox"/><label class="tocitem" for="menuitem-4-3"><span class="docs-label">Coupled Models</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../models/couplings/steady-section/">Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../../models/couplings/quasisteady-section/">Quasi-Steady Thin Airfoil Theory + Typical Section</a></li><li><a class="tocitem" href="../../models/couplings/wagner-section/">Wagner&#39;s Function + Typical Section</a></li><li><a class="tocitem" href="../../models/couplings/peters-section/">Peters&#39; Finite State + Typical Section</a></li></ul></li></ul></li><li><a class="tocitem" href="../../developer/">Developer Guide</a></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/public/">Public</a></li><li><a class="tocitem" href="../../reference/internals/">Internals</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>-</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>-</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/byuflowlab/Aeroelasticity.jl/blob/main/docs/src/literate/section-simulation.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h2 id="section-simulation"><a class="docs-heading-anchor" href="#section-simulation">Time Domain Simulation of a Typical Section</a><a id="section-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#section-simulation" title="Permalink"></a></h2><p>In this example, we simulate the response of two degree of freedom typical section model. We use the same parameters as in the <a href="../section-stability/#section-stability">previous example</a></p><p><img src="../../assets/section-drawing.svg" alt/></p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/byuflowlab/Aeroelasticity.jl/blob/gh-pages/dev/examples/section-simulation.ipynb"><code>section-simulation.ipynb</code></a>.</p></div></div><pre><code class="language-julia hljs">using Aeroelasticity, DifferentialEquations, LinearAlgebra
+
+# define non-dimensional parameters
+V = range(1e-6, 3.1, length=1000) # = U/(b*ωθ) (reduced velocity)
+a = -1/5 # reference point normalized location
+e = -1/10 # center of mass normalized location
+μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
+r2 = 6/25 # = Iθ/(m*b^2) (radius of gyration about P)
+σ = 2/5 # = ωh/ωθ (natural frequency ratio)
+xθ = e - a # distance from center of mass to reference point
+a0 = 2*pi # lift curve slope
+α0 = 0 # zero lift angle
+cd0 = 0 # drag coefficient
+cm0 = 0 # moment coefficient
+
+# choose dimensional parameters
+b = 1 # semichord
+ρ = 1 # air density
+ωθ = 1 # pitch natural frequency
+c = 343 # air speed of sound
+
+# calculate dimensionalized parameters
+U = V*b*ωθ # freestrean velocity
+m = μ*ρ*pi*b^2 # mass
+Sθ = m*xθ*b # mass imbalance
+Iθ = r2*m*b^2 # inertia
+ωh = σ*ωθ # plunge natural frequency
+kh = m*ωh^2 # plunge spring constant
+kθ = Iθ*ωθ^2 # pitch spring constant
+
+# reduced velocity
+V = 1.0 # = U/(b*ωθ)
+
+# dimensionalized velocity
+U = V*b*ωθ
+
+# define coupled model
+model = assemble_model(;
+    aerodynamic_model = Peters{6}(),
+    structural_model = Section())
+
+# define parameter vector
+p = assemble_parameters(model;
+    aerodynamic_parameters = (; a = a, b = b, a0 = a0, alpha0 = α0, cd0 = cd0, cm0 = cm0),
+    structural_parameters = (; kh = kh, ktheta = kθ, m = m, Stheta = Sθ, Itheta = Iθ),
+    additional_parameters = (; U = U, rho = ρ, c = c))
+
+# construct ODE function
+f = ODEFunction(model)
+
+# initial states
+x0 = assemble_states(model;
+    aerodynamic_states = (;lambda=zeros(6)),
+    structural_states = (;h=0.5, theta=0, hdot=0, thetadot=0))
+
+# simulate for 100 seconds
+tspan = (0.0, 100.0)
+
+# construct ODE problem
+prob = ODEProblem(f, x0, tspan, p)
+
+# solve ODE
+sol = solve(prob)</code></pre><p>We can then plot the solution using DifferentialEquations&#39; built-in interface with the <a href="https://github.com/JuliaPlots/Plots.jl">Plots</a> package.</p><pre><code class="language-julia hljs">using Plots
+pyplot()
+
+plot(sol,
+    vars = [7,8,9,10],
+    xlabel = &quot;t&quot;,
+    ylabel = permutedims([
+        &quot;\$h\$&quot;,
+        &quot;\$\\theta\$&quot;,
+        &quot;\$\\dot{h}\$&quot;,
+        &quot;\$\\dot{\\theta}\$&quot;,
+        ]),
+    label = &quot;&quot;,
+    layout = (4, 1),
+    size = (600,1200)
+    )</code></pre><p><img src="../../assets/section-simulation-solution.svg" alt/></p><p>For aeroelastic models based on a typical section, we can also easily visualize the section&#39;s behavior.</p><pre><code class="language-julia hljs"># animation parameters
+a = -1/5
+b = 0.5
+
+# create animation
+anim = @animate for t in range(tspan[1], tspan[2], length=200)
+    h, θ = sol(t, idxs=7:8)
+    xplot, yplot = section_coordinates(h, θ; a, b)
+    plot(xplot, yplot;
+        framestyle = :origin,
+        grid = :false,
+        xlims = (-1.0, 1.0),
+        ylims = (-0.75, 0.75),
+        aspect_ratio = 1.0,
+        label = &quot;t = $(round(t, digits=1))&quot;)
+end
+
+gif(anim, &quot;../assets/section-simulation.gif&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">┌ Info: Saved animation to
+└   fn = &quot;/home/runner/work/Aeroelasticity.jl/Aeroelasticity.jl/docs/build/assets/section-simulation.gif&quot;</code></pre><p><img src="../../assets/section-simulation.gif" alt/></p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.14 on <span class="colophon-date" title="Thursday 10 March 2022 22:28">Thursday 10 March 2022</span>. Using Julia version 1.6.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
