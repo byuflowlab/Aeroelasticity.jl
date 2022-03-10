@@ -17,6 +17,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 ArnoldiMethod = "0.0.4, 0.2"
+FillArrays = "0.13"
 ForwardDiff = "0.10"
 GXBeam = "0.2.3, 0.3"
 LinearMaps = "2, 3"
