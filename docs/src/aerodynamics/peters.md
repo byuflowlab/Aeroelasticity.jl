@@ -1,10 +1,24 @@
 # [Peters' Finite State Model](@id peters-finite-state-model)
 
+![](../airfoil.svg)
+
+## Type Definition
+
+```@docs
+Peters
+```
+
+## Constructors
+
+```@docs
+Peters()
+```
+
 ## Theory
 
-For Peter's finite state model, an additional term is added to the expression for the effective angle of attack from the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory) to account for induced velocity.
+For Peter's finite state model, an additional term is added to the expression for the effective angle of attack from the quasi-steady model to account for induced velocity.
 ```math
-\alpha = \frac{v}{u} + \frac{b}{u}\left( \frac{1}{2} - a \right) \omega + \frac{\lambda_0}{u} - \alpha_0
+\alpha_\text{eff} = \frac{v}{u} + \frac{b}{u}\left( \frac{1}{2} - a \right) \omega + \frac{\lambda_0}{u} - \alpha_0
 ```
 
 The induced velocity ``\lambda_0`` is approximated from a set of N induced-flow states ``\lambda_1, \lambda_2, \dots, \lambda_N`` as
@@ -37,21 +51,27 @@ where
 \end{cases}
 ```
 
-The same force and moment expressions are used as in the [quasi-steady model](@ref quasi-steady-thin-airfoil-theory), but with the new effective angle of attack provided above.
+The same force and moment expressions are used as in the quasi-steady model, but with the new effective angle of attack provided above.
 
 Note that while Peter's finite state model can accommodate any number of aerodynamic state variables, generally 3-10 state variables are used.
 
-## Type Definition
+### Compressibility Correction
 
-```@docs
-Peters
+A compressibility correction may be applied to the results of this model in order to extend their applicability.  Applying a Prandtl-Glauert compressibility correction, the normal force, axial force, and pitching moment become
+```math
+\mathcal{N}_\text{compressible} = \frac{\mathcal{N}}{\sqrt{1 - M^2}} \\
+\mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\sqrt{1 - M^2}} \\
+\mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\sqrt{1 - M^2}}
+```
+where ``M`` is the Mach number, defined as ``\frac{u}{c}`` where ``c`` is the air speed of sound. 
+
+### Viscous Forces
+
+After the Prandtl-Glauert compressibility correction has been applied, an extra force in the axial direction ``\mathcal{F}_v`` may be added to account for viscous forces.  The magnitude of this force is scaled using the ``c_{d_0}`` coefficient.
+
+```math
+\mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
-## Constructors
-
-```@docs
-Peters()
-```
-
-## Example Usage
+## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)

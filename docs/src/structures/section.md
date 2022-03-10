@@ -2,6 +2,18 @@
 
 ![](../typical-section.svg)
 
+## Type Definition
+
+```@docs
+Section
+```
+
+## Constructors
+
+```@docs
+Section()
+```
+
 ## Theory
 
 The equations of motion for this model are:
@@ -14,17 +26,5 @@ The equations of motion for this model are:
 ```
 where ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional spring constant, ``m`` is the mass per unit span, ``S_\theta`` is the structural imbalance, ``I_\theta`` is the mass moment of inertia, ``\mathcal{L}`` is the lift per unit span, and ``\mathcal{M}`` is the moment per unit span.
 
-## Type Definition
-
-```@docs
-TypicalSection
-```
-
-## Constructors
-
-```@docs
-TypicalSection()
-```
-
-## Example Usage
+## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)
