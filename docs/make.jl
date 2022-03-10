@@ -15,6 +15,7 @@ makedocs(;
             ],
             "Structural Models" => [
                 "Typical Section" => joinpath("structures", "section.md"),
+                "Geometrically Exact Beam Theory" => joinpath("structures", "gxbeam.md"),
             ],
             "Coupled Models" => [
                 "Steady Thin Airfoil Theory + Typical Section" => joinpath("couplings", "steady-section.md"),
