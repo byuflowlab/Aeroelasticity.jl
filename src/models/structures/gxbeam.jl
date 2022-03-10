@@ -7,11 +7,11 @@ external forces ``F_{x,i}, F_{y,i}, F_{z,i}, M_{x,i}, M_{y,i}, M_{z,i}`` or
 displacements ``u_{x,i}, u_{y,i}, u_{z,i}, \\theta_{x,i}, \\theta_{y,i},
 \\theta_{z,i}`` applied to each node, followed by the distributed loads
 ``f_{x,i}, f_{y,i}, f_{z,i}, m_{x,i}, m_{y,i}, m_{z,i}`` applied to each beam
-element, followed by the point mass properties ``m, p, I11, I22, I33, I12, I13, I23`` 
-corresponding to each beam element, followed by the gravity vector, linear velocity, 
-angular velocity, linear acceleration, and angular acceleration of the system. Parameters 
-correspond to the location ``p_{x}, p_{y}, p_{z}`` of each node followed by each beam 
-element's properties. Each beam element's properties are defined by a triad which defines 
+element, followed by the point mass properties ``m, p, I_{11}, I_{22}, I_{33}, I_{12}, 
+I_{13}, I_{23}`` corresponding to each beam element, followed by the gravity vector, linear 
+velocity, angular velocity, linear acceleration, and angular acceleration of the system. 
+Parameters correspond to the location ``p_{x}, p_{y}, p_{z}`` of each node followed by each 
+beam element's properties. Each beam element's properties are defined by a triad which defines 
 the orientation of the beam element ``e_{1,x}, e_{1,y}, e_{1,z}, e_{2,x}, e_{2,y}, e_{2,z}, 
 e_{3,x}, e_{3,y}, e_{3,z}``, followed by the 21 independent entries of the compliance matrix 
 ``C_{11}, C_{12}, C_{13}, C_{14}, C_{15}, C_{16}, C_{22}, C_{23}, C_{24}, C_{25}, C_{26}, 
@@ -59,9 +59,10 @@ points with prescribed displacements as specified in `displacement`.
 """
 function GXBeamAssembly(start, stop, displacement; force_scaling=1.0)
 
-    # initialize system pointers
+    static = false
+
     N, irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem =
-        GXBeam.system_indices(start, stop, false)
+        GXBeam.system_indices(start, stop, static)
 
     return GXBeamAssembly(start, stop, displacement, force_scaling,
         irow_point, irow_elem, irow_elem1, irow_elem2, icol_point, icol_elem)
