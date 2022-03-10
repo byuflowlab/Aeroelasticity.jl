@@ -27,6 +27,7 @@ makedocs(;
             "Public" => joinpath("library", "public.md"),
             "Internals" => joinpath("library", "internals.md"),
         ],
+        "Developer Guide" => "developer.md"
     ],
     sitename = "Aeroelasticity.jl",
     authors = "Taylor McDonnell <taylormcd@byu.edu>",

@@ -1,45 +1,108 @@
 # --- Jacobian Types --- #
 
-abstract type JacobianType end
+abstract type AbstractJacobian end
 
-struct Empty <: JacobianType end
-struct Zeros <: JacobianType end
-struct Identity <: JacobianType end
-struct Invariant{T} <: JacobianType; value::T; end
-struct Constant{T} <: JacobianType; func::T; end
-struct Linear{T} <: JacobianType; func::T; end
-struct Nonlinear{T} <: JacobianType; func::T; end
+"""
+    Empty <: AbstractJacobian
 
-# default constructors set jacobian (function) later
+A gradient/jacobian wrapper which indicates that a given gradient/jacobian is empty.
+"""
+struct Empty <: AbstractJacobian end
+
+"""
+    Zeros <: AbstractJacobian
+
+A gradient/jacobian wrapper which indicates that a given gradient/jacobian is zero.
+"""
+struct Zeros <: AbstractJacobian end
+
+"""
+    Identity <: AbstractJacobian
+
+A gradient/jacobian wrapper which indicates that a given gradient/jacobian is the identity 
+matrix.
+"""
+struct Identity <: AbstractJacobian end
+
+"""
+    Invariant <: AbstractJacobian
+
+A gradient/jacobian wrapper which indicates that the value of given gradient/jacobian is 
+independent of the state rates, states, inputs, parameters, and time.
+
+The value of the invariant jacobian/gradient may be provided upon construction, otherwise
+it will be calculated using automatic differentiation.
+"""
+struct Invariant{T} <: AbstractJacobian; value::T; end
+
 Invariant() = Invariant(nothing)
+
+"""
+    Constant <: AbstractJacobian
+
+A gradient/jacobian wrapper which indicates that the value of given gradient/jacobian is 
+independent of the state rates, states, inputs, and time.
+
+The jacobian/gradient will be calculated using automatic differentiation.  Alternatively,
+a function may be provided which defines the value of the gradient/jacobian as a function 
+of the parameters.
+"""
+struct Constant{T} <: AbstractJacobian; func::T; end
+
 Constant() = Constant(nothing)
+
+"""
+    Linear <: AbstractJacobian
+
+A gradient/jacobian wrapper which indicates that the value of given gradient/jacobian is 
+linear with respect to the differentiated variable.
+
+The jacobian/gradient will be calculated using automatic differentiation.  Alternatively,
+a function may be provided which defines the value of the gradient/jacobian as a function 
+of the state rates, states, inputs, parameters, and time. 
+"""
+struct Linear{T} <: AbstractJacobian; func::T; end
+
 Linear() = Linear(nothing)
+
+"""
+    Nonlinear <: AbstractJacobian
+
+A gradient/jacobian wrapper which indicates that the value of given gradient/jacobian is 
+nonlinear with respect to the differentiated variable.
+
+The jacobian/gradient will be calculated using automatic differentiation.  Alternatively,
+a function may be provided which defines the value of the gradient/jacobian as a function 
+of the state rates, states, inputs, parameters, and time. 
+"""
+struct Nonlinear{T} <: AbstractJacobian; func::T; end
+
 Nonlinear() = Nonlinear(nothing)
 
 # trait dispatch
-isempty(::JacobianType) = false
+isempty(::AbstractJacobian) = false
 isempty(::Empty) = true
 
-iszero(::JacobianType) = false
+iszero(::AbstractJacobian) = false
 iszero(::Zeros) = true
 
-isidentity(::JacobianType) = false
+isidentity(::AbstractJacobian) = false
 isidentity(::Identity) = true
 
-isinvariant(::JacobianType) = false
+isinvariant(::AbstractJacobian) = false
 isinvariant(::Empty) = true
 isinvariant(::Zeros) = true
 isinvariant(::Identity) = true
 isinvariant(::Invariant) = true
 
-isconstant(::JacobianType) = false
+isconstant(::AbstractJacobian) = false
 isconstant(::Empty) = true
 isconstant(::Zeros) = true
 isconstant(::Identity) = true
 isconstant(::Invariant) = true
 isconstant(::Constant) = true
 
-islinear(::JacobianType) = false
+islinear(::AbstractJacobian) = false
 islinear(::Empty) = true
 islinear(::Zeros) = true
 islinear(::Identity) = true
