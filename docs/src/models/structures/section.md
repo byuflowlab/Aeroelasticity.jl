@@ -1,6 +1,6 @@
 # [Typical Section Model](@id typical-section-model)
 
-![](../typical-section.svg)
+![](../../assets/section-drawing.svg)
 
 ## Type Definition
 
@@ -28,3 +28,4 @@ where ``k_h`` is the linear spring constant, ``k_\theta`` is the torsional sprin
 
 ## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)
+ - [Time Domain Simulation of a Typical Section](@ref)

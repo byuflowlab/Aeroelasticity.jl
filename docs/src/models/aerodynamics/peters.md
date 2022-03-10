@@ -1,6 +1,6 @@
 # [Peters' Finite State Model](@id peters-finite-state-model)
 
-![](../airfoil.svg)
+![](../../assets/airfoil-drawing.svg)
 
 ## Type Definition
 
@@ -75,3 +75,4 @@ After the Prandtl-Glauert compressibility correction has been applied, an extra 
 
 ## Examples
  - [Aeroelastic Analysis of a Typical Section](@ref)
+ - [Time Domain Simulation of a Typical Section](@ref)
