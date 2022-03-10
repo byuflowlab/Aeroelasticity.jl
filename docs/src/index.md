@@ -22,6 +22,7 @@ Author: Taylor McDonnell
      - Lifting Line (3D)
    - Structural Models
      - Two Degree of Freedom Typical Section Model (2D)
+     - Geometrically Exact Beam Theory Model (3D)
  - Supports multiple analysis types including:
    - Steady State Analyses
    - Eigenvalue Analyses
