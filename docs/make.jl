@@ -14,7 +14,7 @@ makedocs(;
         "Getting Started" => joinpath("examples", "guide.md"),
         "Examples" => [
             joinpath("examples", "section-stability.md"),
-            joinpath("examples", "section-stability.md"),
+            joinpath("examples", "section-simulation.md"),
         ],
         "Model Documentation" => [
             "Aerodynamic Models" => [
