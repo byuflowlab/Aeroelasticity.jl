@@ -596,7 +596,7 @@ function _get_rate_jacobian!(J, ::InPlace, model::CoupledModel, p;
 end
 
 # calculate rate jacobian for a combination of models
-function _get_rate_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model::CoupledModel, 
+function _get_rate_jacobian!(J, ::InPlace, model::CoupledModel, 
     dx, x, y, p, t;
     drdy_cache = similar(J, number_of_states(model), number_of_inputs(model)),
     dyddx_cache = similar(J, number_of_inputs(model), number_of_states(model))
