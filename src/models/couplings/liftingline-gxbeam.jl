@@ -21,41 +21,43 @@ the freestream air density ``\\rho_\\infty`` and air speed of sound ``c``.
 **NOTE: This model assumes that each beam element is oriented with the x-axis along the 
 beam's axis, the y-axis forward (into the freestream), and the z-axis normal**
 """
-function Coupling(aero::LiftingLine, stru::GXBeamAssembly; 
-    lifting_elements = 1:length(aero.submodels))
+function Coupling(models::Tuple{LiftingLine, GXBeamAssembly}, submodels; 
+    lifting_elements = 1:length(models[1].section_models))
 
-    # section models
-    section_models = aero.section_models
+    liftingline, gxbeam = models
 
-    # number of points and elements
-    npoint = length(gxbeam.constants.icol_point)
-    nelem = length(gxbeam.constants.icol_elem)
+    npoint = length(gxbeam.icol_point)
+    nelem = length(gxbeam.icol_elem)
+    displacement = gxbeam.displacement
 
-    # displacement constraints
-    displacement = gxbeam.constants.displacement
-
-    # number of additional parameters
+    # construct a coupled model for each section
+    section_models = broadcast(liftingline.section_models) do aerodynamic_model
+        assemble_model(; 
+            aerodynamic_model = aerodynamic_model,
+            structural_model = LiftingLineSection())
+    end
+    
+    # construct the coupling function
+    g = (y, dx, x, p, t) -> liftingline_gxbeam_inputs!(y, dx, x, p, t; models, submodels,
+        section_models, lifting_elements)
+    
+    # define the number of additional parameters
     npc = 6*npoint + 6*nelem + 10*nelem + 17
 
-    # dimensions
-    nx = number_of_states(liftingline) + number_of_states(gxbeam)
-    ny = number_of_inputs(liftingline) + number_of_inputs(gxbeam)
-    np = number_of_parameters(liftingline) + number_of_parameters(gxbeam) + npc
+    # define the number of states, inputs, and parameters
+    nx = sum(number_of_states.(submodels))
+    ny = sum(number_of_inputs.(submodels))
+    np = sum(number_of_parameters.(submodels)) + npc
 
-    # coupling function
-    g = (y, dx, x, p, t) -> liftingline_gxbeam_inputs!(y, dx, x, p, t; 
-        aero, stru, lifting_elements, section_models)
-
-    # jacobians
+    # define the jacobians
     ratejac = Nonlinear() # TODO: define rate jacobian
     statejac = Nonlinear() # TODO: define state jacobian
     paramjac = Nonlinear() # TODO: define parameter jacobian
     tgrad = Nonlinear() # TODO: define time gradient
     
-    # input/output functions
-    setparam = (p; kwargs...) -> liftingline_gxbeam_setparam!(p, displacement, 
-        npoint, nelem; kwargs...)
-    sepparam = (p) -> liftingline_gxbeam_sepparam(p, displacement, npoint, nelem)
+    # define the input/output functions
+    setparam = (p; kwargs...) -> liftingline_gxbeam_setparam!(p, npoint, nelem, displacement; kwargs...)
+    sepparam = (p) -> liftingline_gxbeam_sepparam(p, npoint, nelem, displacement)
 
     return Coupling{true}(g, nx, ny, np, npc;
         ratejac = ratejac,
@@ -66,25 +68,30 @@ function Coupling(aero::LiftingLine, stru::GXBeamAssembly;
         sepparam = sepparam)
 end
 
-function liftingline_gxbeam_inputs!(y, dx, x, p, t; 
-    liftingline_submodel, gxbeam_submodel, lifting_elements, section_models)
+# coupling function
+function liftingline_gxbeam_inputs!(y, dx, x, p, t; models, submodels, section_models,
+    lifting_elements)
+
+    liftingline, gxbeam = models
+    aero, stru = submodels
 
     # get indices of states, inputs, and parameters for each submodel
-    submodels = (liftingline, gxbeam)
     ixa, ixs = state_indices(submodels)
     iya, iys = input_indices(submodels)
     ipa, ips = parameter_indices(submodels)
+    ipc = sum(number_of_parameters.(submodels)) + 1 : length(p)
 
     # get views of states, inputs, and parameters for each submodel
     dxa, dxs = view(dx, ixa), view(dx, ixs)
     xa, xs = view(x, ixa), view(x, ixs)
     ya, ys = view(y, iya), view(y, iys)
-    pa, ps = view(p, ipa), view(p, ips) 
+    pa, ps, pc = view(p, ipa), view(p, ips), view(p, ipc) 
 
     # get indices of states, inputs, and parameters for each lifting line section model
-    ixas = state_indices(section_models)
-    iyas = input_indices(section_models)
-    ipas = parameter_indices(section_models)
+    section_aerodynamic_submodels = getindex.(getproperty.(section_models, :submodels), 1)
+    ixas = state_indices(section_aerodynamic_submodels)
+    iyas = input_indices(section_aerodynamic_submodels)
+    ipas = parameter_indices(section_aerodynamic_submodels)
 
     # get views of states, inputs, and parameters for each lifting line section model
     dxas = view.(Ref(dxa), ixas)
@@ -93,64 +100,66 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t;
     pas = view.(Ref(pa), ipas) 
 
     # separate gxbeam model rates, states, and parameters
-    gxbeam_rates = separate_rates(gxbeam, dxs)
-    gxbeam_states = separate_states(gxbeam, xs)
-    gxbeam_parameters = separate_parameters(gxbeam, ps)
+    gxbeam_rates = separate_rates(stru, dxs)
+    gxbeam_states = separate_states(stru, xs)
+    gxbeam_parameters = separate_parameters(stru, ps)
 
     # separate additional parameters
-    np = length(p)
-    npc = np - sum(number_of_parameters.(submodels))
-    ipc = np - npc : np
-    pc = view(p, ipc)
-    additional_parameters = liftingline_gxbeam_sepparam(pc, gxbeam.constants.displacement, 
-        length(gxbeam.constants.icol_point), length(gxbeam.constants.icol_elem))
+    nelem = length(gxbeam_parameters.assembly.elements)
+    npoint = length(gxbeam_parameters.assembly.points)
+    additional_parameters = liftingline_gxbeam_sepparam(pc, npoint, nelem, gxbeam.displacement)
 
+    # unpack element rate variables
+    @unpack u_e, theta_e, F_e, M_e, V_e, Omega_e = gxbeam_rates 
+    du_e, dtheta_e, dF_e, dM_e, dV_e, dOmega_e = u_e, theta_e, F_e, M_e, V_e, Omega_e
+
+    # unpack element state variables
+    @unpack u_e, theta_e, F_e, M_e, V_e, Omega_e = gxbeam_states 
+
+    # unpack addition parameters
+    @unpack a, alpha, rho, c, f_d, m_d = additional_parameters
+    
     # initialize distributed loads
-    f_d = SVector{3,eltype(y)}.(additional_parameters.f_d)
-    m_d = SVector{3,eltype(y)}.(additional_parameters.m_d)
+    f_d = SVector{3,eltype(y)}.(f_d)
+    m_d = SVector{3,eltype(y)}.(m_d)
 
-    # calculate aerodynamic inputs and loads
-    for (i, ielem) in enumerate(lifting_elements)
+    # calculate aerodynamic inputs and loads for each lifting element
+    for (i, ie) in enumerate(lifting_elements)
 
-        # unpack element properties
-        elem = gxbeam_parameters.assembly.elements[ielem]
+        # extract element
+        elem = gxbeam_parameters.assembly.elements[ie]
 
-        # transformation from body to element frame
-        C1 = gxbeam_body_to_element(elem, gxbeam_states.theta_e[ielem])
+        # get element velocity and acceleration (in the element frame)
+        vi, ωi = gxbeam_element_velocities(V_e[ie], Omega_e[ie])
+        ai, αi = gxbeam_element_accelerations(elem, u_e[ie], theta_e[ie], dV_e[ie], 
+            dOmega_e[ie], a, alpha)
 
-        # element velocities and accelerations (in the element frame)
-        vi, ωi = gxbeam_element_velocities(gxbeam_states.V_e[ielem], gxbeam_states.Omega_e[ielem])
-        ai, αi = gxbeam_element_accelerations(elem, gxbeam_states.u_e[ielem], 
-            gxbeam_states.theta_e[ielem], gxbeam_rates.V_e[ielem], gxbeam_rates.Omega_e[ielem], 
-            additional_parameters.a, additional_parameters.alpha)
+        # transform velocities and accelerations to the aerodynamic frame
+        local_to_aero = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
+        vi, ωi = -local_to_aero*vi, local_to_aero*ωi
+        ai, αi = -local_to_aero*ai, local_to_aero*αi
 
-        # transformation from element to local aerodynamic frame
-        C2 = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
+        # calculate lifting line section inputs
+        yi = liftingline_section_inputs(section_models[i], dxas[i], xas[i], pas[i], vi, ωi, 
+            ai, αi, rho, c, t)
 
-        # freestream velocities and accelerations (in the local aerodynamic frame)
-        vi, ωi = -C2*vi, C2*ωi
-        ai, αi = -C2*ai, C2*αi
-
-        # calculate lifting line inputs
-        yi = liftingline_section_inputs(section_models[i], dxas[i], xas[i], pas[i], 
-            vi, ωi, ai, αi, additional_parameters.rho, additional_parameters.c, t)
-
-        # separate section aerodynamic and structural inputs
+        # separate lifting line section inputs
         aerodynamic_inputs, structural_inputs = separate_inputs(section_models[i], yi)
 
-        # save section aerodynamic inputs
-        set_inputs!(yas[i], liftingline_section_models[i]; aerodynamic_inputs...)
+        # save aerodynamic inputs
+        set_inputs!(yas[i], section_models[i].submodels[1]; aerodynamic_inputs...)
 
-        # transformation from local aerodynamic frame to body frame
-        C3 = C1'*C2' 
+        # transform loads to the body frame
+        body_to_local = gxbeam_body_to_element(elem, theta_e[ie])
+        aero_to_body = (body_to_local*local_to_aero)'
 
-        # add aerodynamic loads to prescribed distributed loads
-        f_d[ielem] += C3*structural_inputs.f
-        m_d[ielem] += C3*structural_inputs.m
+        # add distributed loads from aerodynamics to prescribed distributed loads
+        f_d[ie] += aero_to_body*structural_inputs.f
+        m_d[ie] += aero_to_body*structural_inputs.m
     end
 
-    # save gxbeam inputs
-    set_inputs!(ys, gxbeam; 
+    # save structural inputs
+    set_inputs!(ys, stru; 
         u_p = additional_parameters.u_p, 
         theta_p = additional_parameters.theta_p, 
         F_p = additional_parameters.F_p, 
@@ -170,7 +179,7 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t;
 end
 
 # convenience function for defining this model's input vector
-function liftingline_gxbeam_setparam!(p, displacement, np, ne; 
+function liftingline_gxbeam_setparam!(p, np, ne, displacement; 
     u_p = nothing, theta_p = nothing, F_p = nothing, M_p = nothing, 
     f_d = nothing, m_d = nothing, 
     m_m = nothing, p_m = nothing, I_m = nothing,
@@ -276,8 +285,8 @@ function liftingline_gxbeam_setparam!(p, displacement, np, ne;
     return p
 end
 
-# convenience function for separating this model's input vector
-function liftingline_gxbeam_sepparam(p, displacement, np, ne)
+# convenience function for separating this model's parameter vector
+function liftingline_gxbeam_sepparam(p, np, ne, displacement)
 
     TF = eltype(p)
 

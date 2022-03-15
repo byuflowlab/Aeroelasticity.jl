@@ -32,7 +32,7 @@ function assemble_model(;
     submodels = Submodel.(models)
 
     # use default coupling if a coupling model is not provided
-    coupling = isnothing(coupling_model) ? Coupling(models...) : coupling_model
+    coupling = isnothing(coupling_model) ? Coupling(models, submodels) : coupling_model
 
     # construct coupled model
     return CoupledModel(submodels, coupling)
@@ -282,7 +282,7 @@ function ode_coupling_function(model::CoupledModel)
         tcache = fill(NaN)
 
         # state rate vector
-        dx = FillArrays.Zeros(x)
+        dx = FillArrays.Zeros(Nx)
 
         # coupling function
         fy = (x, p, t) -> begin
@@ -401,11 +401,11 @@ function ode_time_gradient(model::CoupledModel, fy, p=nothing)
         Ny = number_of_inputs(model)
 
         # cached variables
-        drdy_cache = fill(NaN, Nx, Ny),
+        drdy_cache = fill(NaN, Nx, Ny)
         dyddx_cache = fill(NaN, Ny, Nx)
 
         # state rate vector
-        dx = FillArrays.Zeros(x)
+        dx = FillArrays.Zeros(Nx)
 
         # update function
         tgrad = (dT, x, p, t) -> begin

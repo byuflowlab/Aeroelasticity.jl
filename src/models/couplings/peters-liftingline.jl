@@ -1,45 +1,21 @@
 
 """
-    peters_liftingline_model(N)
+    Coupling(models::Tuple{Peters, LiftingLineSection})
 
 Construct a model by coupling an unsteady aerodynamic model based on Peters' finite state 
-theory (see [`peters_model`](@ref)) and a lifting line section model (see 
-[`liftingline_section_model`](@ref)).
+theory (see [`Peters`](@ref)) and a lifting line section model (see 
+[`LiftingLineSection`](@ref)).
 """
-function peters_liftingline_model(N)
+function Coupling(models::Tuple{Peters{N}, LiftingLineSection}, submodels=Submodel.(models)) where N
 
-    # aerodynamic model
-    aero = peters_model(N)
-
-    # structural model
-    stru = liftingline_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = peters_liftingline_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function peters_liftingline_coupling(aero, stru)
+    peters = models[1]
 
     # state variable indices
-    iλ, iq = state_indices((aero, stru))
-
-    # model constants
-    bbar = aero.constants.bbar
-
-    # number of aerodynamic state variables
-    N = length(bbar)
+    iλ = 1:N
+    iq = N+1:N+6
 
     # coupling function
-    g = (dx, x, p, t) -> peters_liftingline_inputs(dx, x, p, t; iλ, iq, bbar)
+    g = (dx, x, p, t) -> peters_liftingline_inputs(dx, x, p, t; iλ, iq, bbar = peters.b)
 
     # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
     nx = Val(N+6)

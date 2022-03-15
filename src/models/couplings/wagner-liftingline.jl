@@ -1,37 +1,17 @@
 
 """
-    wagner_liftingline_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+    Coupling(models::Tuple{Wagner, LiftingLineSection})
 
-Construct a model by coupling an unsteady aerodynamic model based on Wagner's function 
-(see [`wagner_model`](@ref)) and a lifting line section model (see 
-[`liftingline_section_model`](@ref)).
+Coupling model for coupling an unsteady aerodynamic model based on Wagner's function 
+(see [`Wagner`](@ref)) and a lifting line section model (see [`LiftingLineSection`](@ref)).
 """
-function wagner_liftingline_model(; C1=0.165, C2=0.335, eps1 = 0.0455, eps2 = 0.3)
+function Coupling(models::Tuple{Wagner, LiftingLineSection}, submodels=Submodel.(models))
 
-    # aerodynamic model
-    aero = wagner_model(; C1, C2, eps1, eps2)
-
-    # structural model
-    stru = liftingline_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = wagner_liftingline_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function wagner_liftingline_coupling(aero, stru)
+    wagner = models[1]
 
     # model constants
-    C1 = aero.constants.C1
-    C2 = aero.constants.C2
+    C1 = wagner.C1
+    C2 = wagner.C2
 
     # coupling function
     g = (dx, x, p, t) -> wagner_liftingline_inputs(dx, x, p, t; C1, C2)

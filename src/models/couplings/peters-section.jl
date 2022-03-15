@@ -1,21 +1,23 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(::Peters, ::Section)
+    Coupling(models::Tuple{Peters, ::Section})
 
 Coupling model for coupling an unsteady aerodynamic model based on Peters' finite state 
 theory (see [`Peters`](@ref)) and a two-degree of freedom typical section model (see 
 [`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, 
 air density ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 """
-function Coupling(aero::Peters{N}, ::Section) where N
+function Coupling(models::Tuple{Peters{N}, Section}, submodels=Submodel.(models)) where N
+
+    peters = models[1]
 
     # state variable indices
     iλ = 1:N
     iq = N+1:N+4
 
     # coupling function
-    g = (dx, x, p, t) -> peters_section_inputs(dx, x, p, t; iλ, iq, bbar = aero.b)
+    g = (dx, x, p, t) -> peters_section_inputs(dx, x, p, t; iλ, iq, bbar = peters.b)
 
     # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
     nx = Val(N+4)

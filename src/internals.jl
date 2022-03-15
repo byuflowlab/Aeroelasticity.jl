@@ -362,17 +362,17 @@ end
 # calculate residual for a coupled model
 function _get_residual!(resid, ::InPlace, model::CoupledModel, dx, x, y, p, t)
 
-    ix = state_indices(models)
-    iy = input_indices(models)
-    ip = parameter_indices(models)
+    ix = state_indices(model)
+    iy = input_indices(model)
+    ip = parameter_indices(model)
 
-    resids = view(Ref(resid), ix[i])
-    dxs = view.(Ref(dx), ix[i])
-    xs = view.(Ref(xs), ix[i])
-    ys = view.(Ref(ys), iy[i])
-    ps = view.(Ref(ps), ip[i])
+    resids = view.(Ref(resid), ix)
+    dxs = view.(Ref(dx), ix)
+    xs = view.(Ref(x), ix)
+    ys = view.(Ref(y), iy)
+    ps = view.(Ref(p), ip)
 
-    get_residual!.(resids, models, dxs, xs, ys, ps, t)
+    get_residual!.(resids, model.submodels, dxs, xs, ys, ps, t)
 
     return resid
 end
@@ -596,7 +596,7 @@ function _get_rate_jacobian!(J, ::InPlace, model::CoupledModel, p;
 end
 
 # calculate rate jacobian for a combination of models
-function _get_rate_jacobian!(J, ::Union{Linear,Nonlinear}, ::InPlace, model::CoupledModel, 
+function _get_rate_jacobian!(J, ::InPlace, model::CoupledModel, 
     dx, x, y, p, t;
     drdy_cache = similar(J, number_of_states(model), number_of_inputs(model)),
     dyddx_cache = similar(J, number_of_inputs(model), number_of_states(model))

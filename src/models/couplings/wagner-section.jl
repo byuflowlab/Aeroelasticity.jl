@@ -1,18 +1,20 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(aero::Wagner, stru::Section)
+    Coupling(models::Tuple{<:Wagner, <:Section})
 
 Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see 
 [`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
 This coupling introduces the freestream velocity ``U_\\infty``, air density 
 ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 """
-function Coupling(aero::Wagner, ::Section)
+function Coupling(models::Tuple{Wagner, Section}, submodels=Submodel.(models))
+
+    wagner = models[1]
 
     # model constants
-    C1 = aero.C1
-    C2 = aero.C2
+    C1 = wagner.C1
+    C2 = wagner.C2
 
     # coupling function
     g = (dx, x, p, t) -> wagner_section_inputs(dx, x, p, t; C1, C2)

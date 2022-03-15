@@ -56,7 +56,8 @@ Vinf = vcat(1, 5:5:200) # m/s (velocity)
 xref = xea/chord # normalized reference location (relative to leading edge)
 a = xref - 0.5 # normalized reference location (relative to semi-chord)
 b = chord / 2 # m (semi-chord)
-ρ = 1.02 # kg/m^3 (air density)
+rho = 1.02 # kg/m^3 (air density)
+c = 343 # air speed of sound
 a0 = 0.85*(2*pi) # lift slope (for each section)
 α0 = 0 # zero lift angle of attack (for each section)
 cd0 = 0
@@ -87,23 +88,22 @@ prescribed = Dict(
         theta_z=0),
 )
 
-## prescribed point conditions
-point_conditions = zeros(6, length(assembly.points))
-
-## additional distributed loads
-element_loads = zeros(6, length(assembly.elements))
+## construct section models
+section_models = fill(Peters{6}(), N)
 
 ## construct aerodynamic model
-aerodynamic_model = LiftingLine{N}(Peters{6}())
+aerodynamic_model = LiftingLine(section_models)
 
 ## construct structural model
-structural_model = GEBT(assembly, prescribed)
+structural_model = GXBeamAssembly(assembly, prescribed)
 
 ## define coupled model
-model = couple_models(aerodynamic_model, structural_model)
+model = assemble_model(;
+    aerodynamic_model = aerodynamic_model,
+    structural_model = structural_model)
 
 ## construct ODE function
-f = get_ode(model)
+f = ODEFunction(model)
 
 ## current time
 t = 0.0
@@ -120,25 +120,24 @@ x0 = zeros(number_of_states(model))
 ## loop through each velocity
 for i = 1:length(Vinf)
 
-    ## set parameters
-    p_aero = get_parameters(aerodynamic_model; section_parameters =
-        fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N))
-
-    p_stru = get_parameters(structural_model; assembly = assembly)
-
-    p_additional = get_additional_parameters(model;
-        rho = ρ,
-        point_conditions = point_conditions,
-        element_loads = element_loads,
-        u = Vinf[i],
-        v = 0,
-        w = 0,
-        p = 0,
-        q = 0,
-        r = 0,
+    ## define parameter vector
+    p = assemble_parameters(model;
+        aerodynamic_parameters = (; 
+            sections = fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N)
+            ),
+        structural_parameters = (; 
+            assembly = assembly
+            ),
+        additional_parameters = (; 
+            v = [Vinf[i], 0, 0],
+            rho = rho,
+            c = c,
+            )
         )
 
-    p = vcat(p_aero, p_stru, p_additional)
+    du = similar(x0) .= NaN
+    t = 0
+    f(du, x0, p, t)
 
     ## find state variables corresponding to steady state operating conditions
     sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())

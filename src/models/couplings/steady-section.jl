@@ -1,14 +1,14 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(::Steady, ::Section)
+    Coupling(models::Tuple{<:Steady, <:Section})
 
 Coupling model for coupling a steady aerodynamic model based on thin airfoil theory 
 (see [`Steady`](@ref)) and a two-degree of freedom typical section model 
 (see [`Section()`]).  This model introduces the freestream velocity ``U_\\infty``, air 
 density ``\\rho_\\infty``, and air speed of sound ``c`` as additional parameters.
 """
-function Coupling(::Steady, ::Section)
+function Coupling(models::Tuple{Steady, Section}, submodels=Submodel.(models))
 
     # coupling function
     g = steady_section_inputs
