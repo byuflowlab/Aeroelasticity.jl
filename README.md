@@ -9,7 +9,7 @@ Author: Taylor McDonnell
 
 **Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems.
 
-![](https://flow.byu.edu/Aeroelasticity.jl/dev/assets/typical-section-simulation.gif)
+![](https://flow.byu.edu/Aeroelasticity.jl/dev/assets/section-simulation.gif)
 
 ## Package Features
  - Facilitates defining and simulating the behavior of both 2D and 3D aeroelastic systems
