@@ -88,6 +88,8 @@ prescribed = Dict(
         theta_z=0),
 )
 
+system = System(assembly, false)
+
 ## construct section models
 section_models = fill(Peters{6}(), N)
 
@@ -101,9 +103,6 @@ structural_model = GXBeamAssembly(assembly, prescribed)
 model = assemble_model(;
     aerodynamic_model = aerodynamic_model,
     structural_model = structural_model)
-
-## construct ODE function
-f = ODEFunction(model)
 
 ## current time
 t = 0.0
@@ -129,15 +128,14 @@ for i = 1:length(Vinf)
             assembly = assembly
             ),
         additional_parameters = (; 
-            v = [Vinf[i], 0, 0],
+            v_f = [-Vinf[i], 0, 0],
             rho = rho,
             c = c,
             )
         )
 
-    du = similar(x0) .= NaN
-    t = 0
-    f(du, x0, p, t)
+    ## construct ODE function
+    f = ODEFunction(model)
 
     ## find state variables corresponding to steady state operating conditions
     sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
@@ -253,8 +251,76 @@ p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 
 #md # ![]("../assets/goland-stability.svg")
 
-# As predicted by this analysis, the flutter speed is 140 m/s and the flutter frequency 
-# is 69.7 rad/s.  These results are nearly identical to results by Palacios and Epureanu 
-# in "An Intrinsic Description of the Nonlinear Aeroelasticity of Very Flexible Wings" 
-# for a similar aeroelastic model.  We can therefore be reasonably confident that the 
-# models used for this example are implemented correctly.
+# As predicted by this analysis, the flutter speed is 135 m/s and the flutter frequency 
+# is 69.0 rad/s.  These results compare well with the results found by Palacios and Epureanu 
+# in "An Intrinsic Description of the Nonlinear Aeroelasticity of Very Flexible Wings".
+# Their analysis, which was also based on lifting line aerodynamics predicted a flutter
+# speed of 141 m/s and a flutter frequency of 69.8 rad/s.
+
+#- 
+
+# We can visualize the flutter mode using GXBeam's built in interface with WriteVTK
+
+## flutter velocity
+Vf = 135
+
+## define parameter vector
+p = assemble_parameters(model;
+    aerodynamic_parameters = (; 
+        sections = fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N)
+        ),
+    structural_parameters = (; 
+        assembly = assembly
+        ),
+    additional_parameters = (; 
+        v_f = [-Vf, 0, 0],
+        rho = rho,
+        c = c,
+        )
+    )
+
+## construct ODE function
+f = ODEFunction(model)
+
+## find state variables corresponding to steady state operating conditions
+sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
+
+## use state variables from steady state operating conditions
+x = sol.u
+
+## linearize about steady state operating conditions
+K, M = linearize(model, x, p)
+
+## perform linear stability analysis
+λf, Uλf, Vλf = get_eigen(model, K, M; nev)
+
+## find index corresponding to the flutter mode
+iλ = argmin(abs.(real.(λf)))
+
+## find indices corresponding to the GXBeam state variables
+_, igx = state_indices(model)
+
+## flutter eigenvalue
+eigenvalue = 0 + imag(λf[iλ])*1im
+
+## post-process GXBeam state variables
+state = AssemblyState(system, assembly, xf[igx]; prescribed_conditions=prescribed)
+
+## post-process GXBeam eigenvector variables
+eigenstate = AssemblyState(system, assembly, Vλf[igx,iλ]; prescribed_conditions=prescribed)
+
+## create a 4% thick parabolic airfoil
+f = (x) -> 0.16*x*(1 - x)
+x = 0:0.2:1.0
+zu = f.(x)
+zl = -zu
+x = vcat(x, x[end-1:-1:1])
+y = zeros(length(x))
+z = vcat(zu, zl[end-1:-1:1])
+sections = vcat(x', y', z')
+
+## write the response to vtk files for visualization using ParaView
+write_vtk("goland-flutter-mode", assembly, state, eigenvalue, eigenstate; sections=sections,
+    mode_scaling=100)
+
+#md # ![](../assets/goland-flutter-mode.gif)

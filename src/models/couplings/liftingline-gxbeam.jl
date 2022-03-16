@@ -12,7 +12,8 @@ m_{x,i}, m_{y,i}, m_{z,i}`` applied to each beam element (excluding aerodynamic 
 followed by the properties of point masses attached to each beam element ``m, p, I_{11}, 
 I_{22}, I_{33}, I_{12}, I_{13}, I_{23}``, followed by the gravity vector, linear velocity, 
 angular velocity, linear acceleration, and angular acceleration of the system, followed by 
-the freestream air density ``\\rho_\\infty`` and air speed of sound ``c``.
+the freestream linear velocity, angular velocity, linear acceleration, angular acceleration, 
+air density, ``\\rho_\\infty`` and air speed of sound ``c``.
 
 # Keyword Arguments
  - `lifting_elements`: Beam element index corresponding to each aerodynamic section.
@@ -42,7 +43,7 @@ function Coupling(models::Tuple{LiftingLine, GXBeamAssembly}, submodels;
         section_models, lifting_elements)
     
     # define the number of additional parameters
-    npc = 6*npoint + 6*nelem + 10*nelem + 17
+    npc = 6*npoint + 6*nelem + 10*nelem + 29
 
     # define the number of states, inputs, and parameters
     nx = sum(number_of_states.(submodels))
@@ -117,8 +118,12 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t; models, submodels, section_m
     @unpack u_e, theta_e, F_e, M_e, V_e, Omega_e = gxbeam_states 
 
     # unpack addition parameters
-    @unpack a, alpha, rho, c, f_d, m_d = additional_parameters
+    @unpack v_b, omega_b, a_b, alpha_b, v_f, omega_f, a_f, alpha_f, rho, c, f_d, m_d = additional_parameters
     
+    # net freestream velocity
+    a = a_f - a_b
+    alpha = alpha_f - alpha_b  
+
     # initialize distributed loads
     f_d = SVector{3,eltype(y)}.(f_d)
     m_d = SVector{3,eltype(y)}.(m_d)
@@ -129,15 +134,25 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t; models, submodels, section_m
         # extract element
         elem = gxbeam_parameters.assembly.elements[ie]
 
-        # get element velocity and acceleration (in the element frame)
-        vi, ωi = gxbeam_element_velocities(V_e[ie], Omega_e[ie])
-        ai, αi = gxbeam_element_accelerations(elem, u_e[ie], theta_e[ie], dV_e[ie], 
-            dOmega_e[ie], a, alpha)
+        # transformations
+        local_from_body = elem.Cab'*GXBeam.get_C(theta_e[ie])
+        aero_from_local = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
+        aero_from_body = aero_from_local*local_from_body
+        body_from_aero = aero_from_body'
+
+        # local freestream velocity (in the element frame)
+        vi = local_from_body*v_f - V_e[ie]
+        ωi = local_from_body*omega_f + Omega_e[ie]
+
+        # effective linear and angular acceleration in the body frame
+
+        # local freestream acceleration (in the element frame)
+        ai = local_from_body*(a + cross(alpha, elem.x) + cross(alpha, u_e[ie])) - dV_e[ie]
+        αi = local_from_body*alpha + dOmega_e[ie]
 
         # transform velocities and accelerations to the aerodynamic frame
-        local_to_aero = @SMatrix [0 -1 0; 1 0 0; 0 0 1]
-        vi, ωi = -local_to_aero*vi, local_to_aero*ωi
-        ai, αi = -local_to_aero*ai, local_to_aero*αi
+        vi, ωi = aero_from_local*vi, aero_from_local*ωi
+        ai, αi = aero_from_local*ai, aero_from_local*αi
 
         # calculate lifting line section inputs
         yi = liftingline_section_inputs(section_models[i], dxas[i], xas[i], pas[i], vi, ωi, 
@@ -149,13 +164,9 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t; models, submodels, section_m
         # save aerodynamic inputs
         set_inputs!(yas[i], section_models[i].submodels[1]; aerodynamic_inputs...)
 
-        # transform loads to the body frame
-        body_to_local = gxbeam_body_to_element(elem, theta_e[ie])
-        aero_to_body = (body_to_local*local_to_aero)'
-
         # add distributed loads from aerodynamics to prescribed distributed loads
-        f_d[ie] += aero_to_body*structural_inputs.f
-        m_d[ie] += aero_to_body*structural_inputs.m
+        f_d[ie] += body_from_aero*structural_inputs.f
+        m_d[ie] += body_from_aero*structural_inputs.m
     end
 
     # save structural inputs
@@ -170,11 +181,11 @@ function liftingline_gxbeam_inputs!(y, dx, x, p, t; models, submodels, section_m
         p_m = additional_parameters.p_m,
         I_m = additional_parameters.I_m,
         gvec = additional_parameters.gvec,
-        v = additional_parameters.v,
-        omega = additional_parameters.omega,
-        a = additional_parameters.a,
-        alpha = additional_parameters.alpha)
-        
+        v = additional_parameters.v_b,
+        omega = additional_parameters.omega_b,
+        a = additional_parameters.a_b,
+        alpha = additional_parameters.alpha_b)
+       
     return y
 end
 
@@ -183,7 +194,8 @@ function liftingline_gxbeam_setparam!(p, np, ne, displacement;
     u_p = nothing, theta_p = nothing, F_p = nothing, M_p = nothing, 
     f_d = nothing, m_d = nothing, 
     m_m = nothing, p_m = nothing, I_m = nothing,
-    gvec = nothing, v = nothing, omega = nothing, a = nothing, alpha = nothing,
+    gvec = nothing, v_b = nothing, omega_b = nothing, a_b = nothing, alpha_b = nothing,
+    v_f = nothing, omega_f = nothing, a_f = nothing, alpha_f = nothing,
     rho = nothing, c = nothing)
 
     for ip = 1:np
@@ -250,36 +262,60 @@ function liftingline_gxbeam_setparam!(p, np, ne, displacement;
         p[6*np + 6*ne + 10*ne + 3] = gvec[3]
     end
 
-    if !isnothing(v)
-        p[6*np + 6*ne + 10*ne + 4] = v[1]
-        p[6*np + 6*ne + 10*ne + 5] = v[2]
-        p[6*np + 6*ne + 10*ne + 6] = v[3]
+    if !isnothing(v_b)
+        p[6*np + 6*ne + 10*ne + 4] = v_b[1]
+        p[6*np + 6*ne + 10*ne + 5] = v_b[2]
+        p[6*np + 6*ne + 10*ne + 6] = v_b[3]
     end
 
-    if !isnothing(omega)
-        p[6*np + 6*ne + 10*ne + 7] = omega[1]
-        p[6*np + 6*ne + 10*ne + 8] = omega[2]
-        p[6*np + 6*ne + 10*ne + 9] = omega[3]
+    if !isnothing(omega_b)
+        p[6*np + 6*ne + 10*ne + 7] = omega_b[1]
+        p[6*np + 6*ne + 10*ne + 8] = omega_b[2]
+        p[6*np + 6*ne + 10*ne + 9] = omega_b[3]
     end
 
-    if !isnothing(a)
-        p[6*np + 6*ne + 10*ne + 10] = a[1]
-        p[6*np + 6*ne + 10*ne + 11] = a[2]
-        p[6*np + 6*ne + 10*ne + 12] = a[3]
+    if !isnothing(a_b)
+        p[6*np + 6*ne + 10*ne + 10] = a_b[1]
+        p[6*np + 6*ne + 10*ne + 11] = a_b[2]
+        p[6*np + 6*ne + 10*ne + 12] = a_b[3]
     end
 
-    if !isnothing(alpha)
-        p[6*np + 6*ne + 10*ne + 13] = alpha[1]
-        p[6*np + 6*ne + 10*ne + 14] = alpha[2]
-        p[6*np + 6*ne + 10*ne + 15] = alpha[3]
+    if !isnothing(alpha_b)
+        p[6*np + 6*ne + 10*ne + 13] = alpha_b[1]
+        p[6*np + 6*ne + 10*ne + 14] = alpha_b[2]
+        p[6*np + 6*ne + 10*ne + 15] = alpha_b[3]
+    end
+
+    if !isnothing(v_f)
+        p[6*np + 6*ne + 10*ne + 16] = v_f[1]
+        p[6*np + 6*ne + 10*ne + 17] = v_f[2]
+        p[6*np + 6*ne + 10*ne + 18] = v_f[3]
+    end
+
+    if !isnothing(omega_f)
+        p[6*np + 6*ne + 10*ne + 19] = omega_f[1]
+        p[6*np + 6*ne + 10*ne + 20] = omega_f[2]
+        p[6*np + 6*ne + 10*ne + 21] = omega_f[3]
+    end
+
+    if !isnothing(a_f)
+        p[6*np + 6*ne + 10*ne + 22] = a_f[1]
+        p[6*np + 6*ne + 10*ne + 23] = a_f[2]
+        p[6*np + 6*ne + 10*ne + 24] = a_f[3]
+    end
+
+    if !isnothing(alpha_f)
+        p[6*np + 6*ne + 10*ne + 25] = alpha_f[1]
+        p[6*np + 6*ne + 10*ne + 26] = alpha_f[2]
+        p[6*np + 6*ne + 10*ne + 27] = alpha_f[3]
     end
 
     if !isnothing(rho)
-        p[6*np + 6*ne + 10*ne + 16] = rho
+        p[6*np + 6*ne + 10*ne + 28] = rho
     end
 
     if !isnothing(c)
-        p[6*np + 6*ne + 10*ne + 17] = c
+        p[6*np + 6*ne + 10*ne + 29] = c
     end
 
     return p
@@ -352,19 +388,28 @@ function liftingline_gxbeam_sepparam(p, np, ne, displacement)
     gvec =  view(p, 6*np + 6*ne + 10*ne +  1 : 6*np + 6*ne + 10*ne +  3)
     
     # linear/angular velocity
-    v =     view(p, 6*np + 6*ne + 10*ne +  4 : 6*np + 6*ne + 10*ne +  6)
-    omega = view(p, 6*np + 6*ne + 10*ne +  7 : 6*np + 6*ne + 10*ne +  9)
+    v_b =     view(p, 6*np + 6*ne + 10*ne +  4 : 6*np + 6*ne + 10*ne +  6)
+    omega_b = view(p, 6*np + 6*ne + 10*ne +  7 : 6*np + 6*ne + 10*ne +  9)
     
     # linear/angular acceleration
-    a =     view(p, 6*np + 6*ne + 10*ne + 10 : 6*np + 6*ne + 10*ne + 12)
-    alpha = view(p, 6*np + 6*ne + 10*ne + 13 : 6*np + 6*ne + 10*ne + 15)
+    a_b =     view(p, 6*np + 6*ne + 10*ne + 10 : 6*np + 6*ne + 10*ne + 12)
+    alpha_b = view(p, 6*np + 6*ne + 10*ne + 13 : 6*np + 6*ne + 10*ne + 15)
+
+    # linear/angular velocity
+    v_f =     view(p, 6*np + 6*ne + 10*ne + 16 : 6*np + 6*ne + 10*ne + 18)
+    omega_f = view(p, 6*np + 6*ne + 10*ne + 19 : 6*np + 6*ne + 10*ne + 21)
+    
+    # linear/angular acceleration
+    a_f =     view(p, 6*np + 6*ne + 10*ne + 22 : 6*np + 6*ne + 10*ne + 24)
+    alpha_f = view(p, 6*np + 6*ne + 10*ne + 25 : 6*np + 6*ne + 10*ne + 27)
 
     # freestream air density
-    rho = p[6*np + 6*ne + 10*ne + 16]
+    rho = p[6*np + 6*ne + 10*ne + 28]
 
     # air speed of sound
-    c = p[6*np + 6*ne + 10*ne + 17]
+    c = p[6*np + 6*ne + 10*ne + 29]
 
     return (u_p=u_p, theta_p=theta_p, F_p=F_p, M_p=M_p, f_d=f_d, m_d=m_d, m_m=m_m, p_m=p_m, 
-        I_m=I_m, gvec=gvec, v=v, omega=omega, a=a, alpha=alpha, rho=rho, c=c)
+        I_m=I_m, gvec=gvec, v_b=v_b, omega_b=omega_b, a_b=a_b, alpha_b=alpha_b, 
+        v_f=v_f, omega_f=omega_f, a_f=a_f, alpha_f=alpha_f, rho=rho, c=c)
 end

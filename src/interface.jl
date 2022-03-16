@@ -402,7 +402,7 @@ function ode_time_gradient(model::CoupledModel, fy, p=nothing)
 
         # cached variables
         drdy_cache = fill(NaN, Nx, Ny)
-        dyddx_cache = fill(NaN, Ny, Nx)
+        dydt_cache = fill(NaN, Ny)
 
         # state rate vector
         dx = FillArrays.Zeros(Nx)
@@ -413,7 +413,7 @@ function ode_time_gradient(model::CoupledModel, fy, p=nothing)
             if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
                 # use cache variables
                 get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+                    drdy_cache = drdy_cache, dydt_cache = dydt_cache)
             else
                 # don't use cache variables (to accomodate custom types)
                 get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t)
@@ -455,7 +455,7 @@ function ode_state_jacobian(model::CoupledModel, fy, p=nothing)
 
         # cached variables
         drdy_cache = fill(NaN, Nx, Ny)
-        dyddx_cache = fill(NaN, Ny, Nx)
+        dydx_cache = fill(NaN, Ny, Nx)
 
         # update function
         jac = (J, x, p, t) -> begin
@@ -463,7 +463,7 @@ function ode_state_jacobian(model::CoupledModel, fy, p=nothing)
             if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
                 # use cache variables
                 get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+                    drdy_cache = drdy_cache, dydx_cache = dydx_cache)
             else
                 # don't use cache variables (to accomodate custom types)
                 get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t)
@@ -492,15 +492,16 @@ function ode_parameter_jacobian(model::CoupledModel, fy, p=nothing)
         pJ0 = get_parameter_jacobian(model, p)
         paramjac = (pJ, x, p, t) -> pJ .= pJ0
     else
-        # construct time gradient function
+        # construct parameter jacobian function
 
         # problem dimensions
         Nx = number_of_states(model)
         Ny = number_of_inputs(model)
+        Np = number_of_parameters(model)
 
         # cached variables
         drdy_cache = fill(NaN, Nx, Ny)
-        dyddx_cache = fill(NaN, Ny, Nx)
+        dydp_cache = fill(NaN, Ny, Np)
 
         # state rate vector
         dx = FillArrays.Zeros(Nx)
@@ -511,7 +512,7 @@ function ode_parameter_jacobian(model::CoupledModel, fy, p=nothing)
             if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
                 # use cache variables
                 get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+                    drdy_cache = drdy_cache, dydp_cache = dydp_cache)
             else
                 # don't use cache variables (to accomodate custom types)
                 get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t)
