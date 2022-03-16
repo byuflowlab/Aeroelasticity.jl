@@ -314,9 +314,9 @@ f = (x) -> 0.16*x*(1 - x)
 x = 0:0.2:1.0
 zu = f.(x)
 zl = -zu
-x = vcat(x, x[end-1:-1:1])
-y = zeros(length(x))
-z = vcat(zu, zl[end-1:-1:1])
+x = chord .* vcat(x, x[end-1:-1:1])
+y = chord .* zeros(length(x))
+z = chord .* vcat(zu, zl[end-1:-1:1])
 sections = vcat(x', y', z')
 
 ## write the response to vtk files for visualization using ParaView
