@@ -1,4 +1,4 @@
-# # Aeroelastic Analysis of the Goland Wing
+# # [Aeroelastic Analysis of the Goland Wing](@id goland)
 # 
 # In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis 
 # using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been 
