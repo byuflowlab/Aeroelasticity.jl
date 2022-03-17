@@ -1,7 +1,7 @@
-@testset "Peters' Finite State + Section" begin
-
+@testset "Wagner + LiftingLineSection" begin
+    
     # define models
-    models = (Peters{4}(), Section())
+    models = (Wagner(), LiftingLineSection())
 
     # create coupling
     coupling = Coupling(models)

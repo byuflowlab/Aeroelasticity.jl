@@ -23,7 +23,7 @@ export separate_states, separate_parameters
 export linearize, get_eigen, correlate_eigenmodes
 
 export Steady, QuasiSteady, Wagner, Peters, LiftingLine
-export Section, GXBeamAssembly
+export Section, LiftingLineSection, GXBeamAssembly
 
 export Submodel, Coupling
 
