@@ -1,7 +1,7 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(::LiftingLine, ::GXBeamAssembly; kwargs...)
+    Coupling(models::Tuple{LiftingLine, GXBeamAssembly}; kwargs...)
 
 Coupling model for coupling a lifting line aerodynamic model and a geometrically exact beam 
 element assembly model.  This model introduces additional parameters corresponding to
@@ -22,7 +22,7 @@ air density, ``\\rho_\\infty`` and air speed of sound ``c``.
 **NOTE: This model assumes that each beam element is oriented with the x-axis along the 
 beam's axis, the y-axis forward (into the freestream), and the z-axis normal**
 """
-function Coupling(models::Tuple{LiftingLine, GXBeamAssembly}, submodels; 
+function Coupling(models::Tuple{LiftingLine, GXBeamAssembly}, submodels=Submodel.(models); 
     lifting_elements = 1:length(models[1].section_models))
 
     liftingline, gxbeam = models

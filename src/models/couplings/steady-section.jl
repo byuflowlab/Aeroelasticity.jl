@@ -1,7 +1,7 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(models::Tuple{<:Steady, <:Section})
+    Coupling(models::Tuple{Steady, Section})
 
 Coupling model for coupling a steady aerodynamic model based on thin airfoil theory 
 (see [`Steady`](@ref)) and a two-degree of freedom typical section model 

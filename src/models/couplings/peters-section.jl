@@ -1,7 +1,7 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(models::Tuple{Peters, ::Section})
+    Coupling(models::Tuple{Peters, Section})
 
 Coupling model for coupling an unsteady aerodynamic model based on Peters' finite state 
 theory (see [`Peters`](@ref)) and a two-degree of freedom typical section model (see 

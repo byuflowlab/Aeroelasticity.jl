@@ -1,7 +1,7 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(models::Tuple{<:Wagner, <:Section})
+    Coupling(models::Tuple{Wagner, Section})
 
 Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see 
 [`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  

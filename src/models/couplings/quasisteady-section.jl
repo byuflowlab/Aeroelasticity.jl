@@ -1,7 +1,7 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(models::Tuple{<:QuasiSteady, <:Section})
+    Coupling(models::Tuple{QuasiSteady, Section})
 
 Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory 
 (see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model 
