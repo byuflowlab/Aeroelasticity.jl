@@ -1,7 +1,7 @@
 @testset "LiftingLine + GXBeamAssembly" begin
 
     # number of elements
-    nelem = 4
+    nelem = 2
 
     # point locations
     x = range(0, 60, length=nelem+1)
