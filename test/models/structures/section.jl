@@ -1,4 +1,4 @@
-@testset "Typical Section" begin
+@testset "Section" begin
 
     submodel = Submodel(Section())
     

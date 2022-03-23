@@ -1,31 +1,12 @@
+# --- Coupling Model Creation --- #
+
 """
-    steady_liftingline_model()
+    Coupling(models::Tuple{Steady, LiftingLineSection})
 
 Construct a model by coupling a steady aerodynamic model based on thin airfoil theory (see 
-[`Steady`](@ref)) and a lifting line section model (see 
-[`liftingline_section_model`](@ref)).  
+[`Steady`](@ref)) and a lifting line section model (see [`LiftinLineSection`](@ref)).  
 """
-function steady_liftingline_model()
-
-    # aerodynamic model
-    aero = steady_model()
-
-    # structural model
-    stru = liftingline_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = steady_liftingline_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods --- #
-
-function steady_liftingline_coupling(aero, stru)
+function Coupling(models::Tuple{Steady, LiftingLineSection}, submodels=Submodel.(models))
 
     # coupling function
     g = steady_liftingline_inputs
@@ -51,6 +32,8 @@ function steady_liftingline_coupling(aero, stru)
         paramjac = paramjac,
         tgrad = tgrad)
 end
+
+# --- Internal Methods --- #
 
 # coupling function
 function steady_liftingline_inputs(dx, x, p, t)

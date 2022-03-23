@@ -1,7 +1,11 @@
 @testset "Wagner + Section" begin
     
-    coupling = Coupling(Wagner(), Section())
-    
+    # define models
+    models = (Wagner(), Section())
+
+    # create coupling
+    coupling = Coupling(models)
+
     # test provided jacobians
     coupling_jacobian_tests(coupling)
 

@@ -1,7 +1,11 @@
 @testset "Steady + Section" begin
     
-    coupling = Coupling(Steady(), Section())
-    
+    # define models
+    models = (Steady(), Section())
+
+    # create coupling
+    coupling = Coupling(models)
+
     # test provided jacobians
     coupling_jacobian_tests(coupling)
     

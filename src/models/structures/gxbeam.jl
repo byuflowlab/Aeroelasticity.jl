@@ -190,7 +190,6 @@ function gxbeam_residual!(resid, dx, x, y, p, t; start, stop, displacement, forc
     # construct point loads, distributed loads, and point masses
     prescribed, distributed, point_masses = gxbeam_loads(y, np, ne, displacement, assembly.elements)
 
-    # gravity vector
     gvec = SVector(y[end-14], y[end-13], y[end-12])
 
     # linear/angular velocity and acceleration

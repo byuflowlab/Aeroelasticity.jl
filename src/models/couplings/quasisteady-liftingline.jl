@@ -1,32 +1,12 @@
+# --- Coupling Model Creation --- #
+
 """
-    quasisteady_liftingline_model()
+    Coupling(models::Tuple{QuasiSteady, LiftingLineSection})
 
-Construct a model by coupling a quasi-steady aerodynamic model based on thin airfoil theory 
-(see [`quasisteady_model`](@ref)) and a lifting line section model (see 
-[`liftingline_section_model`](@ref)).  
+Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory 
+(see [`QuasiSteady`](@ref)) and a lifting line section model (see [`LiftingLineSection`](@ref)).  
 """
-function quasisteady_liftingline_model()
-
-    # aerodynamic model
-    aero = quasisteady_model()
-
-    # structural model
-    stru = liftingline_section_model()
-
-    # submodels
-    submodels = (aero, stru)
-
-    # construct coupling
-    coupling = quasisteady_liftingline_coupling(aero, stru)
-
-    # return the coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-# --- Internal Methods for this Coupling --- #
-
-# coupling definition
-function quasisteady_liftingline_coupling(aero, stru)
+function Coupling(models::Tuple{QuasiSteady, LiftingLineSection}, submodels=Submodel.(models))
 
     # coupling function
     g = quasisteady_liftingline_inputs
@@ -52,6 +32,8 @@ function quasisteady_liftingline_coupling(aero, stru)
         paramjac = paramjac,
         tgrad = tgrad)
 end
+
+# --- Internal Methods --- #
 
 # coupling function
 function quasisteady_liftingline_inputs(dx, x, p, t)

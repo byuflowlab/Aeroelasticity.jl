@@ -1,30 +1,28 @@
 """
-    Submodel{iip, F, NS, NI, NP, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
+    Submodel{iip, NS, NI, NP}
 
 Base type for submodels in `Aeroelasticity.jl`.
 """
-struct Submodel{iip, F, NS, NI, NP, C, JR, JS, JI, JP, GT, IS, II, IP, OS, OI, OP}
+struct Submodel{iip, NS, NI, NP}
     # residual function
-    f::F
+    f
     # dimensions
     nx::NS
     ny::NI
     np::NP
-    # constants
-    constants::C
     # jacobians/gradients
-    ratejac::JR
-    statejac::JS
-    inputjac::JI
-    paramjac::JP
-    tgrad::GT
+    ratejac
+    statejac
+    inputjac
+    paramjac
+    tgrad
     # input/output functions
-    setstate::IS
-    setinput::II
-    setparam::IP
-    sepstate::OS
-    sepinput::OI
-    sepparam::OP
+    setstate
+    setinput
+    setparam
+    sepstate
+    sepinput
+    sepparam
 end
 
 """
@@ -56,7 +54,6 @@ Define a custom submodel for use with `Aeroelasticity.jl`.  Note that `iip` shou
  - `sepparam = (p) -> (p = p,)`: Function for separating parameters into named variables.
 """
 function Submodel{iip}(f, nx, ny, np;
-    constants = (),
     ratejac = Nonlinear(),
     statejac = Nonlinear(),
     inputjac = Nonlinear(),
@@ -76,12 +73,8 @@ function Submodel{iip}(f, nx, ny, np;
     paramjac = add_parameter_jacobian(paramjac, f, iip, nx, ny, np)
     tgrad = add_time_gradient(tgrad, f, iip, nx, ny, np)
 
-    return Submodel{iip,
-        typeof(f), typeof(nx), typeof(ny), typeof(np), typeof(constants),
-        typeof(ratejac), typeof(statejac), typeof(inputjac), typeof(paramjac), typeof(tgrad),
-        typeof(setstate), typeof(setinput), typeof(setparam),
-        typeof(sepstate), typeof(sepinput), typeof(sepparam)}(
-            f, nx, ny, np, constants,
+    return Submodel{iip, typeof(nx), typeof(ny), typeof(np)}(
+            f, nx, ny, np, 
             ratejac, statejac, inputjac, paramjac, tgrad,
             setstate, setinput, setparam, 
             sepstate, sepinput, sepparam)
@@ -96,18 +89,15 @@ Define a submodel with no state variables (see [`Submodel`](@ref))
  - `np`: Number of parameters.
 
 # Keyword Arguments
- - `constants = ()`: Constants associated with this model
  - `setparam = (params; p) -> params .= p`: Function for setting parameters using a custom 
     set of keyword arguments.
  - `sepparam = (p) -> (p = p,)`: Function for separating parameters into named variables.
 """
 function Submodel(np; 
-    constants = (),
     setparam = (params; p) -> params .= p,
     sepparam = (p) -> (p = p,))
 
     return Submodel{false}((dx, x, y, p, t) -> Float64[], Val(0), Val(0), np;
-        constants = constants,
         ratejac = Empty(),
         statejac = Empty(),
         inputjac = Empty(),
@@ -122,26 +112,26 @@ function Submodel(np;
 end
 
 """
-    Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT, IP, OP}
+    Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT}
 
 Base type for coupling models in Aeroelasticity.jl.
 """
-struct Coupling{iip, G, NX, NY, NP, NPC, JR, JS, JP, GT, IP, OP}
+struct Coupling{iip, NX, NY, NP, NPC}
     # coupling function
-    g::G
+    g
     # dimensions
     nx::NX
     ny::NY
     np::NP
     npc::NPC
     # jacobians/gradients
-    ratejac::JR
-    statejac::JS
-    paramjac::JP
-    tgrad::GT
+    ratejac
+    statejac
+    paramjac
+    tgrad
     # input/output functions
-    setparam::IP
-    sepparam::OP
+    setparam
+    sepparam
 end
 
 """
@@ -181,10 +171,7 @@ function Coupling{iip}(g, nx, ny, np, npc;
     paramjac = add_coupling_parameter_jacobian(paramjac, g, iip, nx, ny, np)
     tgrad = add_coupling_time_gradient(tgrad, g, iip, nx, ny, np)
 
-    return Coupling{iip, 
-        typeof(g), typeof(nx), typeof(ny), typeof(np), typeof(npc),
-        typeof(ratejac), typeof(statejac), typeof(paramjac), typeof(tgrad),
-        typeof(setparam), typeof(sepparam)}(
+    return Coupling{iip, typeof(nx), typeof(ny), typeof(np), typeof(npc)}(
             g, nx, ny, np, npc, 
             ratejac, statejac, paramjac, tgrad,
             setparam, sepparam)

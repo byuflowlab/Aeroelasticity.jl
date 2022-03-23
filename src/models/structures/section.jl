@@ -21,7 +21,7 @@ function Submodel(::Section)
     # residual function
     fresid = section_residual
 
-    # number of state, input, and parameters (use Val(N) to use inferrable dimensions)
+    # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
     nx = Val(4)
     ny = Val(2)
     np = Val(5)

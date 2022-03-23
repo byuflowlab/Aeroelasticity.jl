@@ -1,20 +1,32 @@
 """
-    liftingline_section_model()
+    LiftingLineSection
 
-Construct a lifting line section model with state variables ``v_x, v_y, v_z, \\omega_x,
+Lifting line section model with state variables ``v_x, v_y, v_z, \\omega_x,
 \\omega_y, \\omega_z``, inputs ``f_x, f_y, f_z, m_x, m_y, m_z``, and parameters 
 ``\\rho, c``.  Two-dimensional aerodynamic models may be extended to three-dimensional 
 models by coupling with this model.  Note that this model has no rate equations of its own 
 since its state variables are defined as functions of the 3D structural model's state 
 variables.  Also note that additional parameters may not be used when coupling with this 
-model, this is a limitation of the [`LiftingLine`](@ref) model.
+model, this limitation is enforced in order to ensure compatability with the 
+[`LiftingLine`](@ref) model.
 """
-function liftingline_section_model()
+struct LiftingLineSection end
+
+"""
+    LiftingLineSection()
+
+Initialize a model of type [`LiftingLineSection`](@ref)
+"""
+LiftingLineSection()
+
+# --- Submodel Creation --- #
+
+function Submodel(::LiftingLineSection)
    
     # residual function (no residual function)
-    f = nothing 
+    fresid = nothing
 
-    # number of state, input, and parameters (use Val(N) to use inferrable dimensions)
+    # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
     nx = Val(6)
     ny = Val(6)
     np = Val(2)
@@ -29,7 +41,7 @@ function liftingline_section_model()
     sepinput = liftingline_section_sepinput
     sepparam = liftingline_section_sepparam
 
-    return Model{false}(f, nx, ny, np;
+    return Submodel{false}(fresid, nx, ny, np;
         setstate = setstate,
         setinput = setinput,
         setparam = setparam,
