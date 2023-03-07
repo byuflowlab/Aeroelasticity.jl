@@ -74,26 +74,26 @@ Iθ = r2*m*b^2 # inertia
 kh = m*ωh^2 # plunge spring constant
 kθ = Iθ*ωθ^2 # pitch spring constant
 
-## define aerodynamic models
-aerodynamic_models = (Steady(), QuasiSteady(), Wagner(), Peters{6}())
+## define coupled model for each analysis
+models = (
+    CoupledModel((Steady(), Section())),
+    CoupledModel((QuasiSteady(), Section())),
+    CoupledModel((Wagner(), Section())),
+    CoupledModel((Peters{6}(), Section()))
+)
 
 ## initialize eigenvalue/eigenvector storage
-λ = Vector{Matrix{ComplexF64}}(undef, length(aerodynamic_models))
-Uλ = Vector{Array{ComplexF64,3}}(undef, length(aerodynamic_models))
-Vλ = Vector{Array{ComplexF64,3}}(undef, length(aerodynamic_models))
+λ = Vector{Matrix{ComplexF64}}(undef, length(models))
+Uλ = Vector{Array{ComplexF64,3}}(undef, length(models))
+Vλ = Vector{Array{ComplexF64,3}}(undef, length(models))
 
 ## perform an analysis for each aerodynamic model
-for imodel = 1:length(aerodynamic_models)
-
-    ## define coupled model
-    model = assemble_model(;
-        aerodynamic_model = aerodynamic_models[imodel],
-        structural_model = Section())
+for (imodel, model) in enumerate(models)
  
-    ## define ODE function
+    ## define an ODEFunction for this model
     f = ODEFunction(model)
 
-    ## eigenvalue/eigenvector storage
+    ## initialize eigenvalue/eigenvector storage
     nλ = number_of_states(model)
     λ[imodel] = zeros(ComplexF64, nλ, length(V))
     Uλ[imodel] = zeros(ComplexF64, nλ, nλ, length(V))
@@ -102,32 +102,20 @@ for imodel = 1:length(aerodynamic_models)
     ## loop through each reduced frequency
     for i = 1:length(V)
 
-        ## define aerodynamic parameters
-        aerodynamic_parameters = (; a = a, b = b, a0 = a0, alpha0 = α0, cd0 = cd0, cm0 = cm0)
+        ## construct parameter vector
+        p = [a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U[i], ρ, c]
 
-        ## define structural parameters
-        structural_parameters = (; kh = kh, ktheta = kθ, m = m, Stheta = Sθ, Itheta = Iθ)
-
-        ## define additional parameters
-        additional_parameters = (; U = U[i], rho = ρ, c = c)
-
-        ## define parameter vector
-        p = assemble_parameters(model;
-            aerodynamic_parameters = aerodynamic_parameters,
-            structural_parameters = structural_parameters,
-            additional_parameters = additional_parameters)
-
-        ## define initial guess for equilibrium states
-        x0 = assemble_states(model)
+        ## define initial guess for the equilibrium states
+        x0 = zeros(number_of_states(model))
 
         ## find equilibrium point
         x = solve(SteadyStateProblem(f, x0, p))
 
-        ## linearize about equilibrium point
+        ## linearize about the equilibrium point
         K, M = linearize(model, x, p)
 
         ## perform linear stability analysis
-        λi, Uλi, Vλi = get_eigen(model, K, M)
+        λi, Uλi, Vλi = sparse_eigen(K, M)
 
         ## correlate eigenvalues
         if i > 1
@@ -195,7 +183,7 @@ sp2 = plot(
 
 labels = ["Steady", "Quasi-Steady", "Wagner", "Peters (N=6)"]
 
-for ia = 1:length(aerodynamic_models)
+for ia = 1:length(models)
 
     plot!(sp1, V, imag.(λ[ia][1,:])/ωθ,
         label = labels[ia],
@@ -249,7 +237,7 @@ p1 = plot(sp1, sp2, layout = (1, 2), size = (800, 300))
 # performed the analysis using a steady-state model and Peter's finite state model with 
 # six state variables.   The results presented here for the steady-state and Peters' 
 # finite state models match the results presented by Hodges and Pierce in "Introduction 
-# to Structural Dynamics and Aeroelasticity", which validates our implementation of 
-# these models.  Additionally, since the flutter speed predicted by the `Wagner` and 
-# `Peters` models match, we can be reasonably confident that the Wagner unsteady 
-# aerodynamic model is also implemented correctly.
+# to Structural Dynamics and Aeroelasticity", which provides a verification for our  
+# implementation of these models.  Additionally, since the flutter speed predicted by the 
+# `Wagner` and  `Peters` models match, we can be reasonably confident that the Wagner 
+# unsteady aerodynamic model is also implemented correctly.

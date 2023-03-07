@@ -1,18 +1,21 @@
 module Aeroelasticity
 
 using ArnoldiMethod
+using FiniteDiff
+using FLOWMath
 using ForwardDiff
 using GXBeam
 using LinearAlgebra
 using LinearMaps
 using FillArrays
+using IterativeSolvers
 using StaticArrays
 using SciMLBase
+using SparseArrays
+using SparseDiffTools
+using Symbolics
 using Printf
 using UnPack
-
-import Base.isempty
-import Base.iszero
 
 export assemble_model
 export assemble_states, assemble_states!
@@ -20,19 +23,19 @@ export assemble_parameters, assemble_parameters!
 export number_of_states, number_of_inputs, number_of_parameters
 export state_indices, input_indices, parameter_indices
 export separate_states, separate_parameters
-export linearize, get_eigen, correlate_eigenmodes
+
+export CoupledModel
+
+export residual, residual!, state_jacobian, state_jacobian!, rate_jacobian, rate_jacobian!
+
+export linearize, dense_eigen, sparse_eigen, correlate_eigenmodes
 
 export Steady, QuasiSteady, Wagner, Peters, LiftingLine
-export Section, LiftingLineSection, GXBeamAssembly
-
-export Submodel, Coupling
+export Section, RigidBody, GXBeamAssembly
 
 export section_coordinates
 
-include("util.jl")
 include("models.jl")
-include("jacobians.jl")
-include("internals.jl")
 include("interface.jl")
 
 include(joinpath("models", "aerodynamics", "steady.jl"))
@@ -42,6 +45,7 @@ include(joinpath("models", "aerodynamics", "peters.jl"))
 include(joinpath("models", "aerodynamics", "liftingline.jl"))
 
 include(joinpath("models", "structures", "section.jl"))
+include(joinpath("models", "structures", "rigidbody.jl"))
 include(joinpath("models", "structures", "liftingline.jl"))
 include(joinpath("models", "structures", "gxbeam.jl"))
 

@@ -320,7 +320,9 @@ z = chord .* vcat(zu, zl[end-1:-1:1])
 sections = vcat(x', y', z')
 
 ## write the response to vtk files for visualization using ParaView
-write_vtk("goland-flutter-mode", assembly, state, eigenvalue, eigenstate; sections=sections,
+mkpath("goland-flutter-mode")
+write_vtk("goland-flutter-mode/goland-flutter-mode", assembly, state, eigenvalue, eigenstate; sections=sections,
     mode_scaling=100)
+#md rm("goland-flutter-mode"; recursive=true) #hide
 
 #md # ![](../assets/goland-flutter-mode.gif)

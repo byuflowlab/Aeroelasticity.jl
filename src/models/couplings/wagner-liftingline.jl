@@ -1,51 +1,29 @@
 
 """
-    Coupling(models::Tuple{Wagner, LiftingLineSection})
+    WagnerLiftingLine{TF}
 
-Coupling model for coupling an unsteady aerodynamic model based on Wagner's function 
-(see [`Wagner`](@ref)) and a lifting line section model (see [`LiftingLineSection`](@ref)).
+Coupling model which allows the Wagner unsteady aerodynamic model (see [`Wagner`](@ref)) to 
+be used more conveniently with the [`LiftingLine`](@ref) model. See [`LiftingLineSection`](@ref).
 """
-function Coupling(models::Tuple{Wagner, LiftingLineSection}, submodels=Submodel.(models))
-
-    wagner = models[1]
-
-    # model constants
-    C1 = wagner.C1
-    C2 = wagner.C2
-
-    # coupling function
-    g = (dx, x, p, t) -> wagner_liftingline_inputs(dx, x, p, t; C1, C2)
-    
-    # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
-    nx = Val(8)
-    ny = Val(9)
-    np = Val(8)
-
-    # number of parameters introduced by the coupling (use Val(N) to use inferrable dimensions)
-    npc = Val(0)
-
-    # jacobian definitions
-    ratejac = Nonlinear() # TODO: define rate jacobian function
-    statejac = Nonlinear() # TODO: define state jacobian function
-    paramjac = Nonlinear() # TODO: define parameter jacobian function
-    tgrad = Zeros()
-
-    # return resulting coupling
-    return Coupling{false}(g, nx, ny, np, npc;
-        ratejac = ratejac,
-        statejac = statejac,
-        paramjac = paramjac,
-        tgrad = tgrad)
+struct WagnerLiftingLine{TF}
+    wagner::Wagner{TF}
+    liftingline::LiftingLineSection
 end
-   
-# coupling function
-function wagner_liftingline_inputs(dx, x, p, t; C1, C2)
-    # rate variables
-    dλ1, dλ2, dvx, dvy, dvz, dωx, dωy, dωz = dx
+
+default_coupling(wagner::Wagner, liftingline::LiftingLineSection) = WagnerLiftingLine(wagner, liftingline)
+
+function (wagner_liftingline::WagnerLiftingLine)(dx, x, p, t)
+    # extract constants
+    @unpack C1, C2 = wagner_section.wagner
+    # extract rate variables
+    dλ1, dλ2 = dx[1] 
+    dvx, dvy, dvz, dωx, dωy, dωz = dx[2]
     # extract state variables
-    λ1, λ2, vx, vy, vz, ωx, ωy, ωz = x
+    λ1, λ2 = x[1] 
+    vx, vy, vz, ωx, ωy, ωz = x[2]
     # extract parameters
-    a, b, a0, α0, cd0, cm0, ρ, c = p
+    a, b, a0, α0, cd0, cm0 = p[1] 
+    ρ, c = p[2] 
     # freestream velocity components
     u, v, ω = liftingline_section_velocities(vx, vz, ωy)
     udot, vdot, ωdot = liftingline_section_accelerations(dvx, dvz, dωy)
@@ -55,5 +33,5 @@ function wagner_liftingline_inputs(dx, x, p, t; C1, C2)
     f = SVector(A, 0, N)
     m = SVector(0, M, 0)
     # return inputs
-    return vcat(u, v, ω, f, m)
+    return SVector(u, v, ω), (f, m)
 end

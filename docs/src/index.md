@@ -7,7 +7,7 @@
 
 Author: Taylor McDonnell
 
-**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems.  Currently, this package only models the aeroelasticity of a two-degree of freedom typical section model, but additional models will be added soon.
+**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems.  A number of built-in models have also been developed to be able simulate various aeroelastic behavior.
 
 ![](assets/section-simulation.gif)
 
@@ -22,14 +22,14 @@ Author: Taylor McDonnell
      - Lifting Line (3D)
    - Structural Models
      - Two Degree of Freedom Typical Section Model (2D)
+     - Rigid Body Model (3D)
      - Geometrically Exact Beam Theory Model (3D)
  - Supports multiple analysis types including:
    - Steady State Analyses
    - Eigenvalue Analyses
-   - Time-Marching Analyses
- - Directly interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
- - Verified/Validated against theoretical, computational, and experimental results (see the [examples](@ref Examples))
- - May be easily extended to include additional models or model couplings.
+   - Time-Marching Analyses (using [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl))
+ - Several verification cases for built-in models (see the [examples](@ref Examples))
+ - Provides modular framework for constructing monolithic coupled systems
 
 ## Installation
 

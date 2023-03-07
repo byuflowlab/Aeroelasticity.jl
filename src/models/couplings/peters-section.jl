@@ -1,64 +1,34 @@
-# --- Coupling Model Creation --- #
 
 """
-    Coupling(models::Tuple{Peters, Section})
+    PetersSection{N}
 
-Coupling model for coupling an unsteady aerodynamic model based on Peters' finite state 
-theory (see [`Peters`](@ref)) and a two-degree of freedom typical section model (see 
-[`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, 
-air density ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
+Coupling model for coupling Peters' finite state theory (see [`Peters`](@ref)) with a 
+typical section model (see [`Section`](@ref)).  This model introduces the freestream 
+velocity ``U``, air density ``\\rho``, and air speed of sound ``c`` as additional parameters.
+
+The parameters for the resulting coupled model (as defined by the parameter function) 
+defaults to the parameters for each model concatenated into a single vector. 
 """
-function Coupling(models::Tuple{Peters{N}, Section}, submodels=Submodel.(models)) where N
-
-    peters = models[1]
-
-    # state variable indices
-    iλ = 1:N
-    iq = N+1:N+4
-
-    # coupling function
-    g = (dx, x, p, t) -> peters_section_inputs(dx, x, p, t; iλ, iq, bbar = peters.b)
-
-    # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
-    nx = Val(N+4)
-    ny = Val(6)
-    np = Val(14)
-
-    # number of parameters introduced by the coupling (use Val(N) to use inferrable dimensions)
-    npc = Val(3)
-
-    # jacobian definitions
-    ratejac = Nonlinear() # TODO: define rate jacobian function
-    statejac = Nonlinear() # TODO: define state jacobian function
-    paramjac = Nonlinear() # TODO: define parameter jacobian function
-    tgrad = Zeros()
-    
-    # convenience function for setting coupling parameters
-    setparam = peters_section_set_parameters!
-
-    # convenience function for separating coupling parameters
-    sepparam = peters_section_separate_parameters
-    
-    # return resulting coupling
-    return Coupling{false}(g, nx, ny, np, npc;
-        ratejac = ratejac,
-        statejac = statejac,
-        paramjac = paramjac,
-        tgrad = tgrad,
-        setparam = setparam,
-        sepparam = sepparam)
+struct PetersSection{N,TF,TV,TA}
+    peters::Peters{N,TF,TV,TA}
+    section::Section
 end
 
-# coupling function
-function peters_section_inputs(dx, x, p, t; iλ, iq, bbar)
+default_coupling(peters::Peters, section::Section) = PetersSection(peters, section)
+
+function (peters_section::PetersSection)(dx, x, p, t)
+    # extract constants
+    bbar = peters_section.peters.b
     # extract rate variables
-    dλ = view(dx, iλ)
-    dh, dθ, dhdot, dθdot = view(dx, iq)
+    dλ = dx[1]
+    dh, dθ, dhdot, dθdot = dx[2]
     # extract state variables
-    λ = view(x, iλ)
-    h, θ, hdot, θdot = view(x, iq)
+    λ = x[1]
+    h, θ, hdot, θdot = x[2]
     # extract parameters
-    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ, c = p
+    a, b, a0, α0, cd0, cm0 = p[1]
+    kh, kθ, m, Sθ, Iθ = p[2]
+    U, ρ, c = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
@@ -66,17 +36,12 @@ function peters_section_inputs(dx, x, p, t; iλ, iq, bbar)
     N, A, M = peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
     # lift is approximately equal to the normal force
     L = N
-    # return inputs
-    return SVector(u, ω, vdot, ωdot, L, M)
+    # return inputs for each model
+    return SVector(u, ω, vdot, ωdot), SVector(L, M)
 end
 
-# convenience function for defining the coupling function parameters
-function peters_section_set_parameters!(p; U, rho, c)
-    p[1] = U
-    p[2] = rho
-    p[3] = c
-    return p
-end
+# default parameter function
+default_parameter_function(::PetersSection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))
 
-# convenience function for separating the coupling function parameters
-peters_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])
+# number of parameters corresponding to the default parameter function
+number_of_parameters(::PetersSection) = 14
