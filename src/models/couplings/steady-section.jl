@@ -3,13 +3,13 @@
 """
     SteadySection
 
-Coupling model for coupling a steady aerodynamic model based on thin airfoil theory 
-(see [`Steady`](@ref)) and a two-degree of freedom typical section model 
-(see [`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, air 
+Coupling model for coupling a steady aerodynamic model based on thin airfoil theory
+(see [`Steady`](@ref)) and a two-degree of freedom typical section model
+(see [`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, air
 density ``\\rho_\\infty``, and air speed of sound ``c`` as additional parameters.
 
-The parameters for the resulting coupled model (as defined by the parameter function) 
-defaults to the parameters for each model concatenated into a single vector. 
+The parameters for the resulting coupled model (as defined by the parameter function)
+defaults to the parameters for each model concatenated into a single vector.
 """
 struct SteadySection
     steady::Steady
@@ -37,9 +37,6 @@ end
 
 # default parameter function
 default_parameter_function(::SteadySection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))
-
-# number of parameters corresponding to the default parameter function
-number_of_parameters(::SteadySection) = 14
 
 # --- Internal Methods --- #
 

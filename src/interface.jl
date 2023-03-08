@@ -2,7 +2,7 @@
     linearize(model, x, p; autodiff=true, fdtype=Val(:forward))
     linearize(model, dx, x, p, t; autodiff=true, fdtype=Val(:forward))
 
-Calculate the jacobian of the residual function for coupled model `model` with respect to 
+Calculate the jacobian of the residual function for coupled model `model` with respect to
 the state variables and their rates.
 """
 linearize
@@ -20,7 +20,7 @@ end
 """
     dense_eigen(K, M; kwargs...)
 
-Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix 
+Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
 corresponding to the model.
 """
 function dense_eigen(K, M)
@@ -36,7 +36,7 @@ end
 """
     sparse_eigen(K, M; nev=min(20, size(K,1)))
 
-Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix 
+Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
 corresponding to the model. `nev` is the number of eigenvalues to compute
 """
 function sparse_eigen(K, M; nev=min(20, size(K,1)))
@@ -81,7 +81,7 @@ end
 """
     correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, atol=1e-3)
 
-Correlate modes from a current iteration with those from a previous iteration. Returns a 
+Correlate modes from a current iteration with those from a previous iteration. Returns a
 permutation that may be used to reorder the new modes and the associated corruption indices.
 """
 function correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, atol=1e-3)
@@ -186,12 +186,12 @@ function correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, ato
 end
 
 """
-    ODEFunction(model::Aeroelasticity.CoupledModel)
+    ODEFunction(model::Aeroelasticity.CoupledModel, p0)
 
 Construct an `ODEFunction` for a coupled model.  Note that by using this function you assume
 that the governing equations may be expressed in the form `M(x, p, t)*dx = f(x, p, t)`
 """
-function SciMLBase.ODEFunction(model::CoupledModel)
+function SciMLBase.ODEFunction(model::CoupledModel, p0)
 
     dx = zeros(number_of_states(model))
 
@@ -201,7 +201,7 @@ function SciMLBase.ODEFunction(model::CoupledModel)
     end
 
     if model.constant_mass_matrix
-        mass_matrix = model.mass_matrix
+        mass_matrix = rate_jacobian!(model.mass_matrix, model, dx, dx, p0, 0.0)
     else
         update_func = (jacob, x, p, t) -> rate_jacobian!(jacob, model, dx, x, p, t)
         mass_matrix = DiffEqArrayOperator(collect(model.mass_matrix); update_func)
@@ -236,7 +236,22 @@ function SciMLBase.DAEFunction(model::CoupledModel)
 
     f = (resid, dx, x, p, t) -> residual!(resid, model, dx, x, p, t)
 
+    mass_matrix = model.mass_matrix
+
+    jac = (jacob, dx, x, p, gamma, t) -> begin
+        # compute jacobian
+        state_jacobian!(jacob, model, dx, x, p, t)
+        # compute mass matrix
+        rate_jacobian!(mass_matrix, model, dx, x, p, t)
+        # add mass matrix
+        jacob .+= gamma * mass_matrix
+    end
+
     jac_prototype = model.rate_jacobian_sparsity .+ model.state_jacobian_sparsity
 
-    return DAEFunction(f; jac_prototype)
+    sparsity = model.rate_jacobian_sparsity .+ model.state_jacobian_sparsity
+
+    colorvec = SparseDiffTools.matrix_colors(sparsity)
+
+    return DAEFunction(f)
 end

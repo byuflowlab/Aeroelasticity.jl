@@ -1,10 +1,10 @@
 # ## [Time Domain Simulation of a Typical Section](@id section-simulation)
-# 
+#
 # In this example, we simulate the response of two degree of freedom typical section model.
 # We use the same parameters as in the [previous example](@ref section-stability)
-# 
+#
 # ![](../assets/section-drawing.svg)
-# 
+#
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
@@ -47,14 +47,17 @@ V = 1.0 # = U/(b*ωθ)
 ## dimensionalized velocity
 U = V*b*ωθ
 
-## define coupled model
-model = CoupledModel((Peters{6}(), Section()))
+## define submodels
+submodels = (Peters{6}(), Section())
 
 ## define parameter vector
 p = [a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ, c]
 
-## construct ODE function
-f = ODEFunction(model)
+## define coupled model
+model = CoupledModel(submodels, p)
+
+## construct function
+f = ODEFunction(model, p)
 
 ## initial states
 λ = zeros(6)
@@ -64,21 +67,18 @@ hdot = 0
 thetadot = 0
 x0 = vcat(λ, h, theta, hdot, thetadot)
 
-## initial rates
-dx0 = zero(x0)
-
 ## simulate for 100 seconds
 tspan = (0.0, 100.0)
 
-## construct DAE problem
+## construct problem
 prob = ODEProblem(f, x0, tspan, p)
 
-## solve DAE
-sol = solve(prob)
+## solve problem
+sol = solve(prob, Rodas4())
 
 #!jl nothing #hide
 
-# We can then plot the solution using DifferentialEquations' built-in interface with the 
+# We can then plot the solution using DifferentialEquations' built-in interface with the
 # [Plots](https://github.com/JuliaPlots/Plots.jl) package.
 
 using Plots
@@ -103,8 +103,8 @@ plot(sol,
 
 #md # ![](../assets/section-simulation-solution.svg)
 #-
-# For aeroelastic models based on a typical section, we can also easily visualize the 
-# section's behavior.
+# For aeroelastic models based on a typical section, we can also visualize the section's
+# behavior.
 
 ## animation parameters
 a = -1/5

@@ -3,13 +3,13 @@
 """
     QuasiSteadySection
 
-Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory 
-(see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model 
-(see [`Section()`]).  This model introduces the freestream velocity ``U``, air density 
+Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory
+(see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model
+(see [`Section()`]).  This model introduces the freestream velocity ``U``, air density
 ``\\rho``, and air speed of sound ``c`` as additional parameters.
 
-The parameters for the resulting coupled model (as defined by the parameter function) 
-defaults to the parameters for each model concatenated into a single vector. 
+The parameters for the resulting coupled model (as defined by the parameter function)
+defaults to the parameters for each model concatenated into a single vector.
 """
 struct QuasiSteadySection
     quasisteady::QuasiSteady
@@ -25,7 +25,7 @@ function (::QuasiSteadySection)(dx, x, p, t)
     h, θ, hdot, θdot = x[2]
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, a0, α0, cd0, cm0 = p[1]
-    kh, kθ, m, Sθ, Iθ = p[2] 
+    kh, kθ, m, Sθ, Iθ = p[2]
     U, ρ, c = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
@@ -41,7 +41,3 @@ end
 
 # default parameter function
 default_parameter_function(::QuasiSteadySection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))
-
-# number of parameters corresponding to the default parameter function
-number_of_parameters(::QuasiSteadySection) = 14
-

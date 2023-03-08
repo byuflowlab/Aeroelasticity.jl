@@ -2,12 +2,12 @@
 """
     PetersSection{N}
 
-Coupling model for coupling Peters' finite state theory (see [`Peters`](@ref)) with a 
-typical section model (see [`Section`](@ref)).  This model introduces the freestream 
+Coupling model for coupling Peters' finite state theory (see [`Peters`](@ref)) with a
+typical section model (see [`Section`](@ref)).  This model introduces the freestream
 velocity ``U``, air density ``\\rho``, and air speed of sound ``c`` as additional parameters.
 
-The parameters for the resulting coupled model (as defined by the parameter function) 
-defaults to the parameters for each model concatenated into a single vector. 
+The parameters for the resulting coupled model (as defined by the parameter function)
+defaults to the parameters for each model concatenated into a single vector.
 """
 struct PetersSection{N,TF,TV,TA}
     peters::Peters{N,TF,TV,TA}
@@ -42,6 +42,3 @@ end
 
 # default parameter function
 default_parameter_function(::PetersSection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))
-
-# number of parameters corresponding to the default parameter function
-number_of_parameters(::PetersSection) = 14

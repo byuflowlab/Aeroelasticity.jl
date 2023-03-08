@@ -1,8 +1,8 @@
 """
     Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
 
-Two-dimensional aerodynamic model based on Peters' finite state model with `N` state 
-variables, inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters 
+Two-dimensional aerodynamic model based on Peters' finite state model with `N` state
+variables, inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters
 ``a, b, a_0, \\alpha_0, c_{d,0}, c_{m,0}``
 """
 struct Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
@@ -29,7 +29,7 @@ end
 
 # residual function
 function (peters::Peters)(resid, dx, x, y, p, t)
-    
+
     # extract constants
     Abar = peters.A
     cbar = peters.c
@@ -99,20 +99,18 @@ function peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdo
     λ0 = 1/2 * bbar'*λ
     # Velocity Magnitude (squared)
     V2 = u^2 + v^2
-    # Mach Number (squared)
-    M2 = V2/c^2
-    # Prandtl-Glauert correction factor
-    beta = sqrt(1 - ksmin(SVector(0.99, M2)))
     # normal force at the reference point
     N = tmp1*(v + d*ω - λ0 - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
     # axial force at the reference point
     A = -a0*ρ*b*(v + d*ω - λ0 - u*α0)^2
     # moment at reference point
     M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + 2*ρ*b^2*u^2*cm0 + (b/2 + a*b)*N
-    # apply compressibility correction
-    N = N / beta
-    A = A / beta
-    M = M / beta
+    # # apply compressibility correction (this adds a nonlinear component)
+    # M2 = V2/c^2 # Mach Number (squared)
+    # beta = sqrt(1 - ksmin(0.99, M2)) # Prandtl-Glauert correction factor
+    # N = N / beta
+    # A = A / beta
+    # M = M / beta
     # add skin friction drag
     A += ρ*b*u^2*cd0
     # return loads

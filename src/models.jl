@@ -7,7 +7,7 @@ struct CoupledModel{TR, TY, TP, TI, TS, TC, TM}
     fresid::TR
     finput::TY
     fparam::TP
-    indices::TI    
+    indices::TI
     rate_jacobian_sparsity::TS
     state_jacobian_sparsity::TS
     rate_jacobian_colorvec::TC
@@ -18,50 +18,48 @@ struct CoupledModel{TR, TY, TP, TI, TS, TC, TM}
 end
 
 """
-    CoupledModel(submodels, nstate=number_of_states.(submodels); kwargs...)
+    CoupledModel(submodels, parameters, nstate=number_of_states.(submodels); kwargs...)
 
-Define a coupled model from a collection of submodels.  Each submodel is defined as an 
+Define a coupled model from a collection of submodels.  Each submodel is defined as an
 in-place implicit differential equation (i.e. `submodels[i](residᵢ, dxᵢ, xᵢ, yᵢ, pᵢ, t)`).
 
 # General Keyword Arguments
  - `finput = default_coupling(submodels...)`: Coupling function for the combined system.
     Has the function signature: `y₁, y₂, ... yₙ = finput(dxᵢ, xᵢ, pᵢ, t)`.  Default coupling
     functions are defined for various combinations of built-in models.
- - `fparam = default_parameter_function(finput)`: Parameter function for the coupled system. 
+ - `fparam = default_parameter_function(finput)`: Parameter function for the coupled system.
     Has the function signature: `p₁, p₂, ... pₙ, pₐ = fparam(p, t)`
- 
+
 # Keyword Arguments for Automatically Determining Jacobian Sparsity
  - `neval=3`: Total number of evaluation points (for computing jacobian properties)
- - `nparam=number_of_parameters(finput)`: Number of parameters
  - `dx0=[rand(sum(nstate) for ieval = 1:neval]`: Evaluation point rates
  - `x0=[rand(sum(nstate) for ieval = 1:neval]`: Evaluation point states
- - `p0=[rand(nparam) for ieval = 1:neval]`: Evaluation point parameters
+ - `p0=fill(default_parameters(finput), neval)`: Evaluation point parameters
  - `t0=[rand() for ieval=1:neval]`: Evaluation point times
  - `symbolic=true`: Symbolically find jacobian sparsity?
  - `autodiff=true`: Use automatic differentiation to evaluate jacobians?
  - `fdtype=Val(:forward)`: Finite differencing type to use if `autodiff=false`
  - `ztol=nothing`: Tolerance for determining jacobian sparsity (the default includes structural zeros)
  - `atol=0.0`: Absolute tolerance for determining rate jacobian properties (see `isapprox`)
- - `rtol=0.0`: Relative tolerance for determining rate jacobian properties (see `isapprox`) 
+ - `rtol=0.0`: Relative tolerance for determining rate jacobian properties (see `isapprox`)
 
  # Keyword Arguments for Providing Jacobian Sparsity (and other properties)
  - `rate_jacobian_sparsity=nothing`: Coupled system rate jacobian sparsity
  - `state_jacobian_sparsity=nothing`: Coupled system state jacobian sparsity
  - `rate_jacobian_colorvec=nothing`: Coupled system rate jacobian color vector
  - `state_jacobian_colorvec=nothing`: Coupled system state jacobian color vector
- - `identity_mass_matrix=nothing`: Indicates whether the mass matrix is the identity matrix 
+ - `identity_mass_matrix=nothing`: Indicates whether the mass matrix is the identity matrix
  - `constant_mass_matrix=nothing`: Indicates whether the mass matrix does not change.  Note
     that when `neval=1` this property defaults to `false` unless `identity_mass_matrix==true`
  - `mass_matrix=spzeros(sum(nstate),sum(nstate))`: Storage for the mass matrix.  Note that
     this matrix is only used if `constant_mass_matrix=true`
 """
-function CoupledModel(submodels, nstate=number_of_states.(submodels);
-    finput=default_coupling(submodels...), fparam=default_parameter_function(finput), 
-    neval=3, nparam=number_of_parameters(finput),
-    dx0=[rand(sum(nstate)) for ieval in 1:neval], x0=[rand(sum(nstate)) for ieval in 1:neval], 
-    p0=fill(rand(nparam), neval), t0=[rand() for ieval in 1:neval], 
-    symbolic=true, autodiff=true, fdtype=Val(:forward), ztol=nothing, atol=0.0, rtol=0.0, 
-    rate_jacobian_sparsity=nothing, rate_jacobian_colorvec=nothing, 
+function CoupledModel(submodels, parameters, nstate=number_of_states.(submodels);
+    finput=default_coupling(submodels...), fparam=default_parameter_function(finput), neval=3,
+    dx0=[rand(sum(nstate)) for ieval in 1:neval], x0=[rand(sum(nstate)) for ieval in 1:neval],
+    p0=fill(parameters, neval), t0=[rand() for ieval in 1:neval],
+    symbolic=true, autodiff=true, fdtype=Val(:forward), ztol=nothing, atol=0.0, rtol=0.0,
+    rate_jacobian_sparsity=nothing, rate_jacobian_colorvec=nothing,
     state_jacobian_sparsity=nothing, state_jacobian_colorvec=nothing,
     identity_mass_matrix=nothing, constant_mass_matrix=nothing,
     mass_matrix=spzeros(sum(nstate), sum(nstate)))
@@ -97,7 +95,7 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
     if symbolic
         # compute jacobian sparsity (symbolically)
         if isnothing(rate_jacobian_sparsity)
-            rate_jacobian_sparsity = symbolic_coupled_rate_sparsity_pattern(dx0[1], x0[1], p0[1], t0[1], 
+            rate_jacobian_sparsity = symbolic_coupled_rate_sparsity_pattern(dx0[1], x0[1], p0[1], t0[1],
                 submodels, finput, fparam, indices; ztol=ztol)
         end
         # compute color vector
@@ -109,13 +107,13 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
             rate_jacobs = [zeros(sum(nstate), sum(nstate)) for ieval = 1:neval]
             for ieval = 1:neval
                 if autodiff
-                    autodiff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval], 
-                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices; 
+                    autodiff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval],
+                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices;
                         colorvec=rate_jacobian_colorvec, sparsity=rate_jacobian_sparsity)
                 else
-                    finitediff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval], 
-                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices; 
-                        colorvec=rate_jacobian_colorvec, sparsity=rate_jacobian_sparsity, 
+                    finitediff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval],
+                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices;
+                        colorvec=rate_jacobian_colorvec, sparsity=rate_jacobian_sparsity,
                         fdtype=fdtype)
                 end
             end
@@ -126,13 +124,13 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
             rate_jacobs = [zeros(sum(nstate), sum(nstate)) for ieval = 1:neval]
             for ieval = 1:neval
                 if autodiff
-                    autodiff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval], 
-                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices; 
+                    autodiff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval],
+                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices;
                         colorvec=rate_jacobian_colorvec, sparsity=rate_jacobian_sparsity)
                 else
-                    finitediff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval], 
-                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices; 
-                        colorvec=rate_jacobian_colorvec, sparsity=rate_jacobian_sparsity, 
+                    finitediff_coupled_rate_jacobian!(rate_jacobs[ieval], dx0[ieval],
+                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices;
+                        colorvec=rate_jacobian_colorvec, sparsity=rate_jacobian_sparsity,
                         fdtype=fdtype)
                 end
             end
@@ -151,7 +149,7 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
     if symbolic
         # compute jacobian sparsity (symbolically)
         if isnothing(state_jacobian_sparsity)
-            state_jacobian_sparsity = symbolic_coupled_state_sparsity_pattern(dx0[1], x0[1], p0[1], t0[1], 
+            state_jacobian_sparsity = symbolic_coupled_state_sparsity_pattern(dx0[1], x0[1], p0[1], t0[1],
                 submodels, finput, fparam, indices; ztol=ztol)
         end
         # compute color vector
@@ -164,13 +162,13 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
             state_jacobs = [zeros(sum(nstate), sum(nstate)) for ieval = 1:neval]
             for ieval = 1:neval
                 if autodiff
-                    autodiff_coupled_state_jacobian!(state_jacobs[ieval], dx0[ieval], 
-                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices; 
+                    autodiff_coupled_state_jacobian!(state_jacobs[ieval], dx0[ieval],
+                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices;
                         colorvec=state_jacobian_colorvec, sparsity=state_jacobian_sparsity)
                 else
-                    finitediff_coupled_state_jacobian!(state_jacobs[ieval], dx0[ieval], 
-                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices; 
-                        colorvec=state_jacobian_colorvec, sparsity=state_jacobian_sparsity, 
+                    finitediff_coupled_state_jacobian!(state_jacobs[ieval], dx0[ieval],
+                        x0[ieval], p0[ieval], t0[ieval], submodels, finput, fparam, indices;
+                        colorvec=state_jacobian_colorvec, sparsity=state_jacobian_sparsity,
                         fdtype=fdtype)
                 end
             end
@@ -187,7 +185,7 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
     if isnothing(identity_mass_matrix)
         identity_mass_matrix = isidentity(rate_jacobs...; atol=atol, rtol=rtol)
     end
-        
+
     # check if the mass matrix is constant
     if identity_mass_matrix
         constant_mass_matrix = true
@@ -199,13 +197,11 @@ function CoupledModel(submodels, nstate=number_of_states.(submodels);
         end
     end
 
-    # save mass matrix (if it is constant)
-    if constant_mass_matrix
-        mass_matrix .= -rate_jacobs[1]
-    end
+    # save mass matrix
+    mass_matrix .= -rate_jacobs[1]
 
-    return CoupledModel(submodels, finput, fparam, indices, rate_jacobian_sparsity, 
-        state_jacobian_sparsity, rate_jacobian_colorvec, state_jacobian_colorvec, 
+    return CoupledModel(submodels, finput, fparam, indices, rate_jacobian_sparsity,
+        state_jacobian_sparsity, rate_jacobian_colorvec, state_jacobian_colorvec,
         identity_mass_matrix, constant_mass_matrix, mass_matrix)
 end
 
@@ -221,9 +217,9 @@ function residual!(resid, coupled_model, dx, x, p, t)
 end
 
 function rate_jacobian(coupled_model, dx, x, p, t; kwargs...)
-    
+
     jacob = spzeros(eltype(dx), length(dx), length(dx))
-    
+
     return rate_jacobian!(jacob, coupled_model, dx, x, p, t; kwargs...)
 end
 
@@ -244,9 +240,9 @@ function rate_jacobian!(jacob, coupled_model, dx, x, p, t; autodiff=true, fdtype
 end
 
 function state_jacobian(coupled_model, dx, x, p, t; kwargs...)
-    
+
     jacob = spzeros(eltype(dx), length(dx), length(dx))
-    
+
     return state_jacobian!(jacob, coupled_model, dx, x, p, t; kwargs...)
 end
 

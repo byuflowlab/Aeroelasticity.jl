@@ -1,7 +1,7 @@
 # # [Aeroelastic Analysis of the Goland Wing](@id goland)
-# 
-# In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis 
-# using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been 
+#
+# In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis
+# using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been
 # extensively used for validation.
 #
 # ![](../assets/goland-wing.png)
@@ -12,21 +12,21 @@
 #md #     [`goland.ipynb`](@__NBVIEWER_ROOT_URL__/examples/goland.ipynb).
 #-
 #
-# The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its airfoil 
-# consists of a 4% thick parabolic arc.  There are two configurations for this wing, one 
-# with a tip store and one without.  The configuration we consider in this example is 
+# The Goland wing is a cantilevered wing with a 20 ft span and 6 ft chord.  Its airfoil
+# consists of a 4% thick parabolic arc.  There are two configurations for this wing, one
+# with a tip store and one without.  The configuration we consider in this example is
 # the configuration without a tip store.
 #
-# The deflections of Goland wing are relatively small, so linear structural models are 
-# sufficient for modeling the wing's structure.  However, to demonstrate the 
-# capabilities of this package, we will use a nonlinear geometrically exact beam 
-# theory model.  
+# The deflections of Goland wing are relatively small, so linear structural models are
+# sufficient for modeling the wing's structure.  However, to demonstrate the
+# capabilities of this package, we will use a nonlinear geometrically exact beam
+# theory model.
 #
-# For the aerodynamics, we use a lifting line model which is capable of using a 
-# variety of 2D models to model section lift and moment coefficients.  While this 
-# type of aerodynamic model is inappropriate for this wing due to the wing's low 
-# aspect ratio, we use it so that we can obtain a better comparison between our 
-# results and the results of other aeroelastic analyses of the Goland wing performed 
+# For the aerodynamics, we use a lifting line model which is capable of using a
+# variety of 2D models to model section lift and moment coefficients.  While this
+# type of aerodynamic model is inappropriate for this wing due to the wing's low
+# aspect ratio, we use it so that we can obtain a better comparison between our
+# results and the results of other aeroelastic analyses of the Goland wing performed
 # with lifting line aerodynamics.
 
 using Aeroelasticity, GXBeam, DifferentialEquations, LinearAlgebra
@@ -73,22 +73,26 @@ stop = 2:N+1 # ending point of each beam element
 frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
 compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 0]), N) # compliance matrix
 xm2 = xea - xcm
-mass = fill([
+mass = fill([ # mass matrix
     μ 0 0 0 0 -μ*xm2;
     0 μ 0 0 0 0;
     0 0 μ μ*xm2 0 0;
     0 0 μ*xm2 i11 0 0;
     0 0 0 0 i22 0;
-    -μ*xm2 0 0 0 0 i33], N) # mass matrix
+    -μ*xm2 0 0 0 0 i33], N)
+
+## define beam assembly
 assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
 
+## define prescribed conditions
 prescribed = Dict(
     ## fixed left edge
     1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
         theta_z=0),
 )
 
-system = System(assembly, false)
+## define system
+system = DynamicSystem(assembly)
 
 ## construct section models
 section_models = fill(Peters{6}(), N)
@@ -97,12 +101,16 @@ section_models = fill(Peters{6}(), N)
 aerodynamic_model = LiftingLine(section_models)
 
 ## construct structural model
-structural_model = GXBeamAssembly(assembly, prescribed)
+structural_model = GXBeamAssembly(system)
 
-## define coupled model
-model = assemble_model(;
-    aerodynamic_model = aerodynamic_model,
-    structural_model = structural_model)
+## define submodels
+submodels = (aerodynamic_model, structural_model)
+
+## define parameters
+parameters =
+
+## construct coupled model
+model = CoupledModel(submodels, parameters)
 
 ## current time
 t = 0.0
@@ -121,13 +129,13 @@ for i = 1:length(Vinf)
 
     ## define parameter vector
     p = assemble_parameters(model;
-        aerodynamic_parameters = (; 
+        aerodynamic_parameters = (;
             sections = fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N)
             ),
-        structural_parameters = (; 
+        structural_parameters = (;
             assembly = assembly
             ),
-        additional_parameters = (; 
+        additional_parameters = (;
             v_f = [-Vinf[i], 0, 0],
             rho = rho,
             c = c,
@@ -251,13 +259,13 @@ p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 
 #md # ![]("../assets/goland-stability.svg")
 
-# As predicted by this analysis, the flutter speed is 135 m/s and the flutter frequency 
-# is 69.0 rad/s.  These results compare well with the results found by Palacios and Epureanu 
+# As predicted by this analysis, the flutter speed is 135 m/s and the flutter frequency
+# is 69.0 rad/s.  These results compare well with the results found by Palacios and Epureanu
 # in "An Intrinsic Description of the Nonlinear Aeroelasticity of Very Flexible Wings".
 # Their analysis, which was also based on lifting line aerodynamics predicted a flutter
 # speed of 141 m/s and a flutter frequency of 69.8 rad/s.
 
-#- 
+#-
 
 # We can visualize the flutter mode using GXBeam's built in interface with WriteVTK
 
@@ -266,13 +274,13 @@ Vf = 135
 
 ## define parameter vector
 p = assemble_parameters(model;
-    aerodynamic_parameters = (; 
+    aerodynamic_parameters = (;
         sections = fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N)
         ),
-    structural_parameters = (; 
+    structural_parameters = (;
         assembly = assembly
         ),
-    additional_parameters = (; 
+    additional_parameters = (;
         v_f = [-Vf, 0, 0],
         rho = rho,
         c = c,

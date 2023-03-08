@@ -3,13 +3,13 @@
 """
     WagnerSection
 
-Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see 
-[`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
-This coupling introduces the freestream velocity ``U_\\infty``, air density 
+Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see
+[`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).
+This coupling introduces the freestream velocity ``U_\\infty``, air density
 ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
 
-The parameters for the resulting coupled model (as defined by the parameter function) 
-defaults to the parameters for each model concatenated into a single vector. 
+The parameters for the resulting coupled model (as defined by the parameter function)
+defaults to the parameters for each model concatenated into a single vector.
 """
 struct WagnerSection{TF}
     wagner::Wagner{TF}
@@ -22,14 +22,14 @@ function (wagner_section::WagnerSection)(dx, x, p, t)
     # extract constants
     @unpack C1, C2 = wagner_section.wagner
     # extract rate variables
-    dλ1, dλ2 = dx[1] 
+    dλ1, dλ2 = dx[1]
     dh, dθ, dhdot, dθdot = dx[2]
     # extract state variables
-    λ1, λ2 = x[1] 
+    λ1, λ2 = x[1]
     h, θ, hdot, θdot = x[2]
     # extract parameters
-    a, b, a0, α0, cd0, cm0 = p[1] 
-    kh, kθ, m, Sθ, Iθ = p[2] 
+    a, b, a0, α0, cd0, cm0 = p[1]
+    kh, kθ, m, Sθ, Iθ = p[2]
     U, ρ, c = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
@@ -44,6 +44,3 @@ end
 
 # default parameter function
 default_parameter_function(::WagnerSection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))
-
-# number of parameters corresponding to the default parameter function
-number_of_parameters(::WagnerSection) = 14
