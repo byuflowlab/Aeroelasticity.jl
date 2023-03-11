@@ -97,8 +97,6 @@ function peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdo
     d = b/2 - a*b
     # induced flow velocity
     λ0 = 1/2 * bbar'*λ
-    # Velocity Magnitude (squared)
-    V2 = u^2 + v^2
     # normal force at the reference point
     N = tmp1*(v + d*ω - λ0 - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
     # axial force at the reference point
@@ -106,7 +104,8 @@ function peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdo
     # moment at reference point
     M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + 2*ρ*b^2*u^2*cm0 + (b/2 + a*b)*N
     # # apply compressibility correction (this adds a nonlinear component)
-    # M2 = V2/c^2 # Mach Number (squared)
+    # V2 = u^2 + v^2 # velocity magnitude (squared)
+    # M2 = V2/c^2 # mach number (squared)
     # beta = sqrt(1 - ksmin(0.99, M2)) # Prandtl-Glauert correction factor
     # N = N / beta
     # A = A / beta
