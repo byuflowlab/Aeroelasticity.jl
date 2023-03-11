@@ -37,7 +37,7 @@ function steady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v)
     # N = N / beta
     # A = A / beta
     # M = M / beta
-    # add skin friction drag
+    # add skin friction drag (note that Prandtl-Glauert correction applies only to pressure)
     A += ρ*b*u^2*cd0
     return SVector(N, A, M)
 end

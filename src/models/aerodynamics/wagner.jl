@@ -67,7 +67,7 @@ function wagner_loads(a, b, ρ, c, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ω
     # N = N / beta
     # A = A / beta
     # M = M / beta
-    # add skin friction drag
+    # add skin friction drag (note that Prandtl-Glauert correction applies only to pressure)
     A += ρ*b*u^2*cd0
     # return loads
     return SVector(N, A, M)
