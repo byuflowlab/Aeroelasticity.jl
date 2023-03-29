@@ -40,8 +40,8 @@ function (gxbeam::GXBeamAssembly)(resid, dx, x, y, p, t)
     assembly = p
 
     # # extract inputs
-    (; prescribed_conditions, distributed_loads, point_masses, linear_velocity,
-        angular_velocity, linear_acceleration, angular_acceleration, gravity) = y
+    @unpack prescribed_conditions, distributed_loads, point_masses, linear_velocity,
+        angular_velocity, linear_acceleration, angular_acceleration, gravity = y
 
     # compute residual
     if typeof(system) <: StaticSystem
