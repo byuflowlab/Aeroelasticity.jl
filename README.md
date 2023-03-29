@@ -7,14 +7,14 @@
 
 Author: Taylor McDonnell
 
-**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems.  A number of built-in models have also been developed to be able simulate various aeroelastic behavior.
+**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems, though this package may also be used to construct general monolithic coupled systems.
 
 ![](https://flow.byu.edu/Aeroelasticity.jl/dev/assets/section-simulation.gif)
 
 ## Package Features
  - Facilitates defining and simulating the behavior of both 2D and 3D aeroelastic systems
  - Contains a number of predefined aerodynamic, structural, and aeroelastic models including:
-   - Aerodynamic Models 
+   - Aerodynamic Models
      - Steady Thin Airfoil Theory (2D)
      - Quasi-Steady Thin Airfoil Theory (2D)
      - Wagner's Function (2D)
@@ -29,7 +29,7 @@ Author: Taylor McDonnell
    - Eigenvalue Analyses
    - Time-Marching Analyses (using [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl))
  - Several verification cases for built-in models (see the [examples](https://flow.byu.edu/Aeroelasticity.jl/dev/examples/))
- - Provides modular framework for constructing monolithic coupled systems
+ - Provides a modular framework for constructing general monolithic coupled systems
 
 ## Installation
 

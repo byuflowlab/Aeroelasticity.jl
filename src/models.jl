@@ -207,6 +207,12 @@ end
 
 number_of_states(coupled_model::CoupledModel) = coupled_model.indices[end][end]
 
+state_indices(coupled_model::CoupledModel) = coupled_model.indices
+
+separate_states(x, coupled_model::CoupledModel) = view.(Ref(x), coupled_model.indices)
+
+default_parameter_function(finput) = (p, t) -> p
+
 (coupled_model::CoupledModel)(resid, dx, x, p, t) = residual!(resid, coupled_model, dx, x, p, t)
 
 function residual!(resid, coupled_model, dx, x, p, t)
@@ -303,7 +309,7 @@ function autodiff_coupled_rate_jacobian!(jacob, dx, x, p, t, fresid, finput, fpa
 
     jac_cache = ForwardColorJacCache(f!, dx; colorvec, sparsity)
 
-    return SparseDiffTools, forwarddiff_color_jacobian!(jacob, f!, dx, jac_cache)
+    return SparseDiffTools.forwarddiff_color_jacobian!(jacob, f!, dx, jac_cache)
 end
 
 function symbolic_coupled_rate_sparsity_pattern(dx, x, p, t, fresid, finput, fparam, indices; ztol=ztol)
@@ -328,7 +334,7 @@ function autodiff_coupled_state_jacobian!(jacob, dx, x, p, t, fresid, finput, fp
 
     jac_cache = ForwardColorJacCache(f!, x; colorvec, sparsity)
 
-    return SparseDiffTools, forwarddiff_color_jacobian!(jacob, f!, x, jac_cache)
+    return SparseDiffTools.forwarddiff_color_jacobian!(jacob, f!, x, jac_cache)
 end
 
 function symbolic_coupled_state_sparsity_pattern(dx, x, p, t, fresid, finput, fparam, indices; ztol=ztol)

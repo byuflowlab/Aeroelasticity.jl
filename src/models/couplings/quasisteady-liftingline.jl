@@ -2,7 +2,7 @@
 """
     QuasiSteadyLiftingLine
 
-Coupling model which allows a quasisteady thin airfoil theory model (see [`Steady`](@ref)) 
+Coupling model which allows a quasisteady thin airfoil theory model (see [`Steady`](@ref))
 to be used more conveniently with the [`LiftingLine`](@ref) model. See [`LiftingLineSection`](@ref).
 """
 struct QuasiSteadyLiftingLine
@@ -21,8 +21,8 @@ function (quasisteady_liftingline::QuasiSteadyLiftingLine)(dx, x, p, t)
     a, b, a0, α0, cd0, cm0 = p[1]
     ρ, c = p[2]
     # freestream velocity components
-    u, v, ω = liftingline_section_velocities(vx, vz, ωy)
-    udot, vdot, ωdot = liftingline_section_accelerations(dvx, dvz, dωy)
+    u, v, ω = liftingline_section_velocities(vx, vz, -ωy)
+    udot, vdot, ωdot = liftingline_section_accelerations(dvx, dvz, -dωy)
     # calculate aerodynamic loads
     N, A, M = quasisteady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v, ω, vdot, ωdot)
     # forces and moments per unit span

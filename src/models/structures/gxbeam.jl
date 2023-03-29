@@ -1,10 +1,10 @@
 """
     GXBeamAssembly{S}
 
-Model which describes the dynamic behavior of an assembly of beam elements, as modeled by 
+Model which describes the dynamic behavior of an assembly of beam elements, as modeled by
 the `GXBeam` package.  State variables are as defined by GXBeam.  Inputs are defined and
 passed as a [`GXBeamInputs`](@ref) struct. Parameters are defined and passed as a
-[`GXBeamParameters`](@ref) struct.  
+[`GXBeamParameters`](@ref) struct.
 """
 struct GXBeamAssembly{S}
     system::S
@@ -14,7 +14,7 @@ struct GXBeamAssembly{S}
 end
 
 """
-    GXBeamAssembly(system::GXBeam.AbstractSystem; steady_state=false, two_dimensional=false, 
+    GXBeamAssembly(system::GXBeam.AbstractSystem; steady_state=false, two_dimensional=false,
         structural_damping=true)
 
 Construct a geometrically exact beam theory structural model
@@ -39,34 +39,32 @@ function (gxbeam::GXBeamAssembly)(resid, dx, x, y, p, t)
     # extract parameters
     assembly = p
 
-    # extract inputs
-    prescribed, distributed, point_masses, linear_velocity, angular_velocity, gravity = y
-
-    # extract additional inputs for steady simulations
-    linear_acceleration, angular_acceleration = y
+    # # extract inputs
+    (; prescribed_conditions, distributed_loads, point_masses, linear_velocity,
+        angular_velocity, linear_acceleration, angular_acceleration, gravity) = y
 
     # compute residual
     if typeof(system) <: StaticSystem
-        static_system_residual!(resid, x, indices, two_dimensional, force_scaling,
-            assembly, prescribed, distributed, point_masses, gravity)
+        GXBeam.static_system_residual!(resid, x, indices, two_dimensional, force_scaling,
+            assembly, prescribed_conditions, distributed_loads, point_masses, gravity)
     elseif typeof(system) <: DynamicSystem
         if steady_state
-            steady_system_residual!(resid, dx, x, indices, two_dimensional, force_scaling,
-                structural_damping, assembly, prescribed, distributed, point_masses,
+            GXBeam.steady_system_residual!(resid, x, indices, two_dimensional, force_scaling,
+                structural_damping, assembly, prescribed_conditions, distributed_loads, point_masses,
                 gravity, linear_velocity, angular_velocity, linear_acceleration, angular_acceleration)
         else
-            dynamic_system_residual!(resid, dx, x, indices, two_dimensional, force_scaling,
-                structural_damping, assembly, prescribed, distributed, point_masses,
+            GXBeam.dynamic_system_residual!(resid, dx, x, indices, two_dimensional, force_scaling,
+                structural_damping, assembly, prescribed_conditions, distributed_loads, point_masses,
                 gravity, linear_velocity, angular_velocity)
         end
     else # typeof(system) <: ExpandedSystem
         if steady_state
-            expanded_steady_system_residual!(resid, dx, x, indices, two_dimensional, force_scaling,
-                structural_damping, assembly, prescribed, distributed, point_masses,
+            GXBeam.expanded_steady_system_residual!(resid, x, indices, two_dimensional, force_scaling,
+                structural_damping, assembly, prescribed_conditions, distributed_loads, point_masses,
                 gravity, linear_velocity, angular_velocity, linear_acceleration, angular_acceleration)
         else
-            expanded_dynamic_system_residual!(resid, dx, x, indices, two_dimensional, force_scaling,
-                structural_damping, assembly, prescribed, distributed, point_masses,
+            GXBeam.expanded_dynamic_system_residual!(resid, dx, x, indices, two_dimensional, force_scaling,
+                structural_damping, assembly, prescribed_conditions, distributed_loads, point_masses,
                 gravity, linear_velocity, angular_velocity)
         end
     end
@@ -75,17 +73,6 @@ function (gxbeam::GXBeamAssembly)(resid, dx, x, y, p, t)
 end
 
 number_of_states(gxbeam::GXBeamAssembly) = length(gxbeam.system.x)
-
-struct GXBeamInputs{TF}
-    prescribed_conditions::Dict{Int,PrescribedConditions{TF}}
-    distributed_loads::Dict{Int,DistributedLoads{TF}}
-    point_masses::Dict{Int,PointMass{TF}}
-    linear_velocity::SVector{3,TF}
-    angular_velocity::SVector{3,TF}
-    linear_acceleration::SVector{3,TF}
-    angular_acceleration::SVector{3,TF}
-    gravity::SVector{3,TF}
-end
 
 """
     GXBeamInputs(; kwargs...)
@@ -97,11 +84,11 @@ Defines inputs for a geometrically exact beam theory structural model
         A dictionary with keys corresponding to the points at
         which prescribed conditions are applied and values of type
         [`PrescribedConditions`](@ref) which describe the prescribed conditions
-        at those points.  
+        at those points.
  - `distributed_loads = Dict{Int,DistributedLoads{Float64}}()`: A dictionary
         with keys corresponding to the elements to which distributed loads are
         applied and values of type [`DistributedLoads`](@ref) which describe
-        the distributed loads on those elements.  
+        the distributed loads on those elements.
  - `point_masses = Dict{Int,PointMass{Float64}}()`: A dictionary with keys
         corresponding to the points to which point masses are attached and values
         of type [`PointMass`](@ref) which contain the properties of the attached
@@ -122,21 +109,17 @@ function GXBeamInputs(;
     angular_acceleration=(@SVector zeros(3)),
     gravity=(@SVector zeros(3)))
 
-    return GXBeamInputs(prescribed_conditions, distributed_loads, point_masses, 
-        linear_velocity, angular_velocity, linear_acceleration, angular_acceleration, 
+    return (; prescribed_conditions, distributed_loads, point_masses,
+        linear_velocity, angular_velocity, linear_acceleration, angular_acceleration,
         gravity)
 end
 
-struct GXBeamParameters{TF,TP,TC,TE}
-    assembly::Assembly{TF,TP,TC,TE}
-end
-
 """
-    GXBeamParameters(assembly::Assembly)
+    GXBeamParameters(assembly::GXBeam.Assembly)
 
 Defines parameters for a geometrically exact beam theory structural model
 """
-GXBeamParameters(assembly)
+GXBeamParameters(assembly) = assembly
 
 # --- Internal Methods for Couplings with this Model --- #
 

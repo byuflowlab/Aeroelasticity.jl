@@ -24,12 +24,12 @@ Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
 corresponding to the model.
 """
 function dense_eigen(K, M)
-    A = -Array(K)
-    B = Array(M)
+    A = Array(K)
+    B = Array(-M)
     E = eigen(A, B) # eigenvalue decomposition
     λ = eigvals(E) # eigenvalues
     V = eigvecs(E) # right eigenvector matrix
-    U = I/(B*V) # left eigenvector matrix
+    U = I/(M*V) # left eigenvector matrix
     return λ, U, V
 end
 
@@ -42,15 +42,16 @@ corresponding to the model. `nev` is the number of eigenvalues to compute
 function sparse_eigen(K, M; nev=min(20, size(K,1)))
 
     # construct linear map
-    T = eltype(K)
+    T = promote_type(eltype(K), eltype(M))
     nx = size(K, 1)
     Kfact = lu(K)
     f! = (b, x) -> ldiv!(b, Kfact, M * x)
     fc! = (b, x) -> mul!(b, M', Kfact' \ x)
-    A = LinearMap{T}(f!, fc!, nx, nx; ismutating=true)
+    L = LinearMap{T}(f!, fc!, nx, nx; ismutating=true)
 
-    # compute eigenvalues and eigenvectors
-    λ, V = partialeigen(partialschur(A; nev=min(nx, nev), which=LM(), tol=1e-9)[1])
+    # # compute eigenvalues and eigenvectors
+    # λ, V, _ = Arpack.eigs(L; nev=min(nx,nev), which=:LM)
+    λ, V = partialeigen(partialschur(L; nev=min(nx, nev), which=LM(), tol=1e-6)[1])
 
     # sort eigenvalues by magnitude
     perm = sortperm(λ, by=(λ) -> (abs(λ), imag(λ)), rev=true)
@@ -61,19 +62,21 @@ function sparse_eigen(K, M; nev=min(20, size(K,1)))
     λ .= -1 ./ λ
 
     # also compute left eigenvectors
-    U = similar(V', complex(T))
-    for iλ in eachindex(λ)
-        # set shift value
-        shift = λ[iλ] + 1e-12im
-        # compute corresponding left eigenvector
-        F = lu(transpose(K) + shift * transpose(M))
-        Fmap = LinearMap{complex(T)}((y, x) -> ldiv!(y, F, x), nx, ismutating = true)
-        _, u = IterativeSolvers.powm(Fmap; inverse = true, shift = shift)
-        # apply normalization
-        u ./= (transpose(u)*M*view(V,:,iλ))
-        # store as a row vector
-        U[iλ,:] .= u
-    end
+    U = left_eigenvectors(K, M, λ, V)
+
+    # U = similar(V', complex(T))
+    # for iλ in eachindex(λ)
+    #     # set shift value
+    #     shift = λ[iλ] + 1e-6im
+    #     # compute corresponding left eigenvector
+    #     F = lu(transpose(K) + shift * transpose(M))
+    #     Fmap = LinearMap{complex(T)}((y, x) -> ldiv!(y, F, x), nx, ismutating=true)
+    #     _, u = IterativeSolvers.powm(Fmap; inverse = true, shift = shift)
+    #     # apply normalization
+    #     u ./= (transpose(u)*M*view(V,:,iλ))
+    #     # store as a row vector
+    #     U[iλ,:] .= u
+    # end
 
     return λ, U, V
 end

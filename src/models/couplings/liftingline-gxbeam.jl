@@ -1,15 +1,13 @@
 """
     LiftingLineGXBeamAssembly()
 
-Construct a model by coupling a lifting line aerodynamic model and a geometrically exact 
-beam theory model (as implemented by GXBeam).  Parameters for this model are defined in 
+Construct a model by coupling a lifting line aerodynamic model and a geometrically exact
+beam theory model (as implemented by GXBeam).  Parameters for this model are defined in
 [`LiftingLineGXBeamParameters`](@ref).
 
 **NOTE: When using this model, the local frame for each beam element is assumed to
-be oriented with the x-axis along the beam's axis, the y-axis forward (into the freestream), 
+be oriented with the x-axis along the beam's axis, the y-axis forward (into the freestream),
 and the z-axis in the airfoil normal direction.**
-
-**NOTE: This model does not define a default parameter function for the coupled model**
 """
 struct LiftingLineGXBeamAssembly{R, Y, I, S}
     liftingline::LiftingLine{R, Y, I}
@@ -23,34 +21,31 @@ default_coupling(liftingline::LiftingLine, gxbeam::GXBeamAssembly) = LiftingLine
 function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
 
     # coupling function for each section
-    finput = liftingline_rigidbody.liftingline.finput
+    finput = liftingline_gxbeam.liftingline.finput
 
     # state variable indices for each section
-    indices = liftingline_rigidbody.liftingline.indices
+    indices = liftingline_gxbeam.liftingline.indices
+
+    # extract rates
+    liftingline_rates, gxbeam_rates = dx
+
+    # extract states
+    liftingline_states, gxbeam_states = x
 
     # extract parameters
     liftingline_parameters, gxbeam_parameters, coupling_parameters = p
 
     # extract GXBeam variables
     system = liftingline_gxbeam.gxbeam.system
-    assembly = gxbeam_parameters.assembly
-    prescribed_conditions = gxbeam_parameters.prescribed_conditions
-    distributed_loads = gxbeam_parameters.distributed_loads
+    assembly = gxbeam_parameters
+    prescribed_conditions = coupling_parameters.prescribed_conditions
+    distributed_loads = coupling_parameters.distributed_loads
 
     # number of sections
     n = length(indices)
 
-    # freestream velocity and acceleration vectors
-    v = SVector(ur, vr, wr)
-    ω = SVector(pr, qr, rr)
-    a = SVector(dur, dvr, dwr)
-    α = SVector(dpr, dqr, drr)
-
-    # initialize loads with body loads
-    F = coupling_parameters.Fb
-    M = coupling_parameters.Mb
-
-    # extract freestream density and speed of sound
+    # freestream properties
+    Vinf = coupling_parameters.Vinf
     ρ = coupling_parameters.rho
     c = coupling_parameters.c
 
@@ -64,11 +59,11 @@ function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
     for i = 1:n
 
         # extract element properties
-        element = gxbeam_parameters.assembly.elements[ie]
+        element = assembly.elements[i]
 
         # extract element state variables
-        element_states = GXBeam.extract_element_state(dx, x, system, assembly, i; 
-            prescribed_conditions = prescribed_conditions)
+        element_states = GXBeam.extract_element_state(gxbeam_rates, gxbeam_states,
+            system, assembly, i; prescribed_conditions = prescribed_conditions)
 
         # construct transformation matrices for this element
         body_to_element = gxbeam_body_to_element(element, element_states.theta)
@@ -76,10 +71,10 @@ function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
         body_to_aero = element_to_aero*body_to_element
 
         # local freestream velocity and acceleration
-        vi = body_to_aero*(v - element_states.V)
-        ωi = body_to_aero*(ω + element_states.Omega)
-        ai = body_to_aero*(a - element_states.Vdot)
-        αi = body_to_aero*(α + element_states.Omegadot)
+        vi = body_to_aero * (Vinf - element_states.V)
+        ωi = -body_to_aero*element_states.Omega
+        ai = -body_to_aero*element_states.Vdot
+        αi = -body_to_aero*element_states.Omegadot
 
         # define section rates, states, and parameters
         dxi = liftingline_rates[indices[i]], SVector(ai..., αi...)
@@ -96,71 +91,59 @@ function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
         # extract load inputs
         fi, mi = yi_load
 
-        # transform distributed loads into the body frame
+        # # transform distributed loads into the body frame
         fi = body_to_aero'*fi
         mi = body_to_aero'*mi
 
         # integrate distributed loads
-        section_distributed_loads = DistributedLoads(assembly, ielem; fx = (s)->fi[1], fy=(s)->fi[2], 
-            fz=(s)->fi[3], mx=(s)->mi[1], my=(s)->mi[2], mz=(s)->mi[3])
+        section_loads = DistributedLoads(assembly, i;
+            fx = (s) -> fi[1], fy = (s) -> fi[2], fz = (s) -> fi[3],
+            mx = (s) -> mi[1], my = (s) -> mi[2], mz = (s) -> mi[3])
 
         # combine with existing distributed loads
         if haskey(distributed_loads, i)
-            section_distributed_loads = GXBeam.combine_loads(distributed_loads[i], section_distributed_loads)
+            section_loads = GXBeam.combine_loads(distributed_loads[i], section_loads)
         end
 
         # save distributed loads
-        combined_distributed_loads = (distributed_loads..., section_aerodynamic_load)
+        combined_distributed_loads = (combined_distributed_loads..., section_loads)
     end
 
     # construct gxbeam inputs
     gxbeam_inputs = GXBeamInputs(;
-        prescribed_conditions = gxbeam_parameters.prescribed_conditions,
+        prescribed_conditions = coupling_parameters.prescribed_conditions,
         distributed_loads = Dict(i=>combined_distributed_loads[i] for i = 1:n),
-        point_masses = gxbeam_parameters.point_masses,
-        linear_velocity = gxbeam_parameters.linear_velocity,
-        angular_velocity = gxbeam_parameters.angular_velocity,
-        linear_acceleration = gxbeam_parameters.linear_acceleration,
-        angular_acceleration = gxbeam_parameters.angular_acceleration,
-        gravity = gxbeam_parameters.gravity)
-       
+        point_masses = coupling_parameters.point_masses,
+        linear_velocity = coupling_parameters.linear_velocity,
+        angular_velocity = coupling_parameters.angular_velocity,
+        linear_acceleration = coupling_parameters.linear_acceleration,
+        angular_acceleration = coupling_parameters.angular_acceleration,
+        gravity = coupling_parameters.gravity)
+
     return liftingline_inputs, gxbeam_inputs
 end
 
 """
-    LiftingLineRigidBodyParameters{TF}
+    LiftingLineGXBeamParameters(Vinf, rho, c; kwargs...)
 
-Struct containing properties for the [`LiftingLineRigidBody`](@ref) coupling.
-"""
-struct LiftingLineGXBeamParameters{TF}
-    prescribed_conditions::Dict{Int,PrescribedConditions{TF}}
-    distributed_laods::Dict{Int,DistributedLoads{TF}}
-    point_masses::Dict{Int,PointMass{TF}}
-    linear_velocity::SVector{3,TF}
-    angular_velocity::SVector{3,TF}
-    linear_acceleration::SVector{3,TF}
-    angular_acceleration::SVector{3,TF}
-    gravity::SVector{3,TF}
-    rho::TF
-    c::TF
-end
+Defines parameters for a lifting line model coupled with a geometrically exact beam theory
+structural model when subjected to a the freestream velocity vector `Vinf`.
 
-"""
-    GXBeamInputs(; kwargs...)
-
-Defines parameters for a lifting line model coupled with a geometrically exact beam theory 
-structural model
+# Arguments
+ - `Vinf`: Freestream velocity vector
+ - `rho`: Air density
+ - `c`: Air speed of sound
 
 # Keyword Arguments
  - `prescribed_conditions = Dict{Int,PrescribedConditions{Float64}}()`:
         A dictionary with keys corresponding to the points at
         which prescribed conditions are applied and values of type
         [`PrescribedConditions`](@ref) which describe the prescribed conditions
-        at those points.  
+        at those points.
  - `distributed_loads = Dict{Int,DistributedLoads{Float64}}()`: A dictionary
         with keys corresponding to the elements to which distributed loads are
         applied and values of type [`DistributedLoads`](@ref) which describe
-        the distributed loads on those elements.  
+        the distributed loads on those elements.
  - `point_masses = Dict{Int,PointMass{Float64}}()`: A dictionary with keys
         corresponding to the points to which point masses are attached and values
         of type [`PointMass`](@ref) which contain the properties of the attached
@@ -170,10 +153,8 @@ structural model
  - `linear_acceleration = zeros(3)`: Prescribed linear acceleration of the body frame.
  - `angular_acceleration = zeros(3)`: Prescribed angular acceleration of the body frame.
  - `gravity = [0,0,0]`: Gravity vector in the body frame.
- - `rho = 1.225`: Air density
- - `c = 343`: Speed of sound
 """
-function LiftingLineGXBeamParameters(;
+function LiftingLineGXBeamParameters(Vinf, rho, c;
     prescribed_conditions=Dict{Int,PrescribedConditions{Float64}}(),
     distributed_loads=Dict{Int,DistributedLoads{Float64}}(),
     point_masses=Dict{Int,PointMass{Float64}}(),
@@ -181,11 +162,9 @@ function LiftingLineGXBeamParameters(;
     angular_velocity=(@SVector zeros(3)),
     linear_acceleration=(@SVector zeros(3)),
     angular_acceleration=(@SVector zeros(3)),
-    gravity=(@SVector zeros(3)),
-    rho=1.225,
-    c=343)
+    gravity=(@SVector zeros(3)))
 
-    return LiftingLineGXBeamParameters(prescribed_conditions, distributed_loads, point_masses, 
-        linear_velocity, angular_velocity, linear_acceleration, angular_acceleration, 
-        gravity, rho, c)
+    return (; Vinf, rho, c, prescribed_conditions, distributed_loads, point_masses,
+        linear_velocity, angular_velocity, linear_acceleration, angular_acceleration,
+        gravity)
 end

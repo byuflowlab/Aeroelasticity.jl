@@ -1,6 +1,6 @@
-# # [Aeroelastic Analysis of a Highly Flexible Cantilever Wing](@id cantilever)
-# 
-# In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis 
+# # [Aeroelastic Analysis of a Highly Flexible Wing](@id cantilever)
+#
+# In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis
 # of a highly flexible cantilever wing.
 #
 # ![](../assets/cantilever-wing.png)
@@ -11,13 +11,15 @@
 #md #     [`cantilever.ipynb`](@__NBVIEWER_ROOT_URL__/examples/cantilever.ipynb).
 #-
 #
-# The wing we are considering in this example was created by modifying Daedalus aircraft 
-# data and is therefore representative of a high-altitude long-endurance wing. It has a 
-# 16 meter span (from root to tip) and a 1 meter chord. To model the wing's aerodynamics, 
-# we will use a lifting line model. To model the wing's structure, we will use a 
-# geometrically exact beam theory model.
+# The wing we are considering in this example was created by modifying Daedalus aircraft
+# data and is therefore representative of a high-altitude long-endurance wing. It has a
+# 16 meter span (from root to tip) and a 1 meter chord. To model the wing's aerodynamics,
+# we use a lifting line model. To model the wing's structure, we use a geometrically exact
+# beam theory model.
 
 using Aeroelasticity, GXBeam, DifferentialEquations, LinearAlgebra
+
+## --- Initial Setup --- #
 
 ## discretization
 N = 8 # number of elements
@@ -25,49 +27,58 @@ N = 8 # number of elements
 ## geometric properties
 span = 16 # m
 chord = 1 # m
+xref = 0.5 # normalized reference location (from leading edge)
+xcg = 0.5 # center of gravity (from leading edge)
 
-## structural section properties
+## stiffness properties
 GJ = 1e4 # N*m^2 (torsional rigidity)
-EIcc = 2e4 # N*m^2 (flat bending rigidity)
-EInn = 4e6 # N*m^2 (chord bending rigidity)
-μ = 0.75 # kg/m (mass per unit length)
+EIyy = 2e4 # N*m^2 (flat bending rigidity)
+EIzz = 5e6 # N*m^2 (chord bending rigidity)
+
+# inertial properties
+mu = 0.75 # kg/m (mass per unit length)
 i11 = 0.1 # kg*m (moment of inertia about elastic axis)
-i22 = 0.1*i11 # moment of inertia about beam y-axis
-i33 = 0.9*i11 # moment of inertia about beam z-axis
+i22 = 0.0375 # moment of inertia about beam y-axis
+i33 = 0.0625 # moment of inertia about beam z-axis
 
 ## freestream properties
-Vinf = vcat(0.1, 1:35) # m/s (velocity)
-α = 2*pi/180 # angle of attack
+Vinf = 10.0 # m/s (velocity)
+rho = 0.0889 # kg/m^3 (air density)
+c = 343 # m/s (air speed of sound)
+alpha = 2*pi/180 # angle of attack
 
 ## aerodynamic section properties
-a = 0.0 # normalized reference location (relative to semi-chord)
+a = xref - 0.5 # normalized reference location (relative to semi-chord)
 b = chord / 2 # m (semi-chord)
-rho = 0.088 # kg/m^3 (air density)
-c = 343 # air speed of sound
 a0 = 2*pi # lift slope (for each section)
-α0 = 0 # zero lift angle of attack (for each section)
+alpha0 = 0 # zero lift angle of attack (for each section)
 cd0 = 0
 cm0 = 0
 
-## define geometry
+## define geometry (assume NED coordinate frame)
 xpt = range(0, 0, length=N+1) # point x-coordinates (in body frame)
 ypt = range(0, span, length=N+1) # point y-coordinates (in body frame)
 zpt = range(0, 0, length=N+1) # point z-coordinates (in body frame)
 points = [[xpt[i],ypt[i],zpt[i]] for i = 1:N+1]
 start = 1:N # starting point of each beam element
 stop = 2:N+1 # ending point of each beam element
-frames = fill([0 1 0; 1 0 0; 0 0 -1], N) # local to body frame transformation
-compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIcc, 1/EInn]), N) # compliance matrix
-mass = fill(Diagonal([μ, μ, μ, i11, i22, i33]), N) # mass matrix
+e1 = [0, 1,  0] # beam x-axis
+e2 = [1, 0,  0] # beam y-axis
+e3 = [0, 0, -1] # beam z-axis
+frames = fill([e1 e2 e3], N) # local to body frame transformation
+compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIyy, 1/EIzz]), N) # compliance matrix
+mass = fill(Diagonal([mu, mu, mu, i11, i22, i33]), N) # mass matrix
 assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
 
-prescribed = Dict(
+prescribed_conditions = Dict(
     ## fixed left edge
-    1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0,
-        theta_z=0),
+    1 => GXBeam.PrescribedConditions(ux=0, uy=0, uz=0, theta_x=0, theta_y=0, theta_z=0),
 )
 
-system = System(assembly, false)
+## define GXBeam system
+system = DynamicSystem(assembly)
+
+## --- Define Submodels --- #
 
 ## construct section models
 section_models = fill(Peters{6}(), N)
@@ -76,18 +87,42 @@ section_models = fill(Peters{6}(), N)
 aerodynamic_model = LiftingLine(section_models)
 
 ## construct structural model
-structural_model = GXBeamAssembly(assembly, prescribed)
+structural_model = GXBeamAssembly(system; structural_damping=false)
 
-## define coupled model
-model = assemble_model(;
-    aerodynamic_model = aerodynamic_model,
-    structural_model = structural_model)
+## define submodels
+submodels = (aerodynamic_model, structural_model)
 
-## current time
-t = 0.0
+# --- Define Initial Parameters --- #
+
+V = [-Vinf*cos(alpha), 0.0, -Vinf*sin(alpha)] # m/s (freestream velocity)
+
+## define parameters for each lifting line section
+section_parameters = fill([a, b, a0, alpha0, cd0, cm0], N)
+
+## define parameters for the lifting line model
+liftingline_parameters = LiftingLineParameters(section_parameters)
+
+## define parameters for the geometrically exact beam theory model
+gxbeam_parameters = GXBeamParameters(assembly)
+
+# define parameters for the coupling
+coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
+    prescribed_conditions = prescribed_conditions)
+
+## combine parameters
+parameters = (liftingline_parameters, gxbeam_parameters, coupling_parameters)
+
+## --- Define Coupled Model --- #
+
+model = CoupledModel(submodels, parameters; symbolic=false)
+
+## --- Perform Analysis --- #
+
+## loop through freestream velocities
+Vinf = 1:50
 
 ## eigenvalue/eigenvector storage
-nev = 12*N
+nev = 100
 λ = zeros(ComplexF64, nev, length(Vinf))
 Uλ = zeros(ComplexF64, nev, number_of_states(model), length(Vinf))
 Vλ = zeros(ComplexF64, number_of_states(model), nev, length(Vinf))
@@ -98,37 +133,45 @@ x0 = zeros(number_of_states(model))
 ## loop through each velocity
 for i = 1:length(Vinf)
 
-    ## define parameter vector
-    p = assemble_parameters(model;
-        aerodynamic_parameters = (; 
-            sections = fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N)
-            ),
-        structural_parameters = (; 
-            assembly = assembly
-            ),
-        additional_parameters = (; 
-            v_f = [-Vinf[i]*cos(α), 0, -Vinf[i]*sin(α)],
-            rho = rho,
-            c = c,
-            )
-        )
+    ## --- Update Parameters --- #
 
-    ## construct ODE function
-    f = ODEFunction(model)
+    V = [-Vinf[i]*cos(alpha), 0.0, -Vinf[i]*sin(alpha)] # m/s (freestream velocity)
 
-    ## find state variables corresponding to steady state operating conditions
-    sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
+    ## define parameters for each lifting line section
+    section_parameters = fill([a, b, a0, alpha0, cd0, cm0], N)
+
+    ## define parameters for the lifting line model
+    liftingline_parameters = LiftingLineParameters(section_parameters)
+
+    ## define parameters for the geometrically exact beam theory model
+    gxbeam_parameters = GXBeamParameters(assembly)
+
+    # define parameters for the coupling
+    coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
+        prescribed_conditions = prescribed_conditions)
+
+    ## combine parameters
+    parameters = (liftingline_parameters, gxbeam_parameters, coupling_parameters)
+
+    ## --- Perform Analysis --- #
+
+    ## define an ODEFunction for this model
+    f = ODEFunction(model, parameters)
+
+    ## find equilibrium point
+    sol = solve(NonlinearProblem(SteadyStateProblem(f, x0, parameters)))
 
     ## use state variables from steady state operating conditions
     x = sol.u
 
     ## linearize about steady state operating conditions
-    K, M = linearize(model, x, p)
+    K, M = linearize(model, x, parameters)
 
     ## perform linear stability analysis
-    λi, Uλi, Vλi = get_eigen(model, K, M; nev)
+    λi, Uλi, Vλi = sparse_eigen(K, M; nev=nev)
 
-    ## correlate eigenvalues
+    ## --- Correlate Eigenvalues --- #
+
     if i > 1
         ## previous left eigenvector matrix
         Uλpi = Uλ[:,:,i-1]
@@ -157,8 +200,8 @@ using Plots
 pyplot()
 
 sp1 = plot(
-    xlim = (0, 35),
-    xtick = 0:5:35,
+    xlim = (0, 50),
+    xtick = 0:5:50,
     xlabel = "Velocity (m/s)",
     ylim = (0, 350),
     ytick = 0:50:350,
@@ -174,12 +217,12 @@ sp1 = plot(
     minorgrid=true)
 
 sp2 = plot(
-    xlim = (0, 35),
-    xtick = 0:5:35,
+    xlim = (0, 50),
+    xtick = 0:5:50,
     xlabel = "Velocity (m/s)",
-    ylim = (-12, 8),
-    ytick = -12:4:8,
-    ylabel = "Damping Ratio",
+    ylim = (-4, 2),
+    ytick = -4:2:2,
+    ylabel = "Damping (1/s)",
     framestyle = :zerolines,
     titlefontsize = 14,
     guidefontsize = 14,
@@ -213,7 +256,7 @@ for i = 1:size(λ, 1)
 
     if any(abs.(λi) .<= 1e4)
         plot!(sp2, Vi,
-            real.(λi)./abs.(λi)*100,
+            real.(λi),#./sqrt.(real.(λi).^2 + abs.(λi).^2)*100,
             label = "",
             color = i,
             markersize = 3,
@@ -230,70 +273,4 @@ p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 
 #md # ![]("../assets/cantilever-stability.svg")
 
-#- 
-
-# # We can visualize the flutter mode using GXBeam's built in interface with WriteVTK
-
-# ## flutter velocity
-# Vf = 135
-
-# ## define parameter vector
-# p = assemble_parameters(model;
-#     aerodynamic_parameters = (; 
-#         sections = fill((a=a, b=b, a0=a0, alpha0=α0, cd0=cd0, cm0=cm0), N)
-#         ),
-#     structural_parameters = (; 
-#         assembly = assembly
-#         ),
-#     additional_parameters = (; 
-#         v_f = [-Vinf[i]*cos(α), 0, Vinf[i]*sin(α)],
-#         rho = rho,
-#         c = c,
-#         )
-#     )
-
-# ## construct ODE function
-# f = ODEFunction(model)
-
-# ## find state variables corresponding to steady state operating conditions
-# sol = solve(SteadyStateProblem(f, x0, p), SSRootfind())
-
-# ## use state variables from steady state operating conditions
-# x = sol.u
-
-# ## linearize about steady state operating conditions
-# K, M = linearize(model, x, p)
-
-# ## perform linear stability analysis
-# λf, Uλf, Vλf = get_eigen(model, K, M; nev)
-
-# ## find index corresponding to the flutter mode
-# iλ = argmin(abs.(real.(λf)))
-
-# ## find indices corresponding to the GXBeam state variables
-# _, igx = state_indices(model)
-
-# ## flutter eigenvalue
-# eigenvalue = 0 + imag(λf[iλ])*1im
-
-# ## post-process GXBeam state variables
-# state = AssemblyState(system, assembly, xf[igx]; prescribed_conditions=prescribed)
-
-# ## post-process GXBeam eigenvector variables
-# eigenstate = AssemblyState(system, assembly, Vλf[igx,iλ]; prescribed_conditions=prescribed)
-
-# ## create a 4% thick parabolic airfoil
-# f = (x) -> 0.16*x*(1 - x)
-# x = 0:0.2:1.0
-# zu = f.(x)
-# zl = -zu
-# x = chord .* vcat(x, x[end-1:-1:1])
-# y = chord .* zeros(length(x))
-# z = chord .* vcat(zu, zl[end-1:-1:1])
-# sections = vcat(x', y', z')
-
-# ## write the response to vtk files for visualization using ParaView
-# write_vtk("cantilever-flutter-mode", assembly, state, eigenvalue, eigenstate; sections=sections,
-#     mode_scaling=100)
-
-# #md # ![](../assets/goland-flutter-mode.gif)
+#-

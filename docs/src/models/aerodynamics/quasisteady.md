@@ -36,11 +36,11 @@ where ``\alpha_0`` is the zero lift angle of attack.
 
 At this point, a compressibility correction may be applied to the results of thin airfoil theory in order to extend their applicability.  Applying a Prandtl-Glauert compressibility correction, the normal force, axial force, and pitching moment become
 ```math
-\mathcal{N}_\text{compressible} = \frac{\mathcal{N}}{\sqrt{1 - M^2}} \\
-\mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\sqrt{1 - M^2}} \\
-\mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\sqrt{1 - M^2}}
+\mathcal{N}_\text{compressible} = \frac{\mathcal{N}}{\beta} \\
+\mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\beta} \\
+\mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\beta}
 ```
-where ``M`` is the Mach number, defined as ``\frac{u}{c}`` where ``c`` is the air speed of sound. 
+where ``\beta=\sqrt{1 - M^2}`` is the Prandtl-Glauert factor, which is a function of the local section Mach number ``M``.
 
 ### Viscous Forces
 

@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 ArnoldiMethod = "ec485272-7323-5ecc-a04f-4719b315124d"
+Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
 FLOWMath = "6cb5d3fb-0fe8-4cc2-bd89-9fe0b19a99d3"
 FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"

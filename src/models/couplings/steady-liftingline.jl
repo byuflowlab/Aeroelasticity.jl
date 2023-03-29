@@ -2,7 +2,7 @@
 """
     SteadyLiftingLine
 
-Coupling model which allows a steady thin airfoil theory model (see [`Steady`](@ref)) to 
+Coupling model which allows a steady thin airfoil theory model (see [`Steady`](@ref)) to
 be used more conveniently with the [`LiftingLine`](@ref) model. See [`LiftingLineSection`](@ref).
 """
 struct SteadyLiftingLine
@@ -19,7 +19,7 @@ function (steady_liftingline::SteadyLiftingLine)(dx, x, p, t)
     a, b, a0, α0, cd0, cm0 = p[1]
     ρ, c = p[2]
     # freestream velocity components
-    u, v, ω = liftingline_section_velocities(vx, vz, ωy)
+    u, v, ω = liftingline_section_velocities(vx, vz, -ωy)
     # calculate aerodynamic loads
     N, A, M = steady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v)
     # forces and moments per unit span

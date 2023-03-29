@@ -64,25 +64,29 @@ monolithic coupled model.
 Our coupling methodology is implemented by the following `CoupledModel` constructor.
 
 ```@docs
-CouplingModel()
+CoupledModel()
 ```
 
 In addition to constructing a coupled model, this constructor automatically detects the
 sparsity of the resulting rate and state jacobian matrices.  This information is then used
-to provide the following fast jacobian evaluation functions.
+when evaluating the following jacobian evaluation functions.
 
 ```@docs
 rate_jacobian!
 state_jacobian!
 ```
 
-The residual may also be evaluated using the following function
+The residual may be evaluated using the following function
 
 ```@docs
 residual!
 ```
 
-Alternatively, the residual may be evaluated by calling the constructor as a function.
+Alternatively, the residual may be evaluated by calling the coupled model as a function.
+
+```@docx
+(::CoupledModel)
+```
 
 ## Analyses
 

@@ -19,10 +19,11 @@ Initializes a lifting line model of type [`LiftingLine`](@ref)
   - `fresid`: Residual function for each lifting line section
   - `nstate`: Number of state variables for each lifting line section
 
- # Keyword Arguments: 
+ # Keyword Arguments:
   - `finput`: Coupling function for each lifting line section.
 """
-function LiftingLine(fresid, nstate=number_of_states.(fresid); finput=default_coupling.(fresid, LiftingLineSection()))
+function LiftingLine(fresid, nstate=number_of_states.(fresid);
+    finput=default_coupling.(fresid, Ref(LiftingLineSection())))
 
     # compute state indices
     ix2 = cumsum(nstate)
@@ -34,7 +35,7 @@ function LiftingLine(fresid, nstate=number_of_states.(fresid); finput=default_co
     TY = typeof(finput)
     TI = typeof(indices)
 
-    return LiftingLine{TR, TY, TI}(fresid, finput, indices, nparam)
+    return LiftingLine{TR, TY, TI}(fresid, finput, indices)
 end
 
 # residual function
@@ -69,6 +70,13 @@ end
 
 number_of_states(liftingline::LiftingLine) = liftingline.indices[end][end]
 
+"""
+    LiftingLineParameters(section_parameters)
+
+Defines parameters for a lifting line theory aerodynamic model.
+"""
+LiftingLineParameters(section_parameters) = section_parameters
+
 # --- Internal Methods for Couplings with this Model --- #
 
 # local section velocities/accelerations
@@ -89,7 +97,7 @@ function liftingline_section_velocities(x, e1, e2, e3, V, Ω, a, α)
 end
 
 function liftingline_section_inputs(model, dxa, xa, pa, v, ω, a, α, rho, c, t)
-    
+
     # aerodynamic rates, states, and parameters
     dxa = dxa
     xa = xa
