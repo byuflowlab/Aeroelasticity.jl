@@ -33,7 +33,7 @@ xcg = 0.5 # center of gravity (from leading edge)
 ## stiffness properties
 GJ = 1e4 # N*m^2 (torsional rigidity)
 EIyy = 2e4 # N*m^2 (flat bending rigidity)
-EIzz = 5e6 # N*m^2 (chord bending rigidity)
+EIzz = 4e6 # N*m^2 (chord bending rigidity)
 
 # inertial properties
 mu = 0.75 # kg/m (mass per unit length)
@@ -43,7 +43,7 @@ i33 = 0.0625 # moment of inertia about beam z-axis
 
 ## freestream properties
 Vinf = 10.0 # m/s (velocity)
-rho = 0.0889 # kg/m^3 (air density)
+rho = 0.0889 # kg/m^3 (air density at 20 km)
 c = 343 # m/s (air speed of sound)
 alpha = 2*pi/180 # angle of attack
 
@@ -68,7 +68,8 @@ e3 = [0, 0, -1] # beam z-axis
 frames = fill([e1 e2 e3], N) # local to body frame transformation
 compliance = fill(Diagonal([0, 0, 0, 1/GJ, 1/EIyy, 1/EIzz]), N) # compliance matrix
 mass = fill(Diagonal([mu, mu, mu, i11, i22, i33]), N) # mass matrix
-assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass)
+damping = fill(fill(1e-4, 6), N) # stiffness proportional structural damping coefficients
+assembly = GXBeam.Assembly(points, start, stop; frames, compliance, mass, damping)
 
 prescribed_conditions = Dict(
     ## fixed left edge
@@ -87,7 +88,7 @@ section_models = fill(Peters{6}(), N)
 aerodynamic_model = LiftingLine(section_models)
 
 ## construct structural model
-structural_model = GXBeamAssembly(system; structural_damping=false)
+structural_model = GXBeamAssembly(system; structural_damping=true)
 
 ## define submodels
 submodels = (aerodynamic_model, structural_model)
@@ -107,7 +108,8 @@ gxbeam_parameters = GXBeamParameters(assembly)
 
 # define parameters for the coupling
 coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
-    prescribed_conditions = prescribed_conditions)
+    prescribed_conditions = prescribed_conditions,
+    gravity = [-9.81*sin(alpha), 0, 9.81*cos(alpha)])
 
 ## combine parameters
 parameters = (liftingline_parameters, gxbeam_parameters, coupling_parameters)
@@ -119,10 +121,10 @@ model = CoupledModel(submodels, parameters; symbolic=false)
 ## --- Perform Analysis --- #
 
 ## loop through freestream velocities
-Vinf = 1:50
+Vinf = vcat(0.1, 0.25:0.25:35)
 
 ## eigenvalue/eigenvector storage
-nev = 100
+nev = 12*N
 λ = zeros(ComplexF64, nev, length(Vinf))
 Uλ = zeros(ComplexF64, nev, number_of_states(model), length(Vinf))
 Vλ = zeros(ComplexF64, number_of_states(model), nev, length(Vinf))
@@ -148,7 +150,8 @@ for i = 1:length(Vinf)
 
     # define parameters for the coupling
     coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
-        prescribed_conditions = prescribed_conditions)
+        prescribed_conditions = prescribed_conditions,
+        gravity = [-9.81*sin(alpha), 0, 9.81*cos(alpha)])
 
     ## combine parameters
     parameters = (liftingline_parameters, gxbeam_parameters, coupling_parameters)
@@ -217,8 +220,8 @@ sp1 = plot(
     minorgrid=true)
 
 sp2 = plot(
-    xlim = (0, 50),
-    xtick = 0:5:50,
+    xlim = (0, 35),
+    xtick = 0:5:35,
     xlabel = "Velocity (m/s)",
     ylim = (-4, 2),
     ytick = -4:2:2,
@@ -274,3 +277,7 @@ p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 #md # ![]("../assets/cantilever-stability.svg")
 
 #-
+
+# These results are similar to those presented by Patil, Hodges, and Cesnik in "Nonlinear
+# Aeroelasticity and Flight Dynamics of High Altitude Long-Endurance Aircraft" and
+# therefore serve as a verification case for this coupled model.

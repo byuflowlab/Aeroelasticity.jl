@@ -50,8 +50,8 @@ function sparse_eigen(K, M; nev=min(20, size(K,1)))
     L = LinearMap{T}(f!, fc!, nx, nx; ismutating=true)
 
     # # compute eigenvalues and eigenvectors
-    # λ, V, _ = Arpack.eigs(L; nev=min(nx,nev), which=:LM)
-    λ, V = partialeigen(partialschur(L; nev=min(nx, nev), which=LM(), tol=1e-6)[1])
+    λ, V, _ = Arpack.eigs(L; nev=min(nx,nev), which=:LM)
+    # λ, V = partialeigen(partialschur(L; nev=min(nx, nev), which=LM(), tol=1e-6)[1])
 
     # sort eigenvalues by magnitude
     perm = sortperm(λ, by=(λ) -> (abs(λ), imag(λ)), rev=true)

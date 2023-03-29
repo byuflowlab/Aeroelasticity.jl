@@ -1,7 +1,7 @@
 # # [Aeroelastic Analysis of a Highly Flexible Wing](@id cantilever)
 #
-# In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis
-# of a highly flexible cantilever wing.
+# In this example, we demonstrate how to find steady state operating conditions for a
+# highly flexible cantilever wing
 #
 # ![](../assets/cantilever-wing.png)
 #
@@ -107,7 +107,8 @@ gxbeam_parameters = GXBeamParameters(assembly)
 
 # define parameters for the coupling
 coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
-    prescribed_conditions = prescribed_conditions)
+    prescribed_conditions = prescribed_conditions,
+    gravity = [0, 0, 9.81])
 
 ## combine parameters
 parameters = (liftingline_parameters, gxbeam_parameters, coupling_parameters)
