@@ -1,599 +1,260 @@
 """
-    assemble_model(;
-        aerodynamic_model = nothing, 
-        structural_model = nothing, 
-        dynamics_model = nothing,
-        control_surface_model = nothing,
-        controller_model = nothing,
-        coupling_model = nothing)
+    linearize(model, x, p; autodiff=true, fdtype=Val(:forward))
+    linearize(model, dx, x, p, t; autodiff=true, fdtype=Val(:forward))
 
-Assemble a coupled model from a collection of models.
-"""
-function assemble_model(;
-    aerodynamic_model = nothing, 
-    structural_model = nothing, 
-    dynamics_model = nothing,
-    control_surface_model = nothing,
-    controller_model = nothing,
-    coupling_model = nothing)
-
-    # construct tuple of provided models
-    models = ()
-    for model in (aerodynamic_model, structural_model, dynamics_model, 
-        control_surface_model, controller_model)
-
-        if !isnothing(model)
-            models = (models..., model)
-        end
-    
-    end
-
-    # define submodels using provided models
-    submodels = Submodel.(models)
-
-    # use default coupling if a coupling model is not provided
-    coupling = isnothing(coupling_model) ? Coupling(models...) : coupling_model
-
-    # construct coupled model
-    return CoupledModel(submodels, coupling)
-end
-
-"""
-    assemble_states(model;
-        aerodynamic_states = nothing, 
-        structural_states = nothing, 
-        dynamics_states = nothing,
-        control_surface_states = nothing,
-        controller_states = nothing)
-
-Assemble the state vector for a coupled model using the specified state variables.  State 
-variables are initialized with zeros.
-"""
-function assemble_states(model::CoupledModel; kwargs...)
-
-    x = zeros(number_of_states(model))
-
-    return assemble_states!(x, model; kwargs...)
-end
-
-"""
-    assemble_states!(x, model;
-        aerodynamic_states = nothing, 
-        structural_states = nothing, 
-        dynamics_states = nothing,
-        control_surface_states = nothing,
-        controller_states = nothing)
-
-In-place version of [`assemble_states`](@ref).  Only replaces the values corresponding to 
-the specified state variables.
-"""
-function assemble_states!(x0, model::CoupledModel;
-    aerodynamic_states = nothing, 
-    structural_states = nothing, 
-    dynamics_states = nothing,
-    control_surface_states = nothing,
-    controller_states = nothing)
-
-    # construct tuple of provided state variables
-    coupled_states = ()
-    for states in (aerodynamic_states, structural_states, dynamics_states,
-        control_surface_states, controller_states)
-
-        if !isnothing(states)
-            coupled_states = (coupled_states..., states)
-        end
-    
-    end
-
-    # populate state vector
-    for i = 1:length(coupled_states)
-        set_states!(x0, model, i; coupled_states[i]...)
-    end
-
-    return x0
-end
-
-"""
-    assemble_parameters(model;
-        aerodynamic_parameters = nothing, 
-        structural_parameters = nothing, 
-        dynamics_parameters = nothing,
-        control_surface_parameters = nothing,
-        controller_parameters = nothing,
-        additional_parameters = nothing)
-
-Assemble the parameter vector for a coupled model using the specified parameter variables.
-"""
-function assemble_parameters(model::CoupledModel; kwargs...)
-
-    x = zeros(number_of_parameters(model))
-
-    return assemble_parameters!(x, model; kwargs...)
-end
-
-"""
-    assemble_parameters!(p, model;
-        aerodynamic_parameters = nothing, 
-        structural_parameters = nothing, 
-        dynamics_parameters = nothing,
-        control_surface_parameters = nothing,
-        controller_parameters = nothing,
-        additional_parameters = nothing)
-
-In-place version of [`assemble_parameters`](@ref). Only replaces the values corresponding 
-to the specified parameters.
-"""
-function assemble_parameters!(p, model::CoupledModel;
-    aerodynamic_parameters = nothing, 
-    structural_parameters = nothing, 
-    dynamics_parameters = nothing,
-    control_surface_parameters = nothing,
-    controller_parameters = nothing,
-    additional_parameters = nothing)
-
-    # define coupled parameters
-    coupled_parameters = ()
-    for parameters in (aerodynamic_parameters, structural_parameters, dynamics_parameters,
-        control_surface_parameters, controller_parameters)
-
-        if !isnothing(parameters)
-            coupled_parameters = (coupled_parameters..., parameters)
-        end
-    
-    end
-
-    # populate parameter vector
-    for i = 1:length(coupled_parameters)
-        set_parameters!(p, model, i; coupled_parameters[i]...)
-    end
-    set_additional_parameters!(p, model; additional_parameters...)
-
-    return p
-end
-
-"""
-    linearize(model, x, p; kwargs...)
-
-Calculate the jacobian of the residual function for coupled model `model` with respect to 
+Calculate the jacobian of the residual function for coupled model `model` with respect to
 the state variables and their rates.
 """
-function linearize(model::CoupledModel, x, p; dx = FillArrays.Zeros(x), t = 0,
-    y = get_coupling_inputs(model, dx, x, p, t))
+linearize
 
-    return _linearize(inplaceness(model), model, dx, x, y, p, t)
-end
+linearize(model::CoupledModel, x, p; kwargs...) = linearize(model, FillArrays.Zeros(x), x, p, 0; kwargs...)
 
-function _linearize(::OutOfPlace, model, args...)
-    K = Array(get_state_jacobian(model, args...))
-    M = Array(get_rate_jacobian(model, args...))
-    return K, M
-end
+function linearize(model::CoupledModel, dx, x, p, t; autodiff=true, fdtype=Val(:forward))
 
-function _linearize(::InPlace, model, args...)
-    K = get_state_jacobian(model, args...)
-    M = get_rate_jacobian(model, args...)
+    K = state_jacobian(model, dx, x, p, t; autodiff=autodiff, fdtype=fdtype)
+    M = rate_jacobian(model, dx, x, p, t; autodiff=autodiff, fdtype=fdtype)
+
     return K, M
 end
 
 """
-    get_eigen(model::TM, K, M; kwargs...)
+    dense_eigen(K, M; kwargs...)
 
-Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix 
+Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
 corresponding to the model.
-
-For in-place models, the number of eigenvalues to compute may be specified using
-the `nev` keyword argument.
 """
-function get_eigen(model, K, M; kwargs...)
-
-    return _get_eigen(inplaceness(model), K, M; kwargs...)
-end
-
-function _get_eigen(::OutOfPlace, K, M)
-    A = -K
-    B = M
+function dense_eigen(K, M)
+    A = Array(K)
+    B = Array(-M)
     E = eigen(A, B) # eigenvalue decomposition
     λ = eigvals(E) # eigenvalues
     V = eigvecs(E) # right eigenvector matrix
-    U = I/(A*V) # left eigenvector matrix
+    U = I/(M*V) # left eigenvector matrix
     return λ, U, V
 end
 
-function _get_eigen(::InPlace, K, M; nev=min(20, number_of_states(model)))
+"""
+    sparse_eigen(K, M; nev=min(20, size(K,1)))
 
-    # calculate state and rate jacobians
-    A = -K
-    B = M
+Return the eigenvalues, left eigenvector matrix, and right eigenvector matrix
+corresponding to the model. `nev` is the number of eigenvalues to compute
+"""
+function sparse_eigen(K, M; nev=min(20, size(K,1)))
 
     # construct linear map
-    nx = size(A, 1)
-    TF = promote_type(eltype(A), eltype(B))
-    Afact = lu(A)
-    f! = (b, x) -> ldiv!(b, Afact, B*x)
-    fc! = (b, x) -> mul!(b, B', Afact'\x)
-    Abar = LinearMap{TF}(f!, fc!, nx, nx; ismutating=true)
+    T = promote_type(eltype(K), eltype(M))
+    nx = size(K, 1)
+    Kfact = lu(K)
+    f! = (b, x) -> ldiv!(b, Kfact, M * x)
+    fc! = (b, x) -> mul!(b, M', Kfact' \ x)
+    L = LinearMap{T}(f!, fc!, nx, nx; ismutating=true)
 
-    # compute eigenvalues and eigenvectors
-    λ, V = partialeigen(partialschur(Abar; nev=min(nx,nev), which=LM())[1])
+    # # compute eigenvalues and eigenvectors
+    λ, V, _ = Arpack.eigs(L; nev=min(nx,nev), which=:LM)
+    # λ, V = partialeigen(partialschur(L; nev=min(nx, nev), which=LM(), tol=1e-6)[1])
 
     # sort eigenvalues by magnitude
-    perm = sortperm(λ, by=(λ)->(abs(λ),imag(λ)), rev=true)
+    perm = sortperm(λ, by=(λ) -> (abs(λ), imag(λ)), rev=true)
     λ = λ[perm[1:nev]]
     V = V[:,perm[1:nev]]
 
-    # eigenvalues are actually 1/λ, no modification necessary for eigenvectors
-    λ .= 1 ./ λ
+    # eigenvalues are actually -1/λ, no modification necessary for eigenvectors
+    λ .= -1 ./ λ
 
-    # also return left eigenvectors
-    U = GXBeam.left_eigenvectors(A, -B, λ, V)
+    # also compute left eigenvectors
+    U = left_eigenvectors(K, M, λ, V)
+
+    # U = similar(V', complex(T))
+    # for iλ in eachindex(λ)
+    #     # set shift value
+    #     shift = λ[iλ] + 1e-6im
+    #     # compute corresponding left eigenvector
+    #     F = lu(transpose(K) + shift * transpose(M))
+    #     Fmap = LinearMap{complex(T)}((y, x) -> ldiv!(y, F, x), nx, ismutating=true)
+    #     _, u = IterativeSolvers.powm(Fmap; inverse = true, shift = shift)
+    #     # apply normalization
+    #     u ./= (transpose(u)*M*view(V,:,iλ))
+    #     # store as a row vector
+    #     U[iλ,:] .= u
+    # end
 
     return λ, U, V
 end
 
 """
-    ODEFunction(model::Aeroelasticity.CoupledModel, p=nothing)
+    correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, atol=1e-3)
 
-Construct an `ODEFunction` for a coupled model which may be used with 
-`DifferentialEquations`.     
+Correlate modes from a current iteration with those from a previous iteration. Returns a
+permutation that may be used to reorder the new modes and the associated corruption indices.
 """
-function SciMLBase.ODEFunction(model::CoupledModel, p=nothing)
+function correlate_eigenmodes(U, M, V; tracked_modes=1:size(U,1), rtol=1e-3, atol=1e-3)
 
-    # always construct in-place models, always compile
-    iip = true
-    compile = true
+    # get number of (not necessarily unique) eigenvalues
+    nev = size(U,1)
 
-    # construct coupling function
-    fy = ode_coupling_function(model)
+    # construct the correlation matrix
+    C = U*M*V
 
-    # construct rate function
-    f = ode_rate_function(model, fy)
+    # get the row permutation that puts maximum values on the diagonals
+    rval = Vector{real(eltype(C))}(undef, nev) # magnitude of values in chosen row
+    cval = Vector{real(eltype(C))}(undef, nev) # magnitude of values in chosen column
+    perm = zeros(Int, nev) # permutation
+    corruption = Vector{real(eltype(C))}(undef, nev) # corruption index for each correlation
 
-    # construct mass matrix
-    mass_matrix = ode_mass_matrix(model, fy)
+    # tracked modes
+    for i in tracked_modes
 
-    # construct time gradient function
-    tgrad = ode_time_gradient(model, fy)
- 
-    # construct jacobian function
-    jac = ode_state_jacobian(model, fy)
-
-    # construct parameter jacobian function
-    paramjac = ode_parameter_jacobian(model, fy)
-
-    # return ODE function
-    return ODEFunction{iip, compile}(f; mass_matrix, tgrad, jac, paramjac)
-end
-
-function ode_coupling_function(model::CoupledModel)
-
-    # check whether cached variables should be used
-    if isinplace(model)
-        # model is inplace so use cached variables if possible
-
-        # problem dimensions
-        Nx = number_of_states(model)
-        Ny = number_of_inputs(model)
-        Np = number_of_parameters(model)
-
-        # cached variables
-        xcache = fill(NaN, Nx)
-        ycache = fill(NaN, Ny)
-        pcache = fill(NaN, Np)
-        tcache = fill(NaN)
-
-        # state rate vector
-        dx = FillArrays.Zeros(x)
-
-        # coupling function
-        fy = (x, p, t) -> begin
-            # check if we can use the cache variables (no custom types)
-            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                # update the cache variables (if necessary)
-                if (x != xcache) && (p != pcache) && (t != tcache[])
-                    xcache .= x
-                    ycache .= get_coupling_inputs!(ycache, model, dx, x, p, t)
-                    pcache .= p
-                    tcache .= t
-                end
-                # set inputs to the cached inputs
-                y = ycache
-            else
-                # calculate inputs (out-of-place to accomodate custom type)
-                y = get_coupling_inputs(model, dx, x, p, t)
-            end
-            # return cached or computed inputs
-            return y
-        end
-    else
-        # model is out of place so calculate coupling inputs directly
-        fy = (x, p, t) -> get_coupling_inputs(model, FillArrays.Zeros(x), x, p, t)
-    end
-
-    # return coupling function
-    return fy
-end
-
-function ode_rate_function(model::CoupledModel, fy)
-
-    f = (dx, x, p, t) -> begin
-        get_residual!(dx, model, FillArrays.Zeros(x), x, fy(x, p, t), p, t)
-        return dx .*= -1
-    end
-
-    return f
-end
-
-function ode_mass_matrix(model::CoupledModel, fy, p=nothing)
-
-    submodels = model.submodels
-    coupling = model.coupling
-
-    if all(isidentity.(getproperty.(submodels, :ratejac))) && iszero(coupling.ratejac)
-        # mass matrix is the identity matrix
-        mass_matrix = I
-    elseif all(isinvariant.(getproperty.(submodels, :ratejac))) && isinvariant(coupling.ratejac)
-        # mass matrix is independent of all inputs
-        mass_matrix = get_rate_jacobian(model)
-    elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :ratejac))) && 
-        isconstant(coupling.ratejac)
-        # mass matrix only depends on the parameter vector
-        mass_matrix = get_rate_jacobian(model, p)
-    else
-        # mass matrix defined as a function of state variables, parameters, and time 
-
-        # problem dimensions
-        Nx = number_of_states(model)
-        Ny = number_of_inputs(model)
-
-        # state rate vector
-        dx = FillArrays.Zeros(Nx)
-
-        # initialize mass matrix
-        M = zeros(Nx, Nx)
-
-        # construct update function
-
-        # cached variables
-        drdy_cache = fill(NaN, Nx, Ny)
-        dyddx_cache = fill(NaN, Ny, Nx)
-
-        # update function
-        update_func = (M, x, p, t) -> begin
-            # check if we can use the cache variables (no custom types)
-            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                # use cache variables
-                get_rate_jacobian!(M, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-            else
-                # don't use cache variables (to accomodate custom types)
-                get_rate_jacobian!(M, model, dx, x, fy(x, p, t), p, t)
-            end
+        # get correlation matrix entry magnitudes for this row
+        for j = 1:nev
+            rval[j] = abs(C[i,j])
         end
 
-        mass_matrix = DiffEqArrayOperator(M; update_func)
-    end
+        # rank modes correlations from best to worst for this row
+        ranked_modes = sortperm(rval, rev=true)
 
-    return mass_matrix 
-end
+        # choose the best unassigned mode correlation for this row
+        j1 = ranked_modes[findfirst((x) -> !(x in perm), ranked_modes)]
 
-function ode_time_gradient(model::CoupledModel, fy, p=nothing)
+        # get correlation matrix entry magnitudes for the chosen column
+        for k = 1:nev
+            cval[k] = abs(C[k,j1])
+        end
 
-    submodels = model.submodels
-    coupling = model.coupling
+        # find approximate multiplicity of left and/or right eigenvector
+        multiplicity = max(
+            count(x -> isapprox(x, rval[j1]; rtol, atol), rval),
+            count(x -> isapprox(x, cval[i]; rtol, atol), cval)
+        )
 
-    if all(iszero.(getproperty.(submodels, :tgrad))) && iszero(coupling.tgrad)
-        # time gradient is a zero vector
-        tgrad = (dT, x, p, t) -> dT .= 0
-    elseif all(isinvariant.(getproperty.(submodels, :tgrad))) && isinvariant(coupling.tgrad)
-        # time gradient is independent of all inputs
-        dT0 = get_time_gradient(model)
-        tgrad = (dT, x, p, t) -> dT .= dT0
-    elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :tgrad))) && 
-        isconstant(coupling.tgrad)
-        # time gradient only depends on the parameter vector
-        dT0 = get_rate_jacobian(model, p)
-        tgrad = (dT, x, p, t) -> dT .= dT0
-    else
-        # time gradient defined as a function of state variables, parameters, and time 
-
-        # problem dimensions
-        Nx = number_of_states(model)
-        Ny = number_of_inputs(model)
-
-        # cached variables
-        drdy_cache = fill(NaN, Nx, Ny),
-        dyddx_cache = fill(NaN, Ny, Nx)
-
-        # state rate vector
-        dx = FillArrays.Zeros(x)
-
-        # update function
-        tgrad = (dT, x, p, t) -> begin
-            # check if we can use the cache variables (no custom types)
-            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                # use cache variables
-                get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
+        if multiplicity < nev
+            # determine n+1 best unassigned fit, where n is the approximate multiplicity
+            if j1 in ranked_modes[1:multiplicity]
+                j2 = ranked_modes[multiplicity+1]
             else
-                # don't use cache variables (to accomodate custom types)
-                get_time_gradient!(dT, model, dx, x, fy(x, p, t), p, t)
+                j2 = ranked_modes[1]
             end
+
+            # assign best eigenmode fit, create corruption index
+            perm[i] = j1
+            corruption[i] = rval[j2]/rval[j1]
+        else
+            # assign best eigenmode fit, create corruption index
+            perm[i] = j1
+            corruption[i] = 0.0
         end
     end
 
-    return tgrad
-end
+    # remaining modes
+    for i = 1:nev
 
-function ode_state_jacobian(model::CoupledModel, fy, p=nothing)
+        if !(i in tracked_modes)
 
-    submodels = model.submodels
-    coupling = model.coupling
-
-    if all(iszero.(getproperty.(submodels, :statejac))) && iszero(coupling.statejac)
-        # state jacobian is a zero vector
-        jac = (J, x, p, t) -> J .= 0
-    elseif all(isinvariant.(getproperty.(submodels, :statejac))) && isinvariant(coupling.statejac)
-        # state jacobian is independent of all inputs
-        J0 = get_state_jacobian(model)
-        jac = (J, x, p, t) -> J .= J0
-    elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :statejac))) && 
-        isconstant(coupling.statejac)
-        # state jacobian only depends on the parameter vector
-        J0 = get_state_jacobian(model, p)
-        jac = (J, x, p, t) -> J .= J0
-    else
-        # state jacobian defined as a function of state variables, parameters, and time 
-
-        # problem dimensions
-        Nx = number_of_states(model)
-        Ny = number_of_inputs(model)
-
-        # state rate vector
-        dx = FillArrays.Zeros(Nx)
-
-        # construct state jacobian function
-
-        # cached variables
-        drdy_cache = fill(NaN, Nx, Ny)
-        dyddx_cache = fill(NaN, Ny, Nx)
-
-        # update function
-        jac = (J, x, p, t) -> begin
-            # check if we can use the cache variables (no custom types)
-            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                # use cache variables
-                get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-            else
-                # don't use cache variables (to accomodate custom types)
-                get_state_jacobian!(J, model, dx, x, fy(x, p, t), p, t)
+            # get correlation matrix entry magnitudes for this row
+            for j = 1:nev
+                rval[j] = abs(C[i,j])
             end
-        end
-    end
 
-    return jac
-end
+            # rank modes correlations from best to worst for this row
+            ranked_modes = sortperm(rval, rev=true)
 
-function ode_parameter_jacobian(model::CoupledModel, fy, p=nothing)
+            # choose the best unassigned mode correlation for this row
+            j1 = ranked_modes[findfirst((x) -> !(x in perm), ranked_modes)]
 
-    submodels = model.submodels
-    coupling = model.coupling
-
-    if all(iszero.(getproperty.(submodels, :paramjac))) && isidentity(coupling.paramjac)
-        # parameter jacobian is a zero matrix
-        jac = (pJ, x, p, t) -> pJ .= 0
-    elseif all(isinvariant.(getproperty.(submodels, :paramjac))) && isinvariant(coupling.paramjac)
-        # parameter jacobian is independent of all inputs
-        pJ0 = get_parameter_jacobian(model)
-        paramjac = (pJ, x, p, t) -> pJ .= pJ0
-    elseif !isnothing(p) && all(isconstant.(getproperty.(submodels, :paramjac))) && 
-        isconstant(coupling.paramjac)
-        # time gradient only depends on the parameter vector
-        pJ0 = get_parameter_jacobian(model, p)
-        paramjac = (pJ, x, p, t) -> pJ .= pJ0
-    else
-        # construct time gradient function
-
-        # problem dimensions
-        Nx = number_of_states(model)
-        Ny = number_of_inputs(model)
-
-        # cached variables
-        drdy_cache = fill(NaN, Nx, Ny)
-        dyddx_cache = fill(NaN, Ny, Nx)
-
-        # state rate vector
-        dx = FillArrays.Zeros(Nx)
-
-        # update function
-        pjac = (dT, x, p, t) -> begin
-            # check if we can use the cache variables (no custom types)
-            if promote_type(eltype(x), eltype(p), typeof(t)) <: Float64
-                # use cache variables
-                get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t;
-                    drdy_cache = drdy_cache, dyddx_cache = dyddx_cache)
-            else
-                # don't use cache variables (to accomodate custom types)
-                get_parameter_jacobian!(pJ, model, dx, x, fy(x, p, t), p, t)
+            # get correlation matrix entry magnitudes for the chosen column
+            for k = 1:nev
+                cval[k] = abs(C[k,j1])
             end
+
+            # find approximate multiplicity of left and/or right eigenvector
+            multiplicity = max(
+                count(x -> isapprox(x, rval[j1]; rtol, atol), rval),
+                count(x -> isapprox(x, cval[i]; rtol, atol), cval)
+            )
+
+            # determine n+1 best unassigned fit, where n is the approximate multiplicity
+            if j1 in ranked_modes[1:multiplicity]
+                j2 = ranked_modes[multiplicity+1]
+            else
+                j2 = ranked_modes[1]
+            end
+
+            # assign best eigenmode fit, create corruption index
+            perm[i] = j1
+            corruption[i] = rval[j2]/rval[j1]
         end
 
     end
 
-    return pjac
+    return perm, corruption
 end
 
 """
-    DAEFunction(model::Aeroelasticity.CoupledModel, p=nothing)
+    ODEFunction(model::Aeroelasticity.CoupledModel, p0)
 
-Construct an `DAEFunction` for a coupled model which may be used with 
-`DifferentialEquations`.     
+Construct an `ODEFunction` for a coupled model.  Note that by using this function you assume
+that the governing equations may be expressed in the form `M(x, p, t)*dx = f(x, p, t)`
 """
-function SciMLBase.DAEFunction(model::CoupledModel, p=nothing)
+function SciMLBase.ODEFunction(model::CoupledModel, p0)
 
-    # always construct in-place models, always compile
-    iip = true
-    compile = true
+    dx = zeros(number_of_states(model))
 
-    # construct coupling function
-    fy = dae_coupling_function(model)
-
-    # construct rate function
-    f = dae_residual_function(model, fy)
-
-    # return ODE function
-    return DAEFunction{iip, compile}(f)
-end
-
-function dae_coupling_function(model::CoupledModel)
-
-    # check whether cached variables should be used
-    if isinplace(model)
-        # model is inplace so use cached variables if possible
-
-        # problem dimensions
-        Nx = number_of_states(model)
-        Ny = number_of_inputs(model)
-        Np = number_of_parameters(model)
-
-        # cached variables
-        dxcache = fill(NaN, Nx)
-        xcache = fill(NaN, Nx)
-        ycache = fill(NaN, Ny)
-        pcache = fill(NaN, Np)
-        tcache = fill(NaN)
-
-        # coupling function
-        fy = (dx, x, p, t) -> begin
-            # check if we can use the cache variables (no custom types)
-            if promote_type(eltype(dx), eltype(x), eltype(p), typeof(t)) <: Float64
-                # update the cache variables (if necessary)
-                if (dx != dxcache) && (x != xcache) && (p != pcache) && (t != tcache[])
-                    dxcache .= dx
-                    xcache .= x
-                    ycache .= get_coupling_inputs!(ycache, model, dx, x, p, t)
-                    pcache .= p
-                    tcache .= t
-                end
-                # set inputs to the cached inputs
-                y = ycache
-            else
-                # calculate inputs (out-of-place to accomodate custom type)
-                y = get_coupling_inputs(model, dx, x, p, t)
-            end
-            # return cached or computed inputs
-            return y
-        end
-    else
-        # model is out of place so calculate coupling inputs directly
-        fy = (dx, x, p, t) -> get_coupling_inputs(model, dx, x, p, t)
+    f = (resid, x, p, t) -> begin
+        residual!(resid, model, dx, x, p, t)
+        resid .*= -1
     end
 
-    # return coupling function
-    return fy
+    if model.constant_mass_matrix
+        mass_matrix = rate_jacobian!(model.mass_matrix, model, dx, dx, p0, 0.0)
+    else
+        update_func = (jacob, x, p, t) -> rate_jacobian!(jacob, model, dx, x, p, t)
+        mass_matrix = DiffEqArrayOperator(collect(model.mass_matrix); update_func)
+    end
+
+    jac = (jacob, x, p, t) -> begin
+        state_jacobian!(jacob, model, dx, x, p, t)
+        jacob .*= -1
+    end
+
+    jac_prototype = model.state_jacobian_sparsity
+
+    sparsity = model.state_jacobian_sparsity
+
+    colorvec = model.state_jacobian_colorvec
+
+    if model.constant_mass_matrix
+        odefunc = ODEFunction(f; mass_matrix, jac, jac_prototype, sparsity, colorvec)
+    else
+        odefunc = ODEFunction(f; mass_matrix, jac)
+    end
+
+    return odefunc
 end
 
-function dae_residual_function(model::CoupledModel, fy)
+"""
+    DAEFunction(model::Aeroelasticity.CoupledModel)
 
-    return (resid, dx, x, p, t) -> get_residual!(resid, model, dx, x, fy(dx, x, p, t), p, t)
+Construct an `DAEFunction` for a coupled model.
+"""
+function SciMLBase.DAEFunction(model::CoupledModel)
+
+    f = (resid, dx, x, p, t) -> residual!(resid, model, dx, x, p, t)
+
+    mass_matrix = model.mass_matrix
+
+    jac = (jacob, dx, x, p, gamma, t) -> begin
+        # compute jacobian
+        state_jacobian!(jacob, model, dx, x, p, t)
+        # compute mass matrix
+        rate_jacobian!(mass_matrix, model, dx, x, p, t)
+        # add mass matrix
+        jacob .+= gamma * mass_matrix
+    end
+
+    jac_prototype = model.rate_jacobian_sparsity .+ model.state_jacobian_sparsity
+
+    sparsity = model.rate_jacobian_sparsity .+ model.state_jacobian_sparsity
+
+    colorvec = SparseDiffTools.matrix_colors(sparsity)
+
+    return DAEFunction(f)
 end

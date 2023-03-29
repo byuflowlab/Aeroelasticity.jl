@@ -1,9 +1,9 @@
 """
     Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
 
-Two-dimensional aerodynamic model based on Peters' finite state model with `N` state 
-variables, inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters ``a, b, a_0, 
-\\alpha_0, c_{d,0}, c_{m,0}``
+Two-dimensional aerodynamic model based on Peters' finite state model with `N` state
+variables, inputs ``u, \\omega, \\dot{v}, \\dot{\\omega}`` and parameters
+``a, b, a_0, \\alpha_0, c_{d,0}, c_{m,0}``
 """
 struct Peters{N,TF,TV<:SVector{N,TF},TA<:SMatrix{N,N,TF}}
     A::TA
@@ -27,54 +27,30 @@ function Peters{N,TF}() where {N,TF}
     return Peters(A, b, c)
 end
 
-# --- Submodel Creation --- #
+# residual function
+function (peters::Peters)(resid, dx, x, y, p, t)
 
-function Submodel(model::Peters{N}) where N
+    # extract constants
+    Abar = peters.A
+    cbar = peters.c
 
-    Abar = model.A
-    bbar = model.b
-    cbar = model.c
+    # create static versions of dλ and λ
+    dλ = similar_type(cbar, eltype(dx))(dx)
+    λ = similar_type(cbar, eltype(x))(x)
 
-    # residual function
-    fresid = (dx, x, y, p, t) -> peters_residual(dx, x, y, p, t; Abar, cbar)
+    # extract inputs
+    u, ω, vdot, ωdot = y
 
-    # number of state, input, and parameters (use Val(N) to use inferrable dimensions)
-    nx = Val(N)
-    ny = Val(4)
-    np = Val(6)
+    # extract parameters
+    a, b, a0, α0, cd0, cm0 = p
 
-    # jacobian definitions
-    ratejac = Invariant(Abar)
-    statejac = Linear((dx, x, y, p, t) -> peters_state_jacobian(dx, x, y, p, t; cbar))
-    inputjac = Nonlinear((dx, x, y, p, t) -> peters_input_jacobian(dx, x, y, p, t; Abar, cbar))
-    paramjac = Nonlinear((dx, x, y, p, t) -> peters_parameter_jacobian(dx, x, y, p, t; Abar, cbar))
-    tgrad = Zeros()
-
-    # convenience functions for setting states, inputs, and parameters
-    setstate = peters_set_states!
-    setinput = peters_set_inputs!
-    setparam = peters_set_parameters!
-
-    # convenience functions for separating states, inputs, and parameters
-    sepstate = peters_separate_states
-    sepinput = peters_separate_inputs
-    sepparam = peters_separate_parameters
-
-    # model definition
-    return Submodel{false}(fresid, nx, ny, np;
-        ratejac = ratejac,
-        statejac = statejac,
-        inputjac = inputjac,
-        paramjac = paramjac,
-        tgrad = tgrad,
-        setstate = setstate,
-        setinput = setinput,
-        setparam = setparam,
-        sepstate = sepstate,
-        sepinput = sepinput,
-        sepparam = sepparam,
-    )
+    # compute and return residual
+    resid .= Abar*dλ - cbar*(vdot + u*ω + (b/2-a*b)*ωdot) + u/b*λ
 end
+
+number_of_states(::Peters{N,TF,TV,TA}) where {N,TF,TV,TA} = N
+
+number_of_parameters(::Peters) = 6
 
 # --- Internal Methods --- #
 
@@ -111,93 +87,6 @@ function peters_constants(N, TF)
     return SMatrix{N,N}(A), SVector{N}(b), SVector{N}(c)
 end
 
-# residual function
-function peters_residual(dx, x, y, p, t; Abar, cbar)
-
-    dλ = similar_type(cbar, eltype(dx))(dx)
-    λ = similar_type(cbar, eltype(x))(x)
-    u, ω, vdot, ωdot = y
-    a, b, a0, α0, cd0, cm0 = p
-    
-    return Abar*dλ - cbar*(vdot + u*ω + (b/2-a*b)*ωdot) + u/b*λ
-end
-
-# rate jacobian function
-peters_rate_jacobian(; Abar) = Abar
-
-# state jacobian function
-function peters_state_jacobian(dx, x, y, p, t; cbar)
-
-    u, ω, vdot, ωdot = y
-    a, b, a0, α0, cd0, cm0 = p
-
-    return u/b*Diagonal(ones(similar_type(cbar)))
-end
-
-# input jacobian function
-function peters_input_jacobian(dx, x, y, p, t; Abar, cbar)
-
-    λ = similar_type(cbar, eltype(x))(x)
-    u, ω, vdot, ωdot = y
-    a, b, a0, α0, cd0, cm0 = p
-
-    dλ_u = -cbar*ω + λ/b
-    dλ_ω = -u*cbar
-    dλ_vdot = -cbar
-    dλ_ωdot = -(b/2-a*b)*cbar
-
-    return hcat(dλ_u, dλ_ω, dλ_vdot, dλ_ωdot)
-end
-
-# parameter jacobian function
-function peters_parameter_jacobian(dx, x, y, p, t; Abar, cbar)
-
-    λ = similar_type(cbar, eltype(x))(x)
-    u, ω, vdot, ωdot = y
-    a, b, a0, α0, cd0, cm0 = p
-
-    dλ_a = b*ωdot*cbar
-    dλ_b = -cbar*(1/2-a)*ωdot - u/b^2*λ
-    dλ_a0 = zero(cbar)
-    dλ_α0 = zero(cbar)
-    dλ_cd0 = zero(cbar)
-    dλ_cm0 = zero(cbar)
-
-    return hcat(dλ_a, dλ_b, dλ_a0, dλ_α0, dλ_cd0, dλ_cm0)
-end
-
-# convenience function for defining this model's state vector
-peters_set_states!(x; lambda) = x .= lambda
-
-# convenience function for defining this model's input vector
-function peters_set_inputs!(y; u, omega, vdot, omegadot)
-    y[1] = u
-    y[2] = omega
-    y[3] = vdot
-    y[4] = omegadot
-    return y
-end
-
-# convenience function for defining this model's parameter vector
-function peters_set_parameters!(p; a, b, a0, alpha0, cd0, cm0)
-    p[1] = a
-    p[2] = b
-    p[3] = a0
-    p[4] = alpha0
-    p[5] = cd0
-    p[6] = cm0
-    return p
-end
-
-# convenience function for separating this model's state vector
-peters_separate_states = (x) -> (lambda=x,)
-
-# convenience function for separating this model's input vector
-peters_separate_inputs = (y) -> (u=y[1], omega=y[2], vdot=y[3], omegadot=y[4])
-
-# convenience function for separating this model's parameter vector
-peters_separate_parameters = (p) -> (a=p[1], b=p[2], a0=p[3], alpha0=p[4], cd0=p[5], cm0=p[6])
-
 # aerodynamic loads per unit span
 function peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
     # circulatory load factor
@@ -208,23 +97,20 @@ function peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdo
     d = b/2 - a*b
     # induced flow velocity
     λ0 = 1/2 * bbar'*λ
-    # Velocity Magnitude (squared)
-    V2 = u^2 + v^2
-    # Mach Number (squared)
-    M2 = V2/c^2
-    # Prandtl-Glauert correction factor
-    beta = sqrt(1 - min(0.99, M2))
     # normal force at the reference point
     N = tmp1*(v + d*ω - λ0 - u*α0) + tmp2*(vdot/b + u/b*ω - a*ωdot)
     # axial force at the reference point
     A = -a0*ρ*b*(v + d*ω - λ0 - u*α0)^2
     # moment at reference point
     M = -tmp2*(vdot/2 + u*ω + b*(1/8 - a/2)*ωdot) + 2*ρ*b^2*u^2*cm0 + (b/2 + a*b)*N
-    # apply compressibility correction
-    N = N / beta
-    A = A / beta
-    M = M / beta
-    # add skin friction drag
+    # # apply compressibility correction (this adds a nonlinear component)
+    # V2 = u^2 + v^2 # velocity magnitude (squared)
+    # M2 = V2/c^2 # mach number (squared)
+    # beta = sqrt(1 - ksmin(0.99, M2)) # Prandtl-Glauert correction factor
+    # N = N / beta
+    # A = A / beta
+    # M = M / beta
+    # add skin friction drag (note that Prandtl-Glauert correction applies only to pressure)
     A += ρ*b*u^2*cd0
     # return loads
     return SVector(N, A, M)

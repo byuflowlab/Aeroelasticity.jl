@@ -1,58 +1,32 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(::QuasiSteady, ::Section)
+    QuasiSteadySection
 
-Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory 
-(see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model 
-(see [`Section()`]).  This model introduces the freestream velocity ``U``, air density 
+Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory
+(see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model
+(see [`Section()`]).  This model introduces the freestream velocity ``U``, air density
 ``\\rho``, and air speed of sound ``c`` as additional parameters.
+
+The parameters for the resulting coupled model (as defined by the parameter function)
+defaults to the parameters for each model concatenated into a single vector.
 """
-function Coupling(::QuasiSteady, ::Section)
-
-    # coupling function
-    g = quasisteady_section_inputs
-
-    # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
-    nx = Val(4)
-    ny = Val(2)
-    np = Val(14)
-
-    # number of parameters introduced by the coupling (use Val(N) to use inferrable dimensions)
-    npc = Val(3)
-
-    # jacobian definitions
-    ratejac = Nonlinear() # TODO: define rate jacobian function
-    statejac = Nonlinear() # TODO: define state jacobian function
-    paramjac = Nonlinear() # TODO: define parameter jacobian function
-    tgrad = Zeros()
-
-    # convenience function for setting coupling parameters
-    setparam = quasisteady_section_set_parameters!
-
-    # convenience function for separating coupling parameters
-    sepparam = quasisteady_section_separate_parameters
-
-    # return resulting coupling
-    return Coupling{false}(g, nx, ny, np, npc;
-        ratejac = ratejac,
-        statejac = statejac,
-        paramjac = paramjac,
-        tgrad = tgrad,
-        setparam = setparam,
-        sepparam = sepparam)
+struct QuasiSteadySection
+    quasisteady::QuasiSteady
+    section::Section
 end
 
-# --- Internal Methods --- #
+default_coupling(quasisteady::QuasiSteady, section::Section) = QuasiSteadySection(quasisteady, section)
 
-# coupling function
-function quasisteady_section_inputs(dx, x, p, t)
+function (::QuasiSteadySection)(dx, x, p, t)
     # extract state variables
-    dh, dθ, dhdot, dθdot = dx
+    dh, dθ, dhdot, dθdot = dx[2]
     # extract state variables
-    h, θ, hdot, θdot = x
+    h, θ, hdot, θdot = x[2]
     # extract aerodynamic, structural, and aerostructural parameters
-    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ, c = p
+    a, b, a0, α0, cd0, cm0 = p[1]
+    kh, kθ, m, Sθ, Iθ = p[2]
+    U, ρ, c = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     # local freestream accelerations
@@ -62,17 +36,8 @@ function quasisteady_section_inputs(dx, x, p, t)
     # lift is approximately equal to the normal force
     L = N
     # return inputs
-    return SVector(L, M)
+    return nothing, SVector(L, M)
 end
 
-# convenience function for defining the coupling function parameters
-function quasisteady_section_set_parameters!(p; U, rho, c)
-    p[1] = U
-    p[2] = rho
-    p[3] = c
-    return p
-end
-    
-# convenience function for separating the coupling function parameters
-quasisteady_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])
-
+# default parameter function
+default_parameter_function(::QuasiSteadySection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))

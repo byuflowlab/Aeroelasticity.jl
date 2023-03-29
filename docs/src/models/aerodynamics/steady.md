@@ -42,7 +42,7 @@ where ``u`` is the tangential velocity and ``v`` is the normal velocity leads to
 \mathcal{N} = a_0 \rho_\infty b U_\infty u (\alpha - \alpha_0) \\
 \mathcal{A} = -a_0 \rho_\infty b U_\infty v (\alpha - \alpha_0)
 ```
-Using a small angle approximation allows us to assume ``\alpha \approx sin(\alpha) = \frac{v}{U_\infty} ``, which allows us to reduce our expressions for the normal and axial force to 
+Using a small angle approximation allows us to assume ``\alpha \approx sin(\alpha) = \frac{v}{U_\infty} ``, which allows us to reduce our expressions for the normal and axial force to
 ```math
 \mathcal{N} = a_0 \rho_\infty b u (v - U_\infty \alpha_0) \\
 \mathcal{A} = -a_0 \rho_\infty b v (v - U_\infty \alpha_0)
@@ -72,11 +72,11 @@ Thin airfoil theory may be used to show that the airfoil quarter chord is the th
 
 At this point, a compressibility correction may be applied to the results of thin airfoil theory in order to extend their applicability.  Applying a Prandtl-Glauert compressibility correction, the normal force, axial force, and pitching moment become
 ```math
-\mathcal{N}_\text{compressible} = \frac{\mathcal{N}}{\sqrt{1 - M^2}} \\
-\mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\sqrt{1 - M^2}} \\
-\mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\sqrt{1 - M^2}}
+\mathcal{N}_\text{compressible} = \frac{\mathcal{N}}{\beta} \\
+\mathcal{A}_\text{compressible} = \frac{\mathcal{A}}{\beta} \\
+\mathcal{M}_\text{compressible} = \frac{\mathcal{M}}{\beta}
 ```
-where ``M`` is the Mach number, defined as ``\frac{u}{c}`` where ``c`` is the air speed of sound. 
+where ``\beta=\sqrt{1 - M^2}`` is the Prandtl-Glauert factor, which is a function of the local section Mach number ``M``.
 
 ### Viscous Forces
 

@@ -7,14 +7,14 @@
 
 Author: Taylor McDonnell
 
-**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems.
+**Aeroelasticity.jl** is a modular multi-fidelity aeroelastic analysis and simulation package.  The intent of this package is to facilitate defining and simulating the behavior of both 2D and 3D aeroelastic systems, though this package may also be used to construct general monolithic coupled systems.
 
 ![](https://flow.byu.edu/Aeroelasticity.jl/dev/assets/section-simulation.gif)
 
 ## Package Features
  - Facilitates defining and simulating the behavior of both 2D and 3D aeroelastic systems
  - Contains a number of predefined aerodynamic, structural, and aeroelastic models including:
-   - Aerodynamic Models 
+   - Aerodynamic Models
      - Steady Thin Airfoil Theory (2D)
      - Quasi-Steady Thin Airfoil Theory (2D)
      - Wagner's Function (2D)
@@ -22,14 +22,14 @@ Author: Taylor McDonnell
      - Lifting Line (3D)
    - Structural Models
      - Two Degree of Freedom Typical Section Model (2D)
+     - Rigid Body Model (3D)
      - Geometrically Exact Beam Theory Model (3D)
  - Supports multiple analysis types including:
    - Steady State Analyses
    - Eigenvalue Analyses
-   - Time-Marching Analyses
- - Directly interfaces with [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl)
- - Verified/Validated against theoretical, computational, and experimental results (see the [examples](https://flow.byu.edu/Aeroelasticity.jl/dev/examples/))
- - May be easily extended to include additional models or model couplings.
+   - Time-Marching Analyses (using [DifferentialEquations](https://github.com/SciML/DifferentialEquations.jl))
+ - Several verification cases for built-in models (see the [examples](https://flow.byu.edu/Aeroelasticity.jl/dev/examples/))
+ - Provides a modular framework for constructing general monolithic coupled systems
 
 ## Installation
 

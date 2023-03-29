@@ -1,62 +1,36 @@
 # --- Coupling Model Creation --- #
 
 """
-    Coupling(aero::Wagner, stru::Section)
+    WagnerSection
 
-Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see 
-[`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).  
-This coupling introduces the freestream velocity ``U_\\infty``, air density 
+Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see
+[`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).
+This coupling introduces the freestream velocity ``U_\\infty``, air density
 ``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
+
+The parameters for the resulting coupled model (as defined by the parameter function)
+defaults to the parameters for each model concatenated into a single vector.
 """
-function Coupling(aero::Wagner, ::Section)
-
-    # model constants
-    C1 = aero.C1
-    C2 = aero.C2
-
-    # coupling function
-    g = (dx, x, p, t) -> wagner_section_inputs(dx, x, p, t; C1, C2)
-    
-    # number of states, inputs, and parameters (use Val(N) to use inferrable dimensions)
-    nx = Val(6)
-    ny = Val(5)
-    np = Val(14)
-
-    # number of parameters introduced by the coupling (use Val(N) to use inferrable dimensions)
-    npc = Val(3)
-
-    # jacobian definitions
-    ratejac = Nonlinear() # TODO: define rate jacobian function
-    statejac = Nonlinear() # TODO: define state jacobian function
-    paramjac = Nonlinear() # TODO: define parameter jacobian function
-    tgrad = Zeros()
-
-    # convenience function for setting coupling parameters
-    setparam = wagner_section_set_parameters!
-
-    # convenience function for separating coupling parameters
-    sepparam = wagner_section_separate_parameters
-
-    # return resulting coupling
-    return Coupling{false}(g, nx, ny, np, npc;
-        ratejac = ratejac,
-        statejac = statejac,
-        paramjac = paramjac,
-        tgrad = tgrad,
-        setparam = setparam,
-        sepparam = sepparam)
+struct WagnerSection{TF}
+    wagner::Wagner{TF}
+    section::Section
 end
 
-# --- Internal Methods --- #
+default_coupling(wagner::Wagner, section::Section) = WagnerSection(wagner, section)
 
-# coupling function
-function wagner_section_inputs(dx, x, p, t; C1, C2)
+function (wagner_section::WagnerSection)(dx, x, p, t)
+    # extract constants
+    @unpack C1, C2 = wagner_section.wagner
     # extract rate variables
-    dλ1, dλ2, dh, dθ, dhdot, dθdot = dx
+    dλ1, dλ2 = dx[1]
+    dh, dθ, dhdot, dθdot = dx[2]
     # extract state variables
-    λ1, λ2, h, θ, hdot, θdot = x
+    λ1, λ2 = x[1]
+    h, θ, hdot, θdot = x[2]
     # extract parameters
-    a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ, c = p
+    a, b, a0, α0, cd0, cm0 = p[1]
+    kh, kθ, m, Sθ, Iθ = p[2]
+    U, ρ, c = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
@@ -65,16 +39,8 @@ function wagner_section_inputs(dx, x, p, t; C1, C2)
     # lift is approximately normal force
     L = N
     # return inputs
-    return SVector(u, v, ω, L, M)
+    return SVector(u, v, ω), SVector(L, M)
 end
 
-# convenience function for defining the coupling function parameters
-function wagner_section_set_parameters!(p; U, rho, c)
-    p[1] = U
-    p[2] = rho
-    p[3] = c
-    return p
-end
-
-# convenience function for separating the coupling function parameters
-wagner_section_separate_parameters(p) = (U = p[1], rho = p[2], c = p[3])
+# default parameter function
+default_parameter_function(::WagnerSection) = (p, t) -> (view(p, 1:6), view(p, 7:11), view(p, 12:14))

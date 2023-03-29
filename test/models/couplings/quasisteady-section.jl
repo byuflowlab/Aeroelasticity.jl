@@ -1,7 +1,11 @@
 @testset "QuasiSteady + Section" begin
     
-    coupling = Coupling(QuasiSteady(), Section())
-    
+    # define models
+    models = (QuasiSteady(), Section())
+
+    # create coupling
+    coupling = Coupling(models)
+
     # test provided jacobians
     coupling_jacobian_tests(coupling)
     

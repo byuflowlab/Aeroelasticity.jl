@@ -11,10 +11,12 @@ makedocs(;
     modules = [Aeroelasticity],
     pages = [
         "Home" => "index.md",
-        "Getting Started" => joinpath("examples", "guide.md"),
+        "Getting Started" => "guide.md",
         "Examples" => [
             joinpath("examples", "section-stability.md"),
             joinpath("examples", "section-simulation.md"),
+            joinpath("examples", "goland.md"),
+            joinpath("examples", "cantilever.md"),
         ],
         "Model Documentation" => [
             "Aerodynamic Models" => [
@@ -25,6 +27,7 @@ makedocs(;
             ],
             "Structural Models" => [
                 "Typical Section" => joinpath("models", "structures", "section.md"),
+                "Rigid Body" => joinpath("models", "structures", "rigidbody.md"),
                 "Geometrically Exact Beam Theory" => joinpath("models", "structures", "gxbeam.md"),
             ],
             "Coupled Models" => [
@@ -34,7 +37,6 @@ makedocs(;
                 "Peters' Finite State + Typical Section" => joinpath("models", "couplings", "peters-section.md"),
             ],
         ],
-        "Developer Guide" => "developer.md",
         "API Reference" => [
             "Public" => joinpath("reference", "public.md"),
             "Internals" => joinpath("reference", "internals.md"),
