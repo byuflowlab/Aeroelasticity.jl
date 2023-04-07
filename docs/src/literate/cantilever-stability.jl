@@ -148,7 +148,7 @@ for i = 1:length(Vinf)
     ## define parameters for the geometrically exact beam theory model
     gxbeam_parameters = GXBeamParameters(assembly)
 
-    # define parameters for the coupling
+    ## define parameters for the coupling
     coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
         prescribed_conditions = prescribed_conditions,
         gravity = [-9.81*sin(alpha), 0, 9.81*cos(alpha)])
