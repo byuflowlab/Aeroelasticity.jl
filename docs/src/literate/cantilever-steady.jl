@@ -92,7 +92,7 @@ structural_model = GXBeamAssembly(system; structural_damping=false)
 ## define submodels
 submodels = (aerodynamic_model, structural_model)
 
-# --- Define Initial Parameters --- #
+## --- Define Initial Parameters --- #
 
 V = [-Vinf*cos(alpha), 0.0, -Vinf*sin(alpha)] # m/s (freestream velocity)
 
