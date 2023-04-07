@@ -112,7 +112,7 @@ structural_model = GXBeamAssembly(system; structural_damping=false)
 ## combine submodels
 submodels = (aerodynamic_model, structural_model)
 
-# --- Define Initial Parameters --- #
+## --- Define Initial Parameters --- #
 
 ## define parameters for each lifting line section
 section_parameters = fill([a, b, a0, alpha0, cd0, cm0], N)
@@ -163,7 +163,7 @@ for i = 1:length(Vinf)
     ## define parameters for the geometrically exact beam theory model
     gxbeam_parameters = GXBeamParameters(assembly)
 
-    # define parameters for the coupling
+    ## define parameters for the coupling
     coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
         prescribed_conditions = prescribed_conditions)
 
