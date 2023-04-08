@@ -124,7 +124,7 @@ for (imodel, model) in enumerate(models)
         K, M = linearize(model, x, p)
 
         ## perform linear stability analysis
-        λi, Uλi, Vλi = sparse_eigen(K, M)
+        λi, Uλi, Vλi = dense_eigen(K, M)
 
         ## correlate eigenvalues
         if i > 1
