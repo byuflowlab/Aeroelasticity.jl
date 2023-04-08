@@ -55,8 +55,8 @@ function sparse_eigen(K, M; nev=min(20, size(K,1)))
 
     # sort eigenvalues by magnitude
     perm = sortperm(λ, by=(λ) -> (abs(λ), imag(λ)), rev=true)
-    λ = λ[perm[1:nev]]
-    V = V[:,perm[1:nev]]
+    λ = λ[perm]
+    V = V[:,perm]
 
     # eigenvalues are actually -1/λ, no modification necessary for eigenvectors
     λ .= -1 ./ λ
