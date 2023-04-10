@@ -34,33 +34,34 @@ V = 1.0 # = U/(b*ωθ)
 # dimensionalized velocity
 U = V*b*ωθ
 
-# define coupled model
-model = assemble_model(;
-    aerodynamic_model = Peters{6}(),
-    structural_model = Section())
+# define submodels
+submodels = (Peters{6}(), Section())
 
 # define parameter vector
-p = assemble_parameters(model;
-    aerodynamic_parameters = (; a = a, b = b, a0 = a0, alpha0 = α0, cd0 = cd0, cm0 = cm0),
-    structural_parameters = (; kh = kh, ktheta = kθ, m = m, Stheta = Sθ, Itheta = Iθ),
-    additional_parameters = (; U = U, rho = ρ, c = c))
+p = [a, b, a0, α0, cd0, cm0, kh, kθ, m, Sθ, Iθ, U, ρ, c]
 
-# construct ODE function
-f = ODEFunction(model)
+# define coupled model
+model = CoupledModel(submodels, p)
+
+# construct function
+f = ODEFunction(model, p)
 
 # initial states
-x0 = assemble_states(model;
-    aerodynamic_states = (;lambda=zeros(6)),
-    structural_states = (;h=0.5, theta=0, hdot=0, thetadot=0))
+λ = zeros(6)
+h = 0.5
+theta = 0
+hdot = 0
+thetadot = 0
+x0 = vcat(λ, h, theta, hdot, thetadot)
 
 # simulate for 100 seconds
 tspan = (0.0, 100.0)
 
-# construct ODE problem
+# construct problem
 prob = ODEProblem(f, x0, tspan, p)
 
-# solve ODE
-sol = solve(prob)
+# solve problem
+sol = solve(prob, Rodas4())
 
 using Plots
 pyplot()
