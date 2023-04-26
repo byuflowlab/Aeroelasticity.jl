@@ -121,7 +121,7 @@ model = CoupledModel(submodels, parameters; symbolic=false)
 ## --- Perform Analysis --- #
 
 ## loop through freestream velocities
-Vinf = vcat(0.1, 0.25:0.25:35)
+Vinf = vcat(0.1, 0.25:0.25:50)
 
 ## eigenvalue/eigenvector storage
 nev = 12*N
@@ -210,6 +210,7 @@ sp1 = plot(
     ytick = 0:50:350,
     ylabel = "Frequency (rad/s)",
     framestyle = :zerolines,
+    grid = false,
     titlefontsize = 14,
     guidefontsize = 14,
     legendfontsize = 11,
@@ -217,16 +218,17 @@ sp1 = plot(
     legend = :topright,
     foreground_color_legend = nothing,
     background_color_legend = nothing,
-    minorgrid=true)
+    minorgrid=false)
 
 sp2 = plot(
-    xlim = (0, 35),
-    xtick = 0:5:35,
+    xlim = (0, 50),
+    xtick = 0:5:50,
     xlabel = "Velocity (m/s)",
     ylim = (-4, 2),
     ytick = -4:2:2,
     ylabel = "Damping (1/s)",
     framestyle = :zerolines,
+    grid = false,
     titlefontsize = 14,
     guidefontsize = 14,
     legendfontsize = 11,
@@ -234,7 +236,7 @@ sp2 = plot(
     legend = :topleft,
     foreground_color_legend = nothing,
     background_color_legend = nothing,
-    minorgrid=true)
+    minorgrid=false)
 
 for i = 1:size(λ, 1)
 
@@ -268,7 +270,7 @@ for i = 1:size(λ, 1)
     end
 end
 
-p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
+p1 = plot(sp1, sp2, layout = (1, 2), size = (800, 300))
 
 #jl plot!(show=true)
 #md savefig("../assets/cantilever-stability.svg")
