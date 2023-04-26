@@ -1,7 +1,7 @@
 using Aeroelasticity, DifferentialEquations, LinearAlgebra
 
 # define non-dimensional parameters
-V = range(1e-6, 3.1, length=1000) # = U/(b*ωθ) (reduced velocity)
+V = range(1e-6, 3.1, length=25) # = U/(b*ωθ) (reduced velocity)
 a = -1/5 # reference point normalized location
 e = -1/10 # center of mass normalized location
 μ = 20 # = m/(ρ*pi*b^2) (mass ratio)
@@ -86,7 +86,7 @@ for (imodel, model) in enumerate(models)
             Uλpi = Uλ[imodel][:,:,i-1]
 
             # use correlation matrix to correlate eigenmodes
-            perm, corruption = correlate_eigenmodes(Uλpi, M, Vλi)
+            perm, corruption = Aeroelasticity.correlate_eigenmodes(Uλpi, M, Vλi)
 
             # re-arrange eigenmodes
             λi = λi[perm]
