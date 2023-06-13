@@ -1,8 +1,4 @@
-# Getting Started
-
-This guide introduces the basic functionality of this package in a step by step manner.
-
-## Theory
+# [Getting Started](@id guide)
 
 The governing equations for many unsteady systems may be described by the first-order
 implicit differential equation
@@ -47,8 +43,8 @@ where
 The concatenated model is a decoupled model, since the states, inputs, and parameters of
 each submodel are not influenced in any way by the states, inputs, and parameters of the
 other submodels. To couple these models, we introduce the following coupling function,
-which defines the inputs of the combined model as functions of its rates, states, and
-parameters as well as the current time.
+which defines the inputs of the concatenated model as functions of its rates, states, and
+parameters, as well as the current time.
 ```math
 \bm{y} = \bm{\mathcal{G}}(\bm{\dot{X}}, \bm{X}, \bm{P}, t)
 ```
@@ -56,7 +52,6 @@ Defining this coupling function allows us to define the governing equations for 
 monolithic coupled model.
 ```math
 \bm{\tilde{\mathcal{F}}}(\bm{\dot{X}}, \bm{X}, \bm{P}, t) = \bm{\mathcal{F}}(\bm{\dot{X}}, \bm{X}, \bm{\mathcal{G}}(\bm{\dot{X}}, \bm{X}, \bm{P}, t), \bm{P}, t) = \bm{0}
-\label{eq:coupled-residual}
 ```
 
 ## Implementation
@@ -64,7 +59,7 @@ monolithic coupled model.
 Our coupling methodology is implemented by the following `CoupledModel` constructor.
 
 ```@docs
-CoupledModel()
+CoupledModel(submodels, parameters)
 ```
 
 In addition to constructing a coupled model, this constructor automatically detects the
@@ -85,7 +80,7 @@ residual!
 Alternatively, the residual may be evaluated by calling the coupled model as a function.
 
 ```@docx
-(::CoupledModel)
+(coupled_model::CoupledModel)(resid, dx, x, p, t)
 ```
 
 ## Analyses
@@ -97,12 +92,12 @@ Once a coupled model has been constructed, the system may be linearized using th
 linearize
 ```
 
-Eigenvalues and eigenvectors may then be computed using the `full_eigen` or
-`partial_eigen` functions.
+Eigenvalues and eigenvectors may then be computed using the `dense_eigen` or
+`sparse_eigen` functions.
 
 ```@docs
-full_eigen
-partial_eigen
+dense_eigen
+sparse_eigen
 ```
 
 Correlating eigenmodes with modes from previous iterations may be done using the
@@ -112,19 +107,22 @@ Correlating eigenmodes with modes from previous iterations may be done using the
 correlate_eigenmodes
 ```
 
-[`DifferentialEquations`](@ref) may be used to find a steady state or time marching
-solution.  To facilitate these analyses, this package provides the following specialized
-constructors for `ODEFunction` and `DAEFunction`.
+[`DifferentialEquations`](https://github.com/SciML/DifferentialEquations.jl) may be used to 
+find a steady state or time marching solution.  To facilitate these analyses, this package 
+provides the following specialized constructors for `ODEFunction` and `DAEFunction`.
 
 ```@docs
-ODEFunction
-DAEFunction
+Aeroelasticity.SciMLBase.ODEFunction(model::CoupledModel, p0)
+Aeroelasticity.SciMLBase.DAEFunction(model::CoupledModel)
 ```
 
-## Built-In Models and Couplings
+## Aeroelasticity
 
-This package comes with a set of predefined models and coupling functions which may be
-used with the [`CoupledModel`](@ref) constructor.  Each model is defined as a callable
-struct, with a calling signature that matches the format expected by the [`CoupledModel`](@ref)
-constructor. For more details about each of these models or couplings, see the relevant
-pages in the documentation.
+The primary intended purpose of the coupling methodology presented in this package 
+is to faciltate constructing aeroelastic systems.  To this end, a number of aerodynamic
+and structural models have been implemented in this package which may be used to construct
+various aeroelastic models.  Each model is defined as a callable struct, with a calling
+signature that matches the format expected by the [`CoupledModel`](@ref) constructor. For
+more details about the theoretical background behind each model, we refer readers to the 
+relevant pages of the documentation.  For more details about how to use these models to 
+construct aeroelastic systems, see the examples.

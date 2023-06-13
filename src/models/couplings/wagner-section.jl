@@ -6,7 +6,8 @@
 Coupling model for coupling an unsteady aerodynamic model based on Wagner's function (see
 [`Wagner`](@ref)) and a two-degree of freedom typical section model (see [`Section`](@ref)).
 This coupling introduces the freestream velocity ``U_\\infty``, air density
-``\\rho_\\infty`` and air speed of sound ``c`` as additional parameters.
+``\\rho_\\infty``, and the Prandtl-Glauert compressibility factor ``\\beta`` as additional 
+parameters.
 
 The parameters for the resulting coupled model (as defined by the parameter function)
 defaults to the parameters for each model concatenated into a single vector.
@@ -30,12 +31,12 @@ function (wagner_section::WagnerSection)(dx, x, p, t)
     # extract parameters
     a, b, a0, α0, cd0, cm0 = p[1]
     kh, kθ, m, Sθ, Iθ = p[2]
-    U, ρ, c = p[3]
+    U, rho, beta = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate loads
-    N, A, M = wagner_loads(a, b, ρ, c, a0, α0, cd0, cm0, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
+    N, A, M = wagner_loads(a, b, a0, α0, cd0, cm0, rho, beta, C1, C2, u, v, ω, vdot, ωdot, λ1, λ2)
     # lift is approximately normal force
     L = N
     # return inputs

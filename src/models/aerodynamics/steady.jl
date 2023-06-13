@@ -1,7 +1,7 @@
 """
     Steady
 
-Two-dimensional aerodynamic model based on steady thin airfoil theory with parameters
+Two-dimensional aerodynamic model based on steady thin airfoil theory with parameters 
 ``a, b, a_0, \\alpha_0, c_{d0}, c_{m0}``.
 """
 struct Steady end
@@ -23,21 +23,18 @@ number_of_parameters(::Steady) = 6
 # --- Internal Methods --- #
 
 # aerodynamic loads per unit span
-function steady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v)
+function steady_loads(a, b, a0, α0, cd0, cm0, rho, beta, u, v)
     # normal force at reference point
-    N = a0*ρ*b*u*(v - u*α0)
+    N = a0*rho*b*u*(v - u*α0)
     # axial force at reference point
-    A = -a0*ρ*b*(v - u*α0)^2
+    A = -a0*rho*b*(v - u*α0)^2
     # moment at reference point
-    M = 2*ρ*b^2*u^2*cm0 + (b/2 + a*b)*N
-    # # apply compressibility correction (this adds a nonlinear component)
-    # V2 = u^2 + v^2 # velocity magnitude (squared)
-    # M2 = V2/c^2 # mach number (squared)
-    # beta = sqrt(1 - ksmin(0.99, M2)) # Prandtl-Glauert correction factor
-    # N = N / beta
-    # A = A / beta
-    # M = M / beta
+    M = 2*rho*b^2*u^2*cm0 + (b/2 + a*b)*N
+    # apply compressibility correction (use constant beta to preserve linearity)
+    N = N / beta
+    A = A / beta
+    M = M / beta
     # add skin friction drag (note that Prandtl-Glauert correction applies only to pressure)
-    A += ρ*b*u^2*cd0
+    A += rho*b*u^2*cd0
     return SVector(N, A, M)
 end

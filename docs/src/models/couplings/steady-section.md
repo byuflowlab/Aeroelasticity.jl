@@ -1,14 +1,24 @@
-# [`Steady`](@ref) + [`TypicalSection`](@ref)
+# [`Steady`](@ref) + [`Section`](@ref)
+
+## Type Definition
+
+```@docs
+SteadySection
+```
+
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref section-stability)
+ - [Time Domain Simulation of a Typical Section](@ref section-simulation) 
 
 ## Theory
 
 This model is defined by coupling steady thin airfoil theory aerodynamics
 
-![](../airfoil.svg)
+![](../../assets/airfoil-drawing.svg)
 
 with the typical section model.  
 
-![](../typical-section.svg)
+![](../../assets/section-drawing.svg)
 
 By making use of a small angle assumption, the freestream velocity components are defined as
 ```math
@@ -22,11 +32,4 @@ where ``U_\infty`` is the freestream velocity magnitude, ``\theta`` is the pitch
 ```
 where ``\mathcal{N}`` is the normal force per unit span at the reference location.
 
-## Constructors
 
-```@docs
-couple_models(aero::Steady, stru::TypicalSection)
-```
-
-## Example Usage
- - [Aeroelastic Analysis of a Typical Section](@ref)

@@ -1,4 +1,4 @@
-# [Quasi-Steady Thin Airfoil Theory Model](@id quasi-steady-thin-airfoil-theory)
+# [Quasi-Steady Thin Airfoil Theory](@id quasi-steady-theory)
 
 ![](../../assets/airfoil-drawing.svg)
 
@@ -6,17 +6,19 @@
 
 ```@docs
 QuasiSteady
-```
-
-## Constructors
-
-```@docs
 QuasiSteady()
 ```
 
+## Examples
+ - [Aeroelastic Analysis of a Typical Section](@ref section-stability)
+ - [Time Domain Simulation of a Typical Section](@ref section-simulation)
+ - [Aeroelastic Analysis of the Goland Wing](@ref goland-stability)
+ - [Steady State Aeroelastic Analysis of a Highly Flexible Wing](@ref cantilever-steady)
+ - [Aeroelastic Stability Analysis of a Highly Flexible Wing](@ref cantilever-stability)
+
 ## Theory
 
-This model is a two-dimensional quasi-steady aerodynamic model derived from thin airfoil theory.  It does not have any state variables or rate equations.  Since this model includes no state variables to model wake development, this model assumes that the airfoil's wake reaches steady state values instantaneously in response to changes in freestream velocities.
+This model is a two-dimensional quasi-steady aerodynamic model derived from thin airfoil theory.  It does not have any state variables or rate equations.  Since this model includes no state variables to model wake development, this model assumes that an airfoil's wake reaches steady-state operating conditions instantaneously in response to changes in freestream velocities.
 
 ### Normal Force, Axial Force, and Pitching Moment
 
@@ -50,6 +52,3 @@ After the Prandtl-Glauert compressibility correction has been applied, an extra 
 \mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
-## Examples
- - [Aeroelastic Analysis of a Typical Section](@ref)
- - [Time Domain Simulation of a Typical Section](@ref)

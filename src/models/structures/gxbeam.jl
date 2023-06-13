@@ -83,15 +83,15 @@ Defines inputs for a geometrically exact beam theory structural model
  - `prescribed_conditions = Dict{Int,PrescribedConditions{Float64}}()`:
         A dictionary with keys corresponding to the points at
         which prescribed conditions are applied and values of type
-        [`PrescribedConditions`](@ref) which describe the prescribed conditions
+        `PrescribedConditions` which describe the prescribed conditions
         at those points.
  - `distributed_loads = Dict{Int,DistributedLoads{Float64}}()`: A dictionary
         with keys corresponding to the elements to which distributed loads are
-        applied and values of type [`DistributedLoads`](@ref) which describe
+        applied and values of type `DistributedLoads` which describe
         the distributed loads on those elements.
  - `point_masses = Dict{Int,PointMass{Float64}}()`: A dictionary with keys
         corresponding to the points to which point masses are attached and values
-        of type [`PointMass`](@ref) which contain the properties of the attached
+        of type `PointMass` which contain the properties of the attached
         point masses.
  - `linear_velocity = zeros(3)`: Prescribed linear velocity of the body frame.
  - `angular_velocity = zeros(3)`: Prescribed angular velocity of the body frame.

@@ -6,13 +6,15 @@
 
 ```@docs
 Peters
-```
-
-## Constructors
-
-```@docs
 Peters()
 ```
+
+## Examples
+ - [Aeroelastic Analysis of a Typical Section](@ref section-stability)
+ - [Time Domain Simulation of a Typical Section](@ref section-simulation)
+ - [Aeroelastic Analysis of the Goland Wing](@ref goland-stability)
+ - [Steady State Aeroelastic Analysis of a Highly Flexible Wing](@ref cantilever-steady)
+ - [Aeroelastic Stability Analysis of a Highly Flexible Wing](@ref cantilever-stability)
 
 ## Theory
 
@@ -73,8 +75,3 @@ After the Prandtl-Glauert compressibility correction has been applied, an extra 
 \mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
-## Examples
- - [Aeroelastic Analysis of a Typical Section](@ref)
- - [Time Domain Simulation of a Typical Section](@ref)
- - [Aeroelastic Analysis of the Goland Wing](@ref)
- - [Aeroelastic Analysis of a High Aspect Ratio Wing](@ref)

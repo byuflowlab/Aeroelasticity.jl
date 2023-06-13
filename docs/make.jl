@@ -11,7 +11,7 @@ makedocs(;
     modules = [Aeroelasticity],
     pages = [
         "Home" => "index.md",
-        "Getting Started" => "guide.md",
+        "Guide" => "guide.md",
         "Examples" => [
             joinpath("examples", "section-stability.md"),
             joinpath("examples", "section-simulation.md"),
@@ -36,11 +36,9 @@ makedocs(;
                 "Quasi-Steady Thin Airfoil Theory + Typical Section" => joinpath("models", "couplings", "quasisteady-section.md"),
                 "Wagner's Function + Typical Section" => joinpath("models", "couplings", "wagner-section.md"),
                 "Peters' Finite State + Typical Section" => joinpath("models", "couplings", "peters-section.md"),
+                "Lifting Line + Rigid Body" => joinpath("models", "couplings", "liftingline-rigidbody.md"),
+                "Lifting Line + Geometrically Exact Beam Theory" => joinpath("models", "couplings", "liftingline-gxbeam.md"),
             ],
-        ],
-        "API Reference" => [
-            "Public" => joinpath("reference", "public.md"),
-            "Internals" => joinpath("reference", "internals.md"),
         ],
     ],
     sitename = "Aeroelasticity.jl",

@@ -12,6 +12,7 @@ struct RigidBody{IS, IR, V}
     state_indices::IS
     rate_indices::IR
     prescribed_values::V
+
     function RigidBody(state_indices=(), rate_indices=(), prescribed_values=())
         @assert length(state_indices) == length(rate_indices) == length(prescribed_values)
         IS = typeof(state_indices)
@@ -19,6 +20,7 @@ struct RigidBody{IS, IR, V}
         V = typeof(prescribed_values)
         return new{IS,IR,V}(state_indices, rate_indices, prescribed_values)
     end
+
 end
 
 # residual function

@@ -46,8 +46,8 @@ function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
 
     # freestream properties
     Vinf = coupling_parameters.Vinf
-    ρ = coupling_parameters.rho
-    c = coupling_parameters.c
+    rho = coupling_parameters.rho
+    beta = coupling_parameters.beta
 
     # initialize aerodynamic model inputs
     liftingline_inputs = ()
@@ -79,7 +79,7 @@ function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
         # define section rates, states, and parameters
         dxi = liftingline_rates[indices[i]], SVector(ai..., αi...)
         xi = liftingline_states[indices[i]], SVector(vi..., ωi...)
-        pi = liftingline_parameters[i], (ρ, c)
+        pi = liftingline_parameters[i], (rho, beta)
         ti = t
 
         # calculate section inputs
@@ -124,7 +124,7 @@ function (liftingline_gxbeam::LiftingLineGXBeamAssembly)(dx, x, p, t)
 end
 
 """
-    LiftingLineGXBeamParameters(Vinf, rho, c; kwargs...)
+    LiftingLineGXBeamParameters(Vinf, rho, beta; kwargs...)
 
 Defines parameters for a lifting line model coupled with a geometrically exact beam theory
 structural model when subjected to a the freestream velocity vector `Vinf`.
@@ -132,21 +132,21 @@ structural model when subjected to a the freestream velocity vector `Vinf`.
 # Arguments
  - `Vinf`: Freestream velocity vector
  - `rho`: Air density
- - `c`: Air speed of sound
+ - `beta`: Prandtl-Glauert compressibility factor ``\\beta = \\sqrt{1 - M^2}``
 
 # Keyword Arguments
  - `prescribed_conditions = Dict{Int,PrescribedConditions{Float64}}()`:
         A dictionary with keys corresponding to the points at
         which prescribed conditions are applied and values of type
-        [`PrescribedConditions`](@ref) which describe the prescribed conditions
+        `PrescribedConditions` which describe the prescribed conditions
         at those points.
  - `distributed_loads = Dict{Int,DistributedLoads{Float64}}()`: A dictionary
         with keys corresponding to the elements to which distributed loads are
-        applied and values of type [`DistributedLoads`](@ref) which describe
+        applied and values of type `DistributedLoads` which describe
         the distributed loads on those elements.
  - `point_masses = Dict{Int,PointMass{Float64}}()`: A dictionary with keys
         corresponding to the points to which point masses are attached and values
-        of type [`PointMass`](@ref) which contain the properties of the attached
+        of type `PointMass` which contain the properties of the attached
         point masses.
  - `linear_velocity = zeros(3)`: Prescribed linear velocity of the body frame.
  - `angular_velocity = zeros(3)`: Prescribed angular velocity of the body frame.
@@ -154,7 +154,7 @@ structural model when subjected to a the freestream velocity vector `Vinf`.
  - `angular_acceleration = zeros(3)`: Prescribed angular acceleration of the body frame.
  - `gravity = [0,0,0]`: Gravity vector in the body frame.
 """
-function LiftingLineGXBeamParameters(Vinf, rho, c;
+function LiftingLineGXBeamParameters(Vinf, rho, beta;
     prescribed_conditions=Dict{Int,PrescribedConditions{Float64}}(),
     distributed_loads=Dict{Int,DistributedLoads{Float64}}(),
     point_masses=Dict{Int,PointMass{Float64}}(),
@@ -164,7 +164,7 @@ function LiftingLineGXBeamParameters(Vinf, rho, c;
     angular_acceleration=(@SVector zeros(3)),
     gravity=(@SVector zeros(3)))
 
-    return (; Vinf, rho, c, prescribed_conditions, distributed_loads, point_masses,
+    return (; Vinf, rho, beta, prescribed_conditions, distributed_loads, point_masses,
         linear_velocity, angular_velocity, linear_acceleration, angular_acceleration,
         gravity)
 end

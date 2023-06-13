@@ -1,14 +1,24 @@
-# [`Wagner`](@ref) + [`TypicalSection`](@ref)
+# [`Wagner`](@ref) + [`Section`](@ref)
 
+## Type Definition
+
+```@docs
+WagnerSection
+```
+
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref section-stability)
+ - [Time Domain Simulation of a Typical Section](@ref section-simulation)
+ 
 ## Theory
 
 This model is defined by coupling Wagner's function unsteady aerodynamics
 
-![](../airfoil.svg)
+![](../../assets/airfoil-drawing.svg)
 
 with the typical section model.  
 
-![](../typical-section.svg)
+![](../../assets/section-drawing.svg)
 
 To facilitate this coupling, the freestream velocity components ``u`` and ``v`` are assumed to be aligned with the undeflected chordwise and normal directions, respectively, so that
 ```math
@@ -30,11 +40,3 @@ A small angle assumption is also used to define the lift about the reference loc
 ```
 where ``\mathcal{N}`` is the normal force per unit span at the reference location.
 
-## Constructors
-
-```@docs
-couple_models(aero::Wagner, stru::TypicalSection)
-```
-
-## Example Usage
- - [Aeroelastic Analysis of a Typical Section](@ref)

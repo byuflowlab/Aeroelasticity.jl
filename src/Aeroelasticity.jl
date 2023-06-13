@@ -19,9 +19,10 @@ using Printf
 using UnPack
 
 export CoupledModel
-export residual, residual!, state_jacobian, state_jacobian!, rate_jacobian, rate_jacobian!
 
 export number_of_states, state_indices, separate_states
+
+export residual, residual!, state_jacobian, state_jacobian!, rate_jacobian, rate_jacobian!
 
 export linearize, dense_eigen, sparse_eigen, correlate_eigenmodes
 
@@ -32,8 +33,10 @@ export Peters
 export LiftingLine, LiftingLineParameters
 export Section, section_coordinates
 export RigidBody
-export GXBeamAssembly, GXBeamParameters, GXBeamInputs
-export LiftingLineGXBeamParameters
+export GXBeamAssembly, GXBeamInputs, GXBeamParameters
+export LiftingLineGXBeamAssembly, LiftingLineGXBeamParameters
+export LiftingLineRigidBody
+export SteadySection, QuasiSteadySection, WagnerSection, PetersSection
 
 include("models.jl")
 
@@ -63,6 +66,9 @@ include(joinpath("models", "couplings", "steady-liftingline.jl"))
 include(joinpath("models", "couplings", "quasisteady-liftingline.jl"))
 include(joinpath("models", "couplings", "wagner-liftingline.jl"))
 include(joinpath("models", "couplings", "peters-liftingline.jl"))
+
+# rigid body couplings
+include(joinpath("models", "couplings", "liftingline-rigidbody.jl"))
 
 # geometrically exact beam theory couplings
 include(joinpath("models", "couplings", "liftingline-gxbeam.jl"))

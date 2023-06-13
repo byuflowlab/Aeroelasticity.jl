@@ -1,4 +1,4 @@
-# # [Aeroelastic Analysis of the Goland Wing](@id goland)
+# # [Aeroelastic Analysis of the Goland Wing](@id goland-stability)
 #
 # In this example, we demonstrate how to perform a three-dimensional aeroelastic analysis
 # using the Goland wing, a low-aspect ratio prismatic metallic wing, which has been
@@ -49,11 +49,12 @@ i11 = 8.64 # kg*m (moment of inertia about elastic axis)
 i22 = 0.1*i11 # moment of inertia about beam y-axis
 i33 = 0.9*i11 # moment of inertia about beam z-axis
 
-# freestream properties
+## freestream properties
 Vinf = 100 # m/s (velocity)
 rho = 1.02 # kg/m^3 (air density)
-c = 343 # m/s (air speed of sound)
 alpha = 0 # angle of attack
+c = 343.0 # m/s (air speed of sound)
+beta = sqrt(1 - Vinf^2/c^2) # Prandtl-Glauert compressibility correction factor
 V = [-Vinf*cos(alpha), 0.0, -Vinf*sin(alpha)] # m/s (velocity)
 
 ## aerodynamic section properties
@@ -100,7 +101,7 @@ system = DynamicSystem(assembly)
 
 ## --- Define Submodels --- #
 
-## define aerodynamic models for each lifting line section
+## define section models (we use Peters' finite state model in this case)
 section_models = fill(Peters{6}(), N)
 
 ## construct lifting line model using lifting line section models
@@ -123,8 +124,8 @@ liftingline_parameters = LiftingLineParameters(section_parameters)
 ## define parameters for the geometrically exact beam theory model
 gxbeam_parameters = GXBeamParameters(assembly)
 
-# define parameters for the coupling
-coupling_parameters = LiftingLineGXBeamParameters(V, rho, c; prescribed_conditions = prescribed_conditions)
+## define parameters for the coupling
+coupling_parameters = LiftingLineGXBeamParameters(V, rho, beta; prescribed_conditions = prescribed_conditions)
 
 ## combine parameters
 parameters = (liftingline_parameters, gxbeam_parameters, coupling_parameters)
@@ -152,7 +153,11 @@ for i = 1:length(Vinf)
 
     ## --- Update Parameters --- #
 
-    V = [-Vinf[i]*cos(alpha), 0.0, -Vinf[i]*sin(alpha)] # m/s (velocity)
+    ## update velocity
+    V = [-Vinf[i]*cos(alpha), 0.0, -Vinf[i]*sin(alpha)]
+
+    ## update compressibility correction factor
+    beta = sqrt(1 - Vinf[i]^2/c^2) # update compressibility correction
 
     ## define parameters for each lifting line section
     section_parameters = fill([a, b, a0, alpha0, cd0, cm0], N)
@@ -164,7 +169,7 @@ for i = 1:length(Vinf)
     gxbeam_parameters = GXBeamParameters(assembly)
 
     ## define parameters for the coupling
-    coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
+    coupling_parameters = LiftingLineGXBeamParameters(V, rho, beta;
         prescribed_conditions = prescribed_conditions)
 
     ## combine parameters
@@ -286,10 +291,10 @@ end
 p1 = plot(sp1, sp2, layout = (2, 1), size = (600, 800))
 
 #jl plot!(show=true)
-#md savefig("../assets/goland-stability.svg")
+#md savefig(p1, "../assets/goland-stability.svg") #hide
 #md nothing
 
-#md # ![]("../assets/goland-stability.svg")
+#md # ![](../assets/goland-stability.svg)
 
 # As predicted by this analysis, the flutter speed is 140 m/s and the flutter frequency
 # is 69.0 rad/s.  These results compare well with the results found by Palacios and Epureanu

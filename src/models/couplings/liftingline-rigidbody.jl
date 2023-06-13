@@ -50,8 +50,8 @@ function (liftingline_rigidbody::LiftingLineRigidBody)(dx, x, p, t)
     M = coupling_parameters.Mb
 
     # extract freestream density and speed of sound
-    ρ = coupling_parameters.rho
-    c = coupling_parameters.c
+    rho = coupling_parameters.rho
+    beta = coupling_parameters.beta
 
     # initialize aerodynamic model inputs
     liftingline_inputs = ()
@@ -72,7 +72,7 @@ function (liftingline_rigidbody::LiftingLineRigidBody)(dx, x, p, t)
         # define section rates, states, and parameters
         dxi = liftingline_rates[indices[i]], SVector(ai..., αi...)
         xi = liftingline_states[indices[i]], SVector(vi..., ωi...)
-        pi = liftingline_parameters[i], (ρ, c)
+        pi = liftingline_parameters[i], (rho, beta)
         ti = t
 
         # calculate section inputs

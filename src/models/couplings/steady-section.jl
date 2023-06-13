@@ -6,7 +6,8 @@
 Coupling model for coupling a steady aerodynamic model based on thin airfoil theory
 (see [`Steady`](@ref)) and a two-degree of freedom typical section model
 (see [`Section`](@ref)).  This model introduces the freestream velocity ``U_\\infty``, air
-density ``\\rho_\\infty``, and air speed of sound ``c`` as additional parameters.
+density ``\\rho_\\infty``, and the Prandtl-Glauert compressibility factor ``\\beta`` as 
+additional parameters.
 
 The parameters for the resulting coupled model (as defined by the parameter function)
 defaults to the parameters for each model concatenated into a single vector.
@@ -24,11 +25,11 @@ function (::SteadySection)(dx, x, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, a0, α0, cd0, cm0 = p[1]
     kh, kθ, m, Sθ, Iθ = p[2]
-    U, ρ, c = p[3]
+    U, rho, beta = p[3]
     # local freestream velocity components
     u, v = section_steady_velocities(U, θ)
     # calculate aerodynamic loads
-    N, A, M = steady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v)
+    N, A, M = steady_loads(a, b, a0, α0, cd0, cm0, rho, beta, u, v)
     # lift is approximately equal to the normal force
     L = N
     # return inputs for each model

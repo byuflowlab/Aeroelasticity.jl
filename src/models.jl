@@ -205,16 +205,65 @@ function CoupledModel(submodels, parameters, nstate=number_of_states.(submodels)
         identity_mass_matrix, constant_mass_matrix, mass_matrix)
 end
 
+"""
+    number_of_states(coupled_model::CoupledModel)
+
+Return the number of state variables in a coupled model
+"""
 number_of_states(coupled_model::CoupledModel) = coupled_model.indices[end][end]
 
+"""
+    state_indices(coupled_model::CoupledModel)
+
+Return indices for accessing submodel states.
+"""
 state_indices(coupled_model::CoupledModel) = coupled_model.indices
 
+"""
+    separate_states(x, coupled_model::CoupledModel)
+
+Return the states corresponding to each submodel.
+"""
 separate_states(x, coupled_model::CoupledModel) = view.(Ref(x), coupled_model.indices)
 
+"""
+    default_parameter_function(finput)
+
+Return the default parameter function for a given coupling function.
+"""
 default_parameter_function(finput) = (p, t) -> p
 
+"""
+    (coupled_model::CoupledModel)(dx, x, p, t)
+
+Compute the residual (out-of-place) for a coupled model.
+"""
+(coupled_model::CoupledModel)(dx, x, p, t) = residual(coupled_model, dx, x, p, t)
+
+"""
+    (coupled_model::CoupledModel)(dx, x, p, t)
+
+Compute the residual (in-place) for a coupled model.
+"""
 (coupled_model::CoupledModel)(resid, dx, x, p, t) = residual!(resid, coupled_model, dx, x, p, t)
 
+"""
+    residual(coupled_model, dx, x, p, t)
+
+Compute the residual for a coupled model.
+"""
+function residual(coupled_model, dx, x, p, t)
+
+    resid = zeros(eltype(dx), length(dx))
+
+    return residual!(resid, coupled_model, dx, x, p, t)
+end
+
+"""
+    residual!(resid, coupled_model, dx, x, p, t)
+
+Compute the residual for a coupled model.
+"""
 function residual!(resid, coupled_model, dx, x, p, t)
 
     @unpack fresid, finput, fparam, indices = coupled_model
@@ -222,6 +271,11 @@ function residual!(resid, coupled_model, dx, x, p, t)
     return coupled_residual!(resid, dx, x, p, t, fresid, finput, fparam, indices)
 end
 
+"""
+    rate_jacobian(coupled_model, dx, x, p, t; kwargs...)
+
+Compute the jacobian of the residual with respect to the state rates.
+"""
 function rate_jacobian(coupled_model, dx, x, p, t; kwargs...)
 
     jacob = spzeros(eltype(dx), length(dx), length(dx))
@@ -229,6 +283,11 @@ function rate_jacobian(coupled_model, dx, x, p, t; kwargs...)
     return rate_jacobian!(jacob, coupled_model, dx, x, p, t; kwargs...)
 end
 
+"""
+    rate_jacobian!(jacob, coupled_model, dx, x, p, t; kwargs...)
+
+Compute the jacobian of the residual with respect to the state rates.
+"""
 function rate_jacobian!(jacob, coupled_model, dx, x, p, t; autodiff=true, fdtype=Val(:forward))
 
     @unpack fresid, finput, fparam, indices = coupled_model
@@ -245,6 +304,11 @@ function rate_jacobian!(jacob, coupled_model, dx, x, p, t; autodiff=true, fdtype
     return jacob
 end
 
+"""
+    state_jacobian(coupled_model, dx, x, p, t; kwargs...)
+
+Compute the jacobian of the residual with respect to the states.
+"""
 function state_jacobian(coupled_model, dx, x, p, t; kwargs...)
 
     jacob = spzeros(eltype(dx), length(dx), length(dx))
@@ -252,6 +316,11 @@ function state_jacobian(coupled_model, dx, x, p, t; kwargs...)
     return state_jacobian!(jacob, coupled_model, dx, x, p, t; kwargs...)
 end
 
+"""
+    state_jacobian!(jacob, coupled_model, dx, x, p, t; kwargs...)
+
+Compute the jacobian of the residual with respect to the state rates.
+"""
 function state_jacobian!(jacob, coupled_model, dx, x, p, t; autodiff=true, fdtype=Val(:forward))
 
     @unpack fresid, finput, fparam, indices = coupled_model

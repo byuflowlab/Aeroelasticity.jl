@@ -1,14 +1,27 @@
-# [`QuasiSteady`](@ref) + [`TypicalSection`](@ref)
+# [`QuasiSteady`](@ref) + [`Section`](@ref)
+
+## Type Definition
+
+```@docs
+QuasiSteadySection
+```
+
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref section-stability)
+ - [Time Domain Simulation of a Typical Section](@ref section-simulation)
+ - [Aeroelastic Analysis of the Goland Wing](@ref goland-stability)
+ - [Steady State Aeroelastic Analysis of a Highly Flexible Wing](@ref cantilever-steady)
+ - [Aeroelastic Stability Analysis of a Highly Flexible Wing](@ref cantilever-stability)
 
 ## Theory
 
 This model is defined by coupling quasi-steady thin airfoil theory aerodynamics
 
-![](../airfoil.svg)
+![](../../assets/airfoil-drawing.svg)
 
 with the typical section model.  
 
-![](../typical-section.svg)
+![](../../assets/section-drawing.svg)
 
 To facilitate this coupling, the freestream velocity components ``u`` and ``v`` are assumed to be aligned with the undeflected chordwise and normal directions, respectively, so that
 ```math
@@ -30,11 +43,3 @@ A small angle assumption is also used to define the lift about the reference loc
 ```
 where ``\mathcal{N}`` is the normal force per unit span at the reference location.
 
-## Constructors
-
-```@docs
-couple_models(aero::QuasiSteady, stru::TypicalSection)
-```
-
-## Example Usage
- - [Aeroelastic Analysis of a Typical Section](@ref)

@@ -6,7 +6,8 @@
 Coupling model for coupling a quasi-steady aerodynamic model based on thin airfoil theory
 (see [`QuasiSteady`](@ref)) and a two-degree of freedom typical section model
 (see [`Section()`]).  This model introduces the freestream velocity ``U``, air density
-``\\rho``, and air speed of sound ``c`` as additional parameters.
+``\\rho``, and the Prandtl-Glauert compressibility factor ``\\beta`` as additional 
+parameters.
 
 The parameters for the resulting coupled model (as defined by the parameter function)
 defaults to the parameters for each model concatenated into a single vector.
@@ -26,13 +27,13 @@ function (::QuasiSteadySection)(dx, x, p, t)
     # extract aerodynamic, structural, and aerostructural parameters
     a, b, a0, α0, cd0, cm0 = p[1]
     kh, kθ, m, Sθ, Iθ = p[2]
-    U, ρ, c = p[3]
+    U, rho, beta = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     # local freestream accelerations
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate aerodynamic loads
-    N, A, M = quasisteady_loads(a, b, ρ, c, a0, α0, cd0, cm0, u, v, ω, vdot, ωdot)
+    N, A, M = quasisteady_loads(a, b, a0, α0, cd0, cm0, rho, beta, u, v, ω, vdot, ωdot)
     # lift is approximately equal to the normal force
     L = N
     # return inputs

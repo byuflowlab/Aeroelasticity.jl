@@ -4,7 +4,8 @@
 
 Coupling model for coupling Peters' finite state theory (see [`Peters`](@ref)) with a
 typical section model (see [`Section`](@ref)).  This model introduces the freestream
-velocity ``U``, air density ``\\rho``, and air speed of sound ``c`` as additional parameters.
+velocity ``U``, air density ``\\rho``, and the Prandtl-Glauert compressibility factor 
+``\\beta`` as additional parameters.
 
 The parameters for the resulting coupled model (as defined by the parameter function)
 defaults to the parameters for each model concatenated into a single vector.
@@ -28,12 +29,12 @@ function (peters_section::PetersSection)(dx, x, p, t)
     # extract parameters
     a, b, a0, α0, cd0, cm0 = p[1]
     kh, kθ, m, Sθ, Iθ = p[2]
-    U, ρ, c = p[3]
+    U, rho, beta = p[3]
     # local freestream velocity components
     u, v, ω = section_velocities(U, θ, hdot, θdot)
     udot, vdot, ωdot = section_accelerations(dhdot, dθdot)
     # calculate loads
-    N, A, M = peters_loads(a, b, ρ, c, a0, α0, cd0, cm0, bbar, u, v, ω, vdot, ωdot, λ)
+    N, A, M = peters_loads(a, b, a0, α0, cd0, cm0, rho, beta, bbar, u, v, ω, vdot, ωdot, λ)
     # lift is approximately equal to the normal force
     L = N
     # return inputs for each model

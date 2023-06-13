@@ -6,13 +6,15 @@
 
 ```@docs
 Wagner
-```
-
-## Constructors
-
-```@docs
 Wagner()
 ```
+
+## Example Usage
+ - [Aeroelastic Analysis of a Typical Section](@ref section-stability)
+ - [Time Domain Simulation of a Typical Section](@ref section-simulation)
+ - [Aeroelastic Analysis of the Goland Wing](@ref goland-stability)
+ - [Steady State Aeroelastic Analysis of a Highly Flexible Wing](@ref cantilever-steady)
+ - [Aeroelastic Stability Analysis of a Highly Flexible Wing](@ref cantilever-stability)
 
 ## Theory
 
@@ -26,7 +28,7 @@ where ``u`` is the freestream velocity in the chordwise direction, ``\omega`` is
 ```math
 \phi(t) = 1 - C_1 e^{-\varepsilon_1 (u/b) t} - C_2 e^{-\varepsilon_2 (u/b) t}
 ```
-where ``C_1 = 0.165``, ``C_2 = 0.335``, ``\varepsilon_1 = 0.455``, and ``\varepsilon_2 = 0.3``.
+where ``C_1 = 0.165``, ``C_2 = 0.335``, ``\varepsilon_1 = 0.0455``, and ``\varepsilon_2 = 0.3``.
 
 ### Normal Force, Axial Force, and Pitching Moment
 
@@ -89,6 +91,3 @@ After the Prandtl-Glauert compressibility correction has been applied, an extra 
 \mathcal{F}_v = ρ b u^2 c_{d_0}
 ```
 
-## Examples
- - [Aeroelastic Analysis of a Typical Section](@ref)
- - [Time Domain Simulation of a Typical Section](@ref)
