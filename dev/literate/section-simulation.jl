@@ -1,4 +1,4 @@
-# ## [Time Domain Simulation of a Typical Section](@id section-simulation)
+# # [Time Domain Simulation of a Typical Section](@id section-simulation)
 #
 # In this example, we simulate the response of two degree of freedom typical section model.
 # We use the same parameters as in the [previous example](@ref section-stability)
@@ -85,7 +85,7 @@ using Plots
 pyplot()
 
 plot(sol,
-    vars = [7,8,9,10],
+    idxs = [7,8,9,10],
     xlabel = "t",
     ylabel = permutedims([
         "\$h\$",

@@ -1,4 +1,4 @@
-# ## [Aeroelastic Analysis of a Typical Section](@id section-stability)
+# # [Aeroelastic Analysis of a Typical Section](@id section-stability)
 #
 # In this example, we perform a two-dimensional aeroelastic analysis for a two degree of
 # freedom typical section model.

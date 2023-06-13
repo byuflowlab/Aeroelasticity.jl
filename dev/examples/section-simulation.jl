@@ -67,7 +67,7 @@ using Plots
 pyplot()
 
 plot(sol,
-    vars = [7,8,9,10],
+    idxs = [7,8,9,10],
     xlabel = "t",
     ylabel = permutedims([
         "\$h\$",

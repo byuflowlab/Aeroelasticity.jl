@@ -16,6 +16,7 @@ GJ = 1e4 # N*m^2 (torsional rigidity)
 EIyy = 2e4 # N*m^2 (flat bending rigidity)
 EIzz = 4e6 # N*m^2 (chord bending rigidity)
 
+# inertial properties
 mu = 0.75 # kg/m (mass per unit length)
 i11 = 0.1 # kg*m (moment of inertia about elastic axis)
 i22 = 0.0375 # moment of inertia about beam y-axis
@@ -24,8 +25,9 @@ i33 = 0.0625 # moment of inertia about beam z-axis
 # freestream properties
 Vinf = 10.0 # m/s (velocity)
 rho = 0.0889 # kg/m^3 (air density at 20 km)
-c = 343 # m/s (air speed of sound)
 alpha = 2*pi/180 # angle of attack
+c = 343.0 # m/s (air speed of sound)
+beta = sqrt(1 - Vinf^2/c^2) # Prandtl-Glauert compressibility correction factor
 
 # aerodynamic section properties
 a = xref - 0.5 # normalized reference location (relative to semi-chord)
@@ -61,7 +63,7 @@ system = DynamicSystem(assembly)
 
 # --- Define Submodels --- #
 
-# construct section models
+# construct section models (we use Peters' finite state model in this case)
 section_models = fill(Peters{6}(), N)
 
 # construct aerodynamic model
@@ -72,6 +74,8 @@ structural_model = GXBeamAssembly(system; structural_damping=true)
 
 # define submodels
 submodels = (aerodynamic_model, structural_model)
+
+# --- Define Initial Parameters --- #
 
 V = [-Vinf*cos(alpha), 0.0, -Vinf*sin(alpha)] # m/s (freestream velocity)
 
@@ -84,7 +88,8 @@ liftingline_parameters = LiftingLineParameters(section_parameters)
 # define parameters for the geometrically exact beam theory model
 gxbeam_parameters = GXBeamParameters(assembly)
 
-coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
+# define parameters for the coupling
+coupling_parameters = LiftingLineGXBeamParameters(V, rho, beta;
     prescribed_conditions = prescribed_conditions,
     gravity = [-9.81*sin(alpha), 0, 9.81*cos(alpha)])
 
@@ -126,7 +131,7 @@ for i = 1:length(Vinf)
     gxbeam_parameters = GXBeamParameters(assembly)
 
     # define parameters for the coupling
-    coupling_parameters = LiftingLineGXBeamParameters(V, rho, c;
+    coupling_parameters = LiftingLineGXBeamParameters(V, rho, beta;
         prescribed_conditions = prescribed_conditions,
         gravity = [-9.81*sin(alpha), 0, 9.81*cos(alpha)])
 
